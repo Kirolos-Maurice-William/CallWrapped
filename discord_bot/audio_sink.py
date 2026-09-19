@@ -91,7 +91,8 @@ class MultiUserAudioSink(voice_recv.AudioSink):
         super().__init__()
         self.loop = loop
         self.on_utterance = on_utterance
-        self.voice_client = voice_client
+        self._voice_client = voice_client  # AudioSink uses self._voice_client for the .voice_client property
+        self._checker_task: Optional[asyncio.Task] = None
         self.buffers: Dict[int, UserSpeechBuffer] = {}
         self._is_active = True
         self._checker_task = self.loop.create_task(self._silence_checker_loop())
@@ -195,7 +196,11 @@ class MultiUserAudioSink(voice_recv.AudioSink):
 
     def cleanup(self):
         self._is_active = False
-        if self._checker_task:
-            self._checker_task.cancel()
-        self.buffers.clear()
+        if getattr(self, "_checker_task", None):
+            try:
+                self._checker_task.cancel()
+            except Exception:
+                pass
+        if hasattr(self, "buffers"):
+            self.buffers.clear()
         logger.info("[AudioSink] MultiUserAudioSink cleaned up.")
