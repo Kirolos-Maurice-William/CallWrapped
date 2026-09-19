@@ -1,6 +1,19 @@
+<div align="center">
+
 # ⚖️ Voice Arbitrator — Autonomous Real-Time Factual Referee
-> **Submission for the [AssemblyAI Voice Agent Hackathon](https://lablab.ai/ai-hackathons/assemblyai-voice-agent-hackathon) (Sept 1–30, 2026)**  
-> *Built with AssemblyAI Universal-3.5 Pro, Discord DAVE E2EE, Groq LPU, Tavily Ground-Truth Search, and Edge Neural TTS.*
+### Built for the [AssemblyAI Voice Agent Hackathon](https://lablab.ai/ai-hackathons/assemblyai-voice-agent-hackathon) (Sept 1–30, 2026)
+### Created & Maintained by **Mostafa Abdallah**
+
+![Voice Arbitrator Banner](./assets/banner.jpg)
+
+[![AssemblyAI](https://img.shields.io/badge/AssemblyAI-Universal--3.5_Pro-blue?style=for-the-badge&logo=assemblyai&logoColor=white)](https://www.assemblyai.com/)
+[![Groq LPU](https://img.shields.io/badge/Groq-LPU_Inference-f55036?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com/)
+[![Discord.py](https://img.shields.io/badge/Discord.py-Voice_DAVE_E2EE-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discordpy.readthedocs.io/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-14_App_Router-black?style=for-the-badge&logo=nextjs&logoColor=white)](https://nextjs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+
+</div>
 
 ---
 
