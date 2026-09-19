@@ -6,6 +6,7 @@ frontend/.env*.local
 # Python
 backend/venv/
 backend/call_intelligence.db
+*.db
 __pycache__/
 *.py[cod]
 *$py.class

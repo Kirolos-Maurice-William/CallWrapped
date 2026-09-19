@@ -7,6 +7,8 @@
 export class AudioStreamer {
   private mediaStream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
+  private peerAudioDestination: MediaStreamAudioDestinationNode | null = null;
+  private peerAudioElement: HTMLAudioElement | null = null;
   private workletNode: AudioWorkletNode | null = null;
   private fallbackProcessor: ScriptProcessorNode | null = null;
   private socket: WebSocket | null = null;
@@ -48,7 +50,7 @@ export class AudioStreamer {
       this.socket.onerror = (err) => reject(err);
     });
 
-    // 2. Request user microphone (16kHz mono)
+    // 2. Request user microphone with native hardware/browser echo cancellation
     this.mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         channelCount: 1,
@@ -56,6 +58,11 @@ export class AudioStreamer {
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
+        // @ts-ignore
+        googEchoCancellation: true,
+        googAutoGainControl: true,
+        googNoiseSuppression: true,
+        googHighpassFilter: true,
       },
     });
 
@@ -64,7 +71,22 @@ export class AudioStreamer {
       sampleRate: 16000,
     });
 
-    // 4. Play incoming peer audio from WebSocket
+    // 4. Chrome Native AEC Integration:
+    // Route peer audio output to an HTML <audio> element via MediaStreamDestination.
+    // This allows Chromium's WebRTC AEC3 engine to recognize the sound and cancel it from the mic!
+    try {
+      this.peerAudioDestination = this.audioContext.createMediaStreamDestination();
+      this.peerAudioElement = document.createElement("audio");
+      this.peerAudioElement.srcObject = this.peerAudioDestination.stream;
+      this.peerAudioElement.autoplay = true;
+      // @ts-ignore
+      this.peerAudioElement.playsInline = true;
+      this.peerAudioElement.play().catch(() => {});
+    } catch (e) {
+      console.warn("Could not create MediaStreamDestination for AEC:", e);
+    }
+
+    // 5. Play incoming peer audio from WebSocket
     this.socket.onmessage = (event) => {
       if (event.data instanceof ArrayBuffer && this.audioContext) {
         this.playPeerAudioChunk(event.data);
@@ -148,7 +170,11 @@ export class AudioStreamer {
 
     const sourceNode = this.audioContext.createBufferSource();
     sourceNode.buffer = audioBuffer;
-    sourceNode.connect(this.audioContext.destination);
+    if (this.peerAudioDestination) {
+      sourceNode.connect(this.peerAudioDestination);
+    } else {
+      sourceNode.connect(this.audioContext.destination);
+    }
 
     // Smooth sample-accurate scheduling to eliminate crackling and overlapping echo
     const currentTime = this.audioContext.currentTime;
@@ -162,6 +188,18 @@ export class AudioStreamer {
   stop(): void {
     this.isStreaming = false;
     this.nextPlaybackTime = 0;
+    if (this.peerAudioElement) {
+      try {
+        this.peerAudioElement.pause();
+        this.peerAudioElement.srcObject = null;
+        this.peerAudioElement.remove();
+      } catch (e) {}
+      this.peerAudioElement = null;
+    }
+    if (this.peerAudioDestination) {
+      try { this.peerAudioDestination.disconnect(); } catch (e) {}
+      this.peerAudioDestination = null;
+    }
     if (this.workletNode) {
       try { this.workletNode.disconnect(); } catch (e) {}
       this.workletNode = null;

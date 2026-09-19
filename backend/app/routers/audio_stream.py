@@ -48,17 +48,29 @@ async def audio_stream_websocket(websocket: WebSocket, call_id: str, speaker_id:
     await websocket.accept()
     orchestrator = get_call_orchestrator(call_id)
 
-    # Register in active audio sockets
+    # Register in active audio sockets with dynamic caller disambiguation
     if call_id not in active_audio_sockets:
         active_audio_sockets[call_id] = {}
-    active_audio_sockets[call_id][speaker_id] = websocket
 
-    speaker_name = "You" if "stream_a" in speaker_id or "a" in speaker_id.lower() else "Friend"
-    session = await orchestrator.get_or_create_stream_session(speaker_id, speaker_name)
-    logger.info(f"[WS Audio] Audio stream started for {speaker_name} ({speaker_id})")
+    # If stream_a is already occupied and incoming is stream_a, automatically promote to stream_b
+    effective_speaker_id = speaker_id
+    if "stream_b" in speaker_id:
+        effective_speaker_id = "stream_b"
+    elif "stream_a" not in active_audio_sockets[call_id]:
+        effective_speaker_id = "stream_a"
+    elif "stream_b" not in active_audio_sockets[call_id]:
+        effective_speaker_id = "stream_b"
+    else:
+        effective_speaker_id = f"stream_{len(active_audio_sockets[call_id]) + 1}"
+
+    active_audio_sockets[call_id][effective_speaker_id] = websocket
+
+    effective_speaker_name = "You" if effective_speaker_id == "stream_a" else "Friend"
+    session = await orchestrator.get_or_create_stream_session(effective_speaker_id, effective_speaker_name)
+    logger.info(f"[WS Audio] Audio stream started for {effective_speaker_name} ({effective_speaker_id})")
 
     # Determine peer stream ID
-    peer_speaker_id = "stream_b" if "stream_a" in speaker_id else "stream_a"
+    peer_speaker_id = "stream_b" if effective_speaker_id == "stream_a" else "stream_a"
 
     try:
         while True:
@@ -82,18 +94,18 @@ async def audio_stream_websocket(websocket: WebSocket, call_id: str, speaker_id:
                     if payload.get("action") == "simulate_turn":
                         turn = payload.get("turn", {})
                         turn["call_id"] = call_id
-                        turn["speaker_id"] = speaker_id
-                        turn["speaker_name"] = speaker_name
+                        turn["speaker_id"] = effective_speaker_id
+                        turn["speaker_name"] = effective_speaker_name
                         await orchestrator.handle_final(turn)
                 except Exception:
                     pass
     except WebSocketDisconnect:
-        logger.info(f"[WS Audio] Audio stream disconnected for {speaker_name}")
+        logger.info(f"[WS Audio] Audio stream disconnected for {effective_speaker_name}")
     except Exception as e:
-        logger.error(f"[WS Audio] Stream error for {speaker_name}: {e}")
+        logger.error(f"[WS Audio] Stream error for {effective_speaker_name}: {e}")
     finally:
-        if call_id in active_audio_sockets and speaker_id in active_audio_sockets[call_id]:
-            del active_audio_sockets[call_id][speaker_id]
+        if call_id in active_audio_sockets and effective_speaker_id in active_audio_sockets[call_id]:
+            del active_audio_sockets[call_id][effective_speaker_id]
         if call_id in active_audio_sockets and not active_audio_sockets[call_id]:
             del active_audio_sockets[call_id]
 

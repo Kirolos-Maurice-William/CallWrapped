@@ -21,15 +21,42 @@ TOPIC_KEYWORDS = {
     "personal": ["انا", "انت", "امبارح", "شغلي", "بيتي", "me", "my", "yesterday", "family", "friend", "work"]
 }
 
-DISAGREEMENT_MARKERS = [
-    "لا", "مش صح", "غلط", "كذاب", "مش مظبوط", "يا عم", "انت فاهم غلط", "أنت فاهم غلط", "مستحيل", "كلام فارغ",
-    "مش حقيقي", "أنت غلطان", "انت غلطان", "مش كده", "انت بتهزر", "أنت بتهزر", "مش مضبوط", "مين قال كده", "لا لا",
+ARABIC_INDIC_DIGITS = {
+    '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+    '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+}
+
+TEXTUAL_NUMBER_MAP = {
+    "ألفين": "2000", "الفين": "2000",
+    "سبعة وتمانين": "1987", "سبعة وثمانين": "1987",
+    "خمسة وتمانين": "1985", "خمسة وثمانين": "1985",
+    "ستة وتمانين": "1986", "ستة وثمانين": "1986",
+    "ثمانية وتمانين": "1988", "ثمانية وثمانين": "1988",
+    "تسعة وتمانين": "1989", "تسعة وثمانين": "1989",
+    "تسعين": "1990", "تمانين": "1980", "ثمانين": "1980",
+    "واحد وتسعين": "1991", "اتنين وتسعين": "1992"
+}
+
+def normalize_conversational_text(text: str) -> str:
+    """Normalizes Eastern Arabic digits and spoken Egyptian textual numbers."""
+    for ar_d, en_d in ARABIC_INDIC_DIGITS.items():
+        text = text.replace(ar_d, en_d)
+    for phrase, num in TEXTUAL_NUMBER_MAP.items():
+        if phrase in text:
+            text = text.replace(phrase, num)
+    return text
+
+DISAGREEMENT_PHRASES = [
+    "مش صح", "غلط", "كذاب", "مش مظبوط", "يا عم", "انت فاهم غلط", "أنت فاهم غلط", "مستحيل", "كلام فارغ",
+    "مش حقيقي", "أنت غلطان", "انت غلطان", "مش كده", "مش كدة", "انت بتهزر", "أنت بتهزر", "مش مضبوط", "مين قال كده", "مين قال",
+    "لا يا عم", "لا يا راجل", "لا يا سيدي", "لا ده", "لا دي", "لا مش", "مش ده", "مش دي", "مش هو", "مش هي", "أصلاً", "اصلا",
     "no", "not true", "wrong", "false", "disagree", "actually", "no way", "impossible", "you're wrong", "thats wrong",
     "not really", "incorrect"
 ]
 
 CLAIM_MARKERS = [
-    "سنة", "نزل في", "طلع في", "تاريخ", "رقم", "سجل", "اتولد", "كسب", "فاز", "مليار", "مليون",
+    "سنة", "سنه", "نزل في", "طلع في", "تاريخ", "رقم", "سجل", "اتولد", "مولود", "مواليد",
+    "عنده", "عمره", "كسب", "فاز", "مليار", "مليون",
     "released in", "came out", "born in", "founded in", "won in", "scored", "joined in", "in 20", "in 19"
 ]
 
@@ -39,7 +66,8 @@ class ConversationAnalyzerService:
 
     def classify_heuristically(self, text: str, speaker_name: str) -> Dict[str, Any]:
         """Fast, robust deterministic analysis used as baseline and instant response."""
-        text_lower = text.lower()
+        norm_text = normalize_conversational_text(text)
+        text_lower = norm_text.lower()
         
         # 1. Topic Detection
         topic_scores = {t: 0 for t in TOPICS}
@@ -53,16 +81,20 @@ class ConversationAnalyzerService:
             best_topic = "other"
 
         # 2. Intent Detection
-        is_disagreement = any(dm in text_lower for dm in DISAGREEMENT_MARKERS)
+        # Match negation tokens with word boundaries to prevent false positives like 'لاعب'
+        has_negation_word = bool(re.search(r'(^|\s)(لا|مش|غلط|كذاب|مستحيل|no|wrong|false|nah|nope)(\s|$)', text_lower))
+        has_disagree_phrase = any(dm in text_lower for dm in DISAGREEMENT_PHRASES)
+        is_disagreement = has_negation_word or has_disagree_phrase
+
         has_question = "?" in text or "؟" in text or text_lower.startswith(("ليه", "ازاي", "مين", "فين", "كام", "متى", "هل", "why", "how", "who", "where", "when", "what", "is it"))
         
         words_count = len(text.strip().split())
-        has_numbers = bool(re.search(r'\d+', text))
+        has_numbers = bool(re.search(r'\d+', norm_text))
         has_claim_marker = any(cm in text_lower for cm in CLAIM_MARKERS)
         is_short_filler = text_lower in ["تمام", "اه", "اوك", "ماشى", "حبيبي", "شكرا", "يا هلا", "yes", "ok", "cool", "yeah", "sure", "nice", "hello", "hi"]
 
-        # Any substantive statement that is not a question or simple filler is treated as a factual assertion
-        is_claim = not has_question and not is_short_filler and words_count >= 3
+        # Any substantive statement with a number/claim marker, or a factual turn >= 3 words that is not a question or filler
+        is_claim = not has_question and not is_short_filler and ((has_numbers or has_claim_marker) if words_count < 3 else True)
 
         if is_disagreement:
             intent = "disagreement"

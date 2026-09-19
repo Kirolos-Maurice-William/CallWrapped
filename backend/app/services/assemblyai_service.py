@@ -62,9 +62,9 @@ class AssemblyAIRealtimeSession:
             self.is_running = True
             return
 
-        # V3 Global Edge Endpoint
+        # V3 Global Edge Endpoint locked to Arabic
         model = (settings.ASSEMBLYAI_MODEL or "universal-3-5-pro").replace(".", "-")
-        url = f"wss://streaming.assemblyai.com/v3/ws?sample_rate={self.sample_rate}&speech_model={model}"
+        url = f"wss://streaming.assemblyai.com/v3/ws?sample_rate={self.sample_rate}&speech_model={model}&language_codes=ar&language_code=ar"
         headers = {
             "Authorization": settings.ASSEMBLYAI_API_KEY
         }
@@ -149,6 +149,14 @@ class AssemblyAIRealtimeSession:
                     text = (data.get("transcript") or data.get("text") or "").strip()
                     end_of_turn = data.get("end_of_turn", False)
                     if text:
+                        # Discard noise turns with foreign scripts (CJK, Hebrew, Cyrillic, etc.)
+                        has_cjk = any('\u4e00' <= char <= '\u9fff' or '\u3040' <= char <= '\u30ff' for char in text)
+                        has_hebrew = any('\u0590' <= char <= '\u05ff' for char in text)
+                        has_cyrillic = any('\u0400' <= char <= '\u04ff' for char in text)
+                        if has_cjk or has_hebrew or has_cyrillic:
+                            logger.debug(f"[AssemblyAI] Discarded foreign script hallucination: {text}")
+                            continue
+
                         words = data.get("words", [])
                         start_ms = words[0]["start"] if (words and "start" in words[0]) else 0
                         end_ms = words[-1]["end"] if (words and "end" in words[-1]) else 0

@@ -332,6 +332,10 @@ export default function LiveVoiceRoom({
           </span>
           <span className="text-slate-600">•</span>
           <span className="text-indigo-400">AssemblyAI Universal-3.5 Pro</span>
+          <span className="text-slate-600">•</span>
+          <span className="px-2.5 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-700/50 text-[11px]">
+            🎧 يُنصح بسماعات الرأس لمنع أي صدى
+          </span>
         </div>
       </div>
 

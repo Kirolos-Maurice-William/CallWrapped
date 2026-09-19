@@ -96,6 +96,10 @@ class FactCheckerService:
 
     def _build_search_query(self, claim_a: str, claim_b: str, topic: str) -> str:
         """Dynamically builds search query from contested claims without topic hardcoding."""
+        from app.services.analyzer_service import normalize_conversational_text
+        norm_a = normalize_conversational_text(claim_a)
+        norm_b = normalize_conversational_text(claim_b)
+
         noise_words = {
             "بص", "يا", "عم", "أنا", "انا", "انت", "أنت", "متأكد", "فاهم", "غلط", "صح", "لا", "مش", "في", "من", "على",
             "هو", "هي", "ده", "دي", "حبيبي", "كلام", "فارغ", "عارف", "شايف", "يعني", "أصلا", "اصلا", "بقى",
@@ -103,24 +107,36 @@ class FactCheckerService:
             "is", "was", "are", "were", "that", "this", "it", "they", "in", "on", "at", "to", "for", "with"
         }
 
-        tokens_a = [w for w in re.findall(r'[\w\d]+', claim_a) if w.lower() not in noise_words and len(w) > 1]
-        tokens_b = [w for w in re.findall(r'[\w\d]+', claim_b) if w.lower() not in noise_words and len(w) > 1]
+        tokens_a = [w for w in re.findall(r'[\w\d]+', norm_a) if w.lower() not in noise_words and len(w) > 1]
+        tokens_b = [w for w in re.findall(r'[\w\d]+', norm_b) if w.lower() not in noise_words and len(w) > 1]
 
-        set_a = set(w.lower() for w in tokens_a)
-        set_b = set(w.lower() for w in tokens_b)
+        # Extract asserted numbers & expand 2-digit years
+        nums_a = re.findall(r'\d+', norm_a)
+        nums_b = re.findall(r'\d+', norm_b)
+        all_nums: List[str] = []
+        for n in nums_a + nums_b:
+            if n not in all_nums:
+                all_nums.append(n)
+                if len(n) == 2 and n.isdigit():
+                    val = int(n)
+                    century = f"19{n}" if val >= 35 else f"20{n}"
+                    if century not in all_nums:
+                        all_nums.append(century)
 
-        common_subject = [w for w in tokens_a if w.lower() in set_b]
-        diff_a = [w for w in tokens_a if w.lower() not in set_b]
-        diff_b = [w for w in tokens_b if w.lower() not in set_a]
+        subjs_a = [w for w in tokens_a if not w.isdigit()]
+        subjs_b = [w for w in tokens_b if not w.isdigit()]
 
-        if common_subject:
-            subj = " ".join(common_subject[:4])
-            diffs = " ".join((diff_a[:2] + diff_b[:2]))
-            return f"{subj} {diffs}".strip()
+        # Combine subject words preserving order
+        unique_subjs: List[str] = []
+        for w in subjs_a + subjs_b:
+            if w.lower() not in [s.lower() for s in unique_subjs]:
+                unique_subjs.append(w)
 
-        # Fallback: extract distinct meaningful entities
-        combined = (tokens_a[:3] + tokens_b[:3])
-        return " ".join(combined) if combined else f"{claim_a} fact check"
+        query_tokens = unique_subjs[:4] + all_nums[:4]
+        if query_tokens:
+            return " ".join(query_tokens).strip()
+
+        return f"{norm_a} {norm_b}".strip()
 
     async def _search_web_fast(self, query: str) -> List[Dict[str, str]]:
         """Executes search with fallback strategy."""
@@ -242,12 +258,29 @@ class FactCheckerService:
         diff_b_norm = set(norm_b.keys()) - set(norm_a.keys())
         common_norm = set(norm_a.keys()) & set(norm_b.keys())
 
-        numbers_a = set(re.findall(r'\d+', claim_a))
-        numbers_b = set(re.findall(r'\d+', claim_b))
+        from app.services.analyzer_service import normalize_conversational_text
+        norm_a_str = normalize_conversational_text(claim_a)
+        norm_b_str = normalize_conversational_text(claim_b)
+
+        # Detect numbers explicitly negated with 'مش' or 'not'
+        neg_a = set(re.findall(r'(?:مش|not)\s*(\d+)', norm_a_str))
+        neg_b = set(re.findall(r'(?:مش|not)\s*(\d+)', norm_b_str))
+
+        numbers_a = (set(re.findall(r'\d+', norm_a_str)) - neg_a) | neg_b
+        numbers_b = (set(re.findall(r'\d+', norm_b_str)) - neg_b) | neg_a
 
         score_a = 0
         score_b = 0
         best_sentence = ""
+
+        def num_matches_text(n: str, text: str) -> bool:
+            if n in text:
+                return True
+            if len(n) == 2 and n.isdigit():
+                val = int(n)
+                century = f"19{n}" if val >= 35 else f"20{n}"
+                return century in text
+            return False
 
         for s in sources:
             full_text = f"{s.get('title', '')}. {s.get('snippet', '')}"
@@ -259,9 +292,9 @@ class FactCheckerService:
                 tokens = [normalize_w(w) for w in re.findall(r'[\w\d]+', sent_clean)]
                 sent_norm = set(tokens)
 
-                # 1. Number & Year matching
-                has_num_a = any(n in sent_clean for n in numbers_a)
-                has_num_b = any(n in sent_clean for n in numbers_b)
+                # 1. Number & Year matching with 2-to-4 digit expansion
+                has_num_a = any(num_matches_text(n, sent_clean) for n in numbers_a)
+                has_num_b = any(num_matches_text(n, sent_clean) for n in numbers_b)
                 if has_num_a and not has_num_b:
                     score_a += 6
                     best_sentence = sent_clean

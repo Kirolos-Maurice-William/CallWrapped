@@ -42,21 +42,31 @@ class ClaimDetectorService:
         # Case 2: Speaker disagrees with a previous speaker's recent factual claim or states a conflicting claim
         if history:
             import re
+            from app.services.analyzer_service import normalize_conversational_text
+            norm_curr = normalize_conversational_text(text)
+            
             for prev_claim in reversed(history):
                 if prev_claim["speaker_name"] != speaker_name:
                     dispute_found = False
+                    norm_prev = normalize_conversational_text(prev_claim["text"])
+                    nums_prev = set(re.findall(r'\d+', norm_prev))
+                    nums_curr = set(re.findall(r'\d+', norm_curr))
+
                     # Condition A: Explicit disagreement marker
                     if is_disagreement:
                         dispute_found = True
-                    # Condition B: Overlapping subject entities with conflicting asserted details
+                    # Condition B: Contrasting numbers/years (e.g., 87 vs 85)
+                    elif nums_prev and nums_curr and nums_prev != nums_curr:
+                        dispute_found = True
+                    # Condition C: Overlapping subject entities with conflicting asserted details
                     elif current_claim:
-                        words_prev = set(re.findall(r'[\w\d]+', prev_claim["text"].lower()))
-                        words_curr = set(re.findall(r'[\w\d]+', text.lower()))
+                        words_prev = set(re.findall(r'[\w\d]+', norm_prev.lower()))
+                        words_curr = set(re.findall(r'[\w\d]+', norm_curr.lower()))
                         noise = {'في', 'من', 'على', 'هو', 'هي', 'ده', 'دي', 'the', 'is', 'was', 'in', 'at', 'a', 'an'}
                         common = (words_prev & words_curr) - noise
                         diff_prev = (words_prev - words_curr) - noise
                         diff_curr = (words_curr - words_prev) - noise
-                        if len(common) >= 2 and diff_prev and diff_curr:
+                        if len(common) >= 1 and diff_prev and diff_curr:
                             dispute_found = True
 
                     if dispute_found:
