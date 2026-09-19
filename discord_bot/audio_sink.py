@@ -80,12 +80,18 @@ class MultiUserAudioSink(voice_recv.AudioSink):
     - Decodes incoming audio per user.
     - Accurately captures user display names (e.g. أحمد, كريم).
     - Supports unlimited concurrent speakers in the voice channel (>2 participants).
-    - Automatically segments utterances via RMS VAD and silence timeout.
+    - Never drops audio packets even if Discord member metadata is initially unmapped.
     """
-    def __init__(self, loop: asyncio.AbstractEventLoop, on_utterance: Callable[[int, str, bytes], Awaitable[None]]):
+    def __init__(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        on_utterance: Callable[[int, str, bytes], Awaitable[None]],
+        voice_client: Optional[voice_recv.VoiceRecvClient] = None
+    ):
         super().__init__()
         self.loop = loop
         self.on_utterance = on_utterance
+        self.voice_client = voice_client
         self.buffers: Dict[int, UserSpeechBuffer] = {}
         self._is_active = True
         self._checker_task = self.loop.create_task(self._silence_checker_loop())
@@ -95,23 +101,53 @@ class MultiUserAudioSink(voice_recv.AudioSink):
         return False
 
     def write(self, user: Optional[discord.User], data: voice_recv.VoiceData):
-        if not self._is_active or not user:
+        if not self._is_active:
             return
 
         pcm_bytes = data.pcm
         if not pcm_bytes or len(pcm_bytes) < 4:
             return
 
-        user_id = user.id
-        display_name = getattr(user, "display_name", user.name)
+        # 1. Dynamically resolve user identity
+        resolved_user = user or getattr(data, "source", None)
+        user_id: Optional[int] = None
+        display_name: str = "المتحدث"
 
+        if resolved_user:
+            user_id = resolved_user.id
+            display_name = getattr(resolved_user, "display_name", getattr(resolved_user, "name", str(user_id)))
+        elif self.voice_client:
+            ssrc = getattr(data.packet, "ssrc", None)
+            if ssrc:
+                user_id = self.voice_client._ssrc_to_id.get(ssrc)
+                channel = getattr(self.voice_client, "channel", None)
+                if user_id and channel:
+                    for m in channel.members:
+                        if m.id == user_id:
+                            display_name = m.display_name
+                            break
+                elif not user_id and channel:
+                    # Match to non-bot members in channel
+                    humans = [m for m in channel.members if not m.bot]
+                    if len(humans) == 1:
+                        user_id = humans[0].id
+                        display_name = humans[0].display_name
+                    else:
+                        user_id = ssrc
+                        display_name = f"المتحدث_{ssrc % 1000}"
+
+        if not user_id:
+            user_id = 9999
+            display_name = "المتحدث"
+
+        # 2. Get or create user buffer
         if user_id not in self.buffers:
             self.buffers[user_id] = UserSpeechBuffer(user_id, display_name)
 
         buf = self.buffers[user_id]
-        buf.user_name = display_name  # Keep display name updated
+        buf.user_name = display_name
 
-        # Calculate RMS energy of this 20ms frame
+        # 3. Calculate RMS energy
         try:
             samples = np.frombuffer(pcm_bytes, dtype=np.int16)
             rms = float(np.sqrt(np.mean(samples.astype(np.float32) ** 2)))
@@ -119,9 +155,13 @@ class MultiUserAudioSink(voice_recv.AudioSink):
             rms = 0.0
 
         now = time.time()
+        was_speaking = buf.is_speaking
         buf.add_frame(pcm_bytes, rms, now)
 
-        # Force transcription if utterance exceeded maximum duration
+        if not was_speaking and buf.is_speaking:
+            logger.info(f"🎙️ [Voice Activity] {display_name} بدأ يتكلم (Energy RMS: {rms:.0f})...")
+
+        # 4. Force transcription if utterance exceeded maximum duration
         if buf.is_speaking and (now - buf.speech_start_time >= config.MAX_SPEECH_DURATION_SEC):
             self._finalize_utterance(buf)
 
@@ -145,9 +185,9 @@ class MultiUserAudioSink(voice_recv.AudioSink):
         buf.reset()
 
         if duration >= config.MIN_SPEECH_DURATION_SEC and len(chunks) > 5:
+            logger.info(f"📤 [Utterance Finished] انتهى كلام {user_name} ({duration:.1f}s). جاري الإرسال للتفريغ...")
             wav_bytes = convert_discord_pcm_to_wav(chunks)
             if wav_bytes:
-                # Dispatch async callback safely
                 asyncio.run_coroutine_threadsafe(
                     self.on_utterance(user_id, user_name, wav_bytes),
                     self.loop

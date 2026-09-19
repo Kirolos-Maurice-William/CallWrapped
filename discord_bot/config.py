@@ -37,9 +37,9 @@ class BotConfig:
     )
     
     # Audio VAD (Voice Activity Detection) Parameters
-    SILENCE_THRESHOLD_RMS: int = 350       # Audio energy threshold to detect speech vs silence
+    SILENCE_THRESHOLD_RMS: int = 70        # Audio energy threshold (lowered for Discord Krisp/Opus)
     SILENCE_DURATION_SEC: float = 0.75     # Seconds of silence required to segment an utterance
-    MIN_SPEECH_DURATION_SEC: float = 0.5   # Ignore short clicks/coughs below this duration
+    MIN_SPEECH_DURATION_SEC: float = 0.4   # Minimum duration to ignore short clicks
     MAX_SPEECH_DURATION_SEC: float = 12.0  # Max utterance duration before auto-transcribing
     
     # TTS Settings

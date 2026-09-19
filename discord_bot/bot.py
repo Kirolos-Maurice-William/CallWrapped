@@ -37,6 +37,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 intents.guilds = True
+intents.members = True
 
 bot = commands.Bot(command_prefix=config.COMMAND_PREFIX, intents=intents)
 
@@ -77,13 +78,15 @@ async def on_user_speech_finished(guild_id: int, user_id: int, user_name: str, w
     if not state.voice_client or not state.voice_client.is_connected():
         return
 
+    logger.info(f"🎙️ [Audio Received] Processing {len(wav_bytes)} bytes for {user_name}...")
     # 1. Transcribe speech
     text = await transcriber.transcribe_wav(wav_bytes)
     if not text or len(text.strip()) < 2:
+        logger.info(f"⚠️ [STT Ignored] No clear speech returned for {user_name}.")
         return
 
     state.recognized_speakers.add(user_name)
-    logger.info(f"[{user_name}]: {text}")
+    logger.info(f"🗣️ [Recognized Speech] {user_name}: {text}")
 
     # 2. Output to text channel
     if state.text_channel:
@@ -289,10 +292,14 @@ async def cmd_join(ctx: commands.Context):
         async def handle_utterance(user_id: int, user_name: str, wav_bytes: bytes):
             await on_user_speech_finished(ctx.guild.id, user_id, user_name, wav_bytes)
 
-        # Attach MultiUserAudioSink
-        sink = MultiUserAudioSink(bot.loop, handle_utterance)
+        # Attach MultiUserAudioSink with direct voice_client reference
+        sink = MultiUserAudioSink(bot.loop, handle_utterance, voice_client)
         state.sink = sink
         voice_client.listen(sink)
+
+        # Log members in channel
+        humans = [m.display_name for m in voice_channel.members if not m.bot]
+        logger.info(f"🎙️ [Connected] Joined '{voice_channel.name}' with members: {humans}")
 
         embed = discord.Embed(
             title="🎙️ الطرف الثالث (المحكم الذكي) انضم للروم!",
@@ -301,7 +308,7 @@ async def cmd_join(ctx: commands.Context):
                 "✨ **المميزات المفعلة**:\n"
                 "• التعرف على أسماء كل المتحدثين تلقائياً.\n"
                 "• دعم أي عدد من المتحدثين في الروم (أكثر من 2).\n"
-                "• تفريغ فوري بالعامية المصرية والعربية عبر **Groq Whisper**.\n"
+                "• تفريغ صوتي فوري عبر **AssemblyAI** (مع دعم اللهجة المصرية والعربية).\n"
                 "• التدخل والتحكيم الصوتي بصوت **سلمى** عند حدوث خلاف واقعي.\n\n"
                 f"للمغادرة: اكتب `{config.COMMAND_PREFIX}leave`"
             ),
