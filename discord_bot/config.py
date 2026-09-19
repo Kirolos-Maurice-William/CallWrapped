@@ -19,10 +19,14 @@ class BotConfig:
     COMMAND_PREFIX: str = "!"
     
     # Intelligence APIs
+    ASSEMBLYAI_API_KEY: str = os.getenv("ASSEMBLYAI_API_KEY", "")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
     
-    # Whisper STT Model on Groq (Ultra-fast, high-accuracy Arabic & Egyptian dialect)
+    # Primary Speech-to-Text Provider: "assemblyai" (Primary) -> "groq" (Fallback)
+    PRIMARY_STT_PROVIDER: str = os.getenv("PRIMARY_STT_PROVIDER", "assemblyai")
+    
+    # Whisper STT Model on Groq (Fallback)
     WHISPER_MODEL: str = "whisper-large-v3-turbo"
     SPEECH_LANGUAGE: str = "ar"
     
