@@ -5,7 +5,7 @@ import logging
 
 from app.config import settings
 from app.database import init_db
-from app.routers import calls, audio_stream, dashboard
+from app.routers import calls, audio_stream, dashboard, sync
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +40,7 @@ app.add_middleware(
 app.include_router(calls.router)
 app.include_router(audio_stream.router)
 app.include_router(dashboard.router)
+app.include_router(sync.router)
 
 @app.get("/health")
 async def health_check():

@@ -19,8 +19,7 @@ if not exist "%PYTHON_EXE%" (
     exit /b 1
 )
 
-echo Starting Discord Voice Bot...
-echo.
-"%PYTHON_EXE%" -m discord_bot.bot
+echo Starting Discord Voice Bot (Hackathon Edition)...
+"%PYTHON_EXE%" -m bot.main
 
 pause

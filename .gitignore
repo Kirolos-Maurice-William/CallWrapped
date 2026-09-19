@@ -23,3 +23,9 @@ frontend/build/
 # Operating System
 .DS_Store
 Thumbs.db
+
+# Audio & Temporary Recordings
+*.wav
+*.mp3
+discord_bot/debug_last_audio.wav
+
