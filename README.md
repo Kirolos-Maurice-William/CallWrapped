@@ -202,7 +202,7 @@ Voice Arbitrator was engineered from the ground up for the **AssemblyAI Voice Ag
 | Team Member | Role & Expertise | Focus Areas |
 | :--- | :--- | :--- |
 | **Mostafa Abdallah** | AI & Machine Learning Engineer<br>Computer Vision & Deep Learning Specialist<br>Faculty of AI, Egyptian Chinese University (ECU)<br>GitHub: [@Mostafa23](https://github.com/Mostafa23) • Email: `tofa201714@gmail.com` | • System Architecture & End-to-End Orchestration<br>• Real-Time AssemblyAI Universal-3.5 Pro Streaming<br>• Discord DAVE E2EE Decryption Engine |
-| **Kirollos Maurice** | AI & Software Engineer | • Epistemic Verification & FastGate Logic<br>• Groq LPU Reasoning & Tavily Search Pipelines<br>• Real-Time Event Bus & Web Dashboard |
+| **Kirolos Maurice William** | AI & Software Engineer<br>GitHub: [@Kirolos-Maurice-William](https://github.com/Kirolos-Maurice-William) | • Epistemic Verification & FastGate Logic<br>• Groq LPU Reasoning & Tavily Search Pipelines<br>• Real-Time Event Bus & Web Dashboard |
 
 ---
 
