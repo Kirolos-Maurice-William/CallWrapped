@@ -85,6 +85,11 @@ async def on_user_speech_finished(guild_id: int, user_id: int, user_name: str, w
         logger.info(f"⚠️ [STT Ignored] No clear speech returned for {user_name}.")
         return
 
+    from discord_bot.transcriber import is_hallucination
+    if is_hallucination(text):
+        logger.info(f"🛡️ [Suppressed Hallucination] Ignored: '{text}'")
+        return
+
     state.recognized_speakers.add(user_name)
     logger.info(f"🗣️ [Recognized Speech] {user_name}: {text}")
 

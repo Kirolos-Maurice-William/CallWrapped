@@ -8,10 +8,31 @@ from .config import config
 
 logger = logging.getLogger(__name__)
 
+# Known hallucination patterns Whisper outputs when fed silence / background noise
+WHISPER_HALLUCINATIONS = [
+    "نانسي", "قنقر", "ترجمة", "اشترك", "قناة", "تحرير من شباب",
+    "subtitles", "amara.org", "mbc", "watching", "subscribe", "translated by"
+]
+
+def is_hallucination(text: str) -> bool:
+    """Detects if Whisper hallucinated subtitle credits on silent audio."""
+    text_clean = text.strip()
+    if not text_clean or len(text_clean) < 2:
+        return True
+    for pat in WHISPER_HALLUCINATIONS:
+        if pat in text_clean:
+            return True
+    return False
+
+
 class AssemblyAITranscriber:
     """
     Primary Speech-to-Text Transcriber using AssemblyAI.
     Uploads audio, requests Arabic transcription, and consumes credits from user's account.
+    Returns:
+      - str (transcribed text) if speech found
+      - "" (empty string) if AssemblyAI successfully analyzed and found silence/no speech
+      - None only if network/HTTP error occurred
     """
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or config.ASSEMBLYAI_API_KEY
@@ -72,7 +93,8 @@ class AssemblyAITranscriber:
                             duration = data.get("audio_duration", 0)
                             elapsed = (time.perf_counter() - t0) * 1000
                             logger.info(f"✅ [AssemblyAI API] Transcribed {duration}s in {elapsed:.0f}ms (Credit Consumed): {text}")
-                            return text if text else None
+                            # Return text (even if empty string) to indicate successful processing!
+                            return text
                         elif status == "error":
                             logger.error(f"[AssemblyAI API] Transcription error: {data.get('error')}")
                             return None
@@ -88,14 +110,13 @@ class AssemblyAITranscriber:
 class GroqWhisperTranscriber:
     """
     High-Speed Fallback Speech-to-Text using Groq Whisper Large v3 Turbo.
-    Sub-200ms latency, high Egyptian Arabic dialect accuracy.
+    Strictly filters out any silent-frame subtitle hallucinations.
     """
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or config.GROQ_API_KEY
         self.url = "https://api.groq.com/openai/v1/audio/transcriptions"
         self.model = config.WHISPER_MODEL
         self.language = config.SPEECH_LANGUAGE
-        self.prompt = config.WHISPER_PROMPT
 
     async def transcribe_wav(self, wav_bytes: bytes) -> Optional[str]:
         if not self.api_key:
@@ -107,10 +128,10 @@ class GroqWhisperTranscriber:
         files = {
             "file": ("audio.wav", wav_bytes, "audio/wav")
         }
+        # Do not send any hallucination-prone prompt
         data = {
             "model": self.model,
             "language": self.language,
-            "prompt": self.prompt,
             "response_format": "json"
         }
 
@@ -124,6 +145,9 @@ class GroqWhisperTranscriber:
                 )
                 if response.status_code == 200:
                     text = response.json().get("text", "").strip()
+                    if is_hallucination(text):
+                        logger.info(f"🛡️ [Filtered Hallucination] Ignored Whisper output: '{text}'")
+                        return None
                     logger.info(f"⚡ [Groq Whisper STT] Transcribed: {text}")
                     return text if text else None
                 else:
@@ -136,8 +160,11 @@ class GroqWhisperTranscriber:
 
 class UnifiedTranscriber:
     """
-    Orchestrates transcription with AssemblyAI as Primary provider to consume account credits,
-    with automatic seamless fallback to Groq Whisper if AssemblyAI encounters an issue.
+    Orchestrates transcription:
+    1. AssemblyAI is PRIMARY: Consumes account credits.
+       - If AssemblyAI completes with text -> Returns speech text.
+       - If AssemblyAI completes with empty text -> It was silence, returns None (NO hallucination!).
+    2. Groq Whisper is FALLBACK: Only called if AssemblyAI has a network/HTTP outage.
     """
     def __init__(self):
         self.assemblyai = AssemblyAITranscriber()
@@ -150,14 +177,22 @@ class UnifiedTranscriber:
         # 1. Try AssemblyAI First (Consumes user credits)
         if config.PRIMARY_STT_PROVIDER == "assemblyai" and config.ASSEMBLYAI_API_KEY:
             try:
-                text = await self.assemblyai.transcribe_wav(wav_bytes)
-                if text:
-                    return text
+                res = await self.assemblyai.transcribe_wav(wav_bytes)
+                if res is not None:
+                    # AssemblyAI successfully processed the audio
+                    clean = res.strip()
+                    if clean and not is_hallucination(clean):
+                        return clean
+                    # If clean is empty, it was pure silence or non-speech noise -> Do NOT hallucinate!
+                    return None
             except Exception as e:
-                logger.warning(f"AssemblyAI failed, falling back to Groq: {e}")
+                logger.warning(f"AssemblyAI failed with exception: {e}")
 
-        # 2. Fallback to Groq Whisper Large v3
-        return await self.groq.transcribe_wav(wav_bytes)
+        # 2. Fallback to Groq Whisper only if AssemblyAI was unavailable
+        res = await self.groq.transcribe_wav(wav_bytes)
+        if res and not is_hallucination(res):
+            return res.strip()
+        return None
 
 
 # Global transcriber instance
