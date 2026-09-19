@@ -64,10 +64,13 @@ class AssemblyAITranscriber:
                 if not upload_url:
                     return None
 
-                # 2. Submit transcription job (Arabic speech model)
+                # 2. Submit transcription job (Latest Universal-3.5 Pro Arabic speech model)
                 job_payload = {
                     "audio_url": upload_url,
-                    "language_code": config.SPEECH_LANGUAGE
+                    "language_code": config.SPEECH_LANGUAGE,
+                    "speech_models": ["universal-3-5-pro", "universal-2"],
+                    "punctuate": True,
+                    "format_text": True
                 }
                 job_resp = await client.post(
                     self.transcript_url,
@@ -81,9 +84,9 @@ class AssemblyAITranscriber:
                 job_id = job_resp.json().get("id")
                 poll_url = f"{self.transcript_url}/{job_id}"
 
-                # 3. Poll for completion (up to 5 seconds max)
-                for _ in range(10):
-                    await asyncio.sleep(0.5)
+                # 3. Poll for completion (ultra-responsive 0.25s intervals)
+                for _ in range(20):
+                    await asyncio.sleep(0.25)
                     poll_resp = await client.get(poll_url, headers=headers)
                     if poll_resp.status_code == 200:
                         data = poll_resp.json()
@@ -193,25 +196,32 @@ class UnifiedTranscriber:
         if not wav_bytes or len(wav_bytes) < 1000:
             return None
 
-        # 1. Try AssemblyAI First (Consumes user credits)
+        from discord_bot.corrector import corrector
+        text = None
+
+        # 1. Try AssemblyAI First (Consumes user credits with latest Universal-3.5 Pro)
         if config.PRIMARY_STT_PROVIDER == "assemblyai" and config.ASSEMBLYAI_API_KEY:
             try:
                 res = await self.assemblyai.transcribe_wav(wav_bytes)
                 if res is not None:
-                    # AssemblyAI successfully processed the audio
                     clean = res.strip()
                     if clean and not is_hallucination(clean):
-                        return clean
-                    # If clean is empty, it was pure silence or non-speech noise -> Do NOT hallucinate!
-                    return None
+                        text = clean
             except Exception as e:
                 logger.warning(f"AssemblyAI failed with exception: {e}")
 
         # 2. Fallback to Groq Whisper only if AssemblyAI was unavailable
-        res = await self.groq.transcribe_wav(wav_bytes)
-        if res and not is_hallucination(res):
-            return res.strip()
-        return None
+        if text is None:
+            res = await self.groq.transcribe_wav(wav_bytes)
+            if res and not is_hallucination(res):
+                text = res.strip()
+
+        if not text:
+            return None
+
+        # 3. Fast Groq LPU polish: Fix Egyptian dialect misrecognitions & typos in ~150ms
+        polished = await corrector.correct_text(text)
+        return polished
 
 
 # Global transcriber instance

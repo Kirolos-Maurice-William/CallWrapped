@@ -37,9 +37,9 @@ class BotConfig:
     )
     
     # Audio VAD (Voice Activity Detection) Parameters
-    SILENCE_THRESHOLD_RMS: int = 80        # Lowered: catches Arabic unvoiced consonants (س,ت,ف,ك have RMS 40-90)
-    SILENCE_DURATION_SEC: float = 1.4      # Raised: avoids chopping mid-sentence natural pauses
-    MIN_SPEECH_DURATION_SEC: float = 0.6   # Lowered: catches shorter but valid utterances
+    SILENCE_THRESHOLD_RMS: int = 80        # Catches Arabic unvoiced consonants (س,ت,ف,ك have RMS 40-90)
+    SILENCE_DURATION_SEC: float = 0.75     # Snappy turn-taking (saves ~700ms latency)
+    MIN_SPEECH_DURATION_SEC: float = 0.5   # Minimum duration (ignores short clicks/bumps)
     MAX_SPEECH_DURATION_SEC: float = 12.0  # Max utterance duration before auto-transcribing
     
     # TTS Settings
