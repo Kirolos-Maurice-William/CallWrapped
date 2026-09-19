@@ -63,7 +63,7 @@ class AssemblyAIRealtimeSession:
             return
 
         # V3 Global Edge Endpoint
-        model = settings.ASSEMBLYAI_MODEL or "universal-3.5-pro"
+        model = (settings.ASSEMBLYAI_MODEL or "universal-3-5-pro").replace(".", "-")
         url = f"wss://streaming.assemblyai.com/v3/ws?sample_rate={self.sample_rate}&speech_model={model}"
         headers = {
             "Authorization": settings.ASSEMBLYAI_API_KEY

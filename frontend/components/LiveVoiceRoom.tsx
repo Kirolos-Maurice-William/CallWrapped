@@ -406,47 +406,47 @@ export default function LiveVoiceRoom({
             </p>
           </div>
 
-          {/* Simulation Playground */}
-          <div className="p-4 rounded-xl bg-[#0f172a]/70 border border-slate-800 flex flex-col gap-2.5">
-            <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Simulation Playground
-            </h4>
-            <button
-              onClick={() => {
-                sendSimulatedTurn("You", "بص يا عم أنا متأكد فيلم Inception نزل في 2015");
-                setTimeout(() => {
-                  sendSimulatedTurn("Friend", "لا يا عم أنت فاهم غلط الفيلم نزل في 2010");
-                }, 1200);
-              }}
-              className="px-3 py-2 text-xs text-left rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/60 transition-colors"
-            >
-              🎬 <strong>Dispute: Inception Release</strong>
-              <div className="text-[11px] text-slate-400">2015 vs 2010 (Triggers Speculative Check)</div>
-            </button>
-
-            <button
-              onClick={() => {
-                sendSimulatedTurn("You", "Messi joined Inter Miami back in 2022");
-                setTimeout(() => {
-                  sendSimulatedTurn("Friend", "No bro, Messi signed with Miami in 2023");
-                }, 1200);
-              }}
-              className="px-3 py-2 text-xs text-left rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/60 transition-colors"
-            >
-              ⚽ <strong>Dispute: Messi Inter Miami</strong>
-              <div className="text-[11px] text-slate-400">2022 vs 2023 (Triggers Speculative Check)</div>
-            </button>
-
-            <button
-              onClick={() => {
-                sendSimulatedTurn("You", "بص يا عم basically أنا شايف الذكاء الاصطناعي هيغير كل حاجة السنة دي");
-              }}
-              className="px-3 py-2 text-xs text-left rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/60 transition-colors"
-            >
-              💬 <strong>Egyptian Code-Switching</strong>
-              <div className="text-[11px] text-slate-400">Casual tech turn without dispute</div>
-            </button>
+          {/* Live Voice Active Card */}
+          <div className="p-4 rounded-xl bg-[#0f172a]/90 border border-slate-800 flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              Live Microphone Mode
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Talk naturally with your friend about <strong>any topic</strong> in Egyptian Arabic or English. Any factual disagreement will be verified in real time from authoritative web sources.
+            </p>
           </div>
+
+          {/* Optional Developer Test Collapsible */}
+          <details className="p-3 rounded-xl bg-slate-900/40 border border-slate-800/80 text-xs text-slate-400 cursor-pointer">
+            <summary className="font-semibold text-slate-400 hover:text-slate-300">
+              ⚡ Developer Simulator (Optional)
+            </summary>
+            <div className="mt-3 flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  sendSimulatedTurn("You", "بص يا عم أنا متأكد فيلم Inception نزل في 2015");
+                  setTimeout(() => {
+                    sendSimulatedTurn("Friend", "لا يا عم أنت فاهم غلط الفيلم نزل في 2010");
+                  }, 1200);
+                }}
+                className="px-2.5 py-1.5 text-xs text-left rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+              >
+                🎬 Inception 2015 vs 2010
+              </button>
+              <button
+                onClick={() => {
+                  sendSimulatedTurn("You", "عاصمة أستراليا سيدني");
+                  setTimeout(() => {
+                    sendSimulatedTurn("Friend", "لا عاصمة أستراليا كانبرا");
+                  }, 1200);
+                }}
+                className="px-2.5 py-1.5 text-xs text-left rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+              >
+                🌍 Capital: Sydney vs Canberra
+              </button>
+            </div>
+          </details>
         </div>
 
         {/* Center & Right Columns: Live Transcript & Alerts */}

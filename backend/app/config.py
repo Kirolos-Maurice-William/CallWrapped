@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     
     # AssemblyAI
     ASSEMBLYAI_API_KEY: str = ""
-    ASSEMBLYAI_MODEL: str = "universal-3.5-pro"
+    ASSEMBLYAI_MODEL: str = "universal-3-5-pro"
     
     # LLM Settings
     GEMINI_API_KEY: str = ""

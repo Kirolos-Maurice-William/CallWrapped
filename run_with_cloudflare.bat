@@ -15,6 +15,7 @@ echo ========================================================
 echo   LOOK BELOW FOR YOUR PUBLIC HTTPS LINK:
 echo   It will look like: https://xxxx.trycloudflare.com
 echo   Open that link and share it with your friend!
+echo   (IMPORTANT: Keep this window OPEN while calling!)
 echo ========================================================
 echo.
-cloudflared tunnel --url http://localhost:8000
+cloudflared tunnel --url http://127.0.0.1:8000

@@ -22,8 +22,10 @@ TOPIC_KEYWORDS = {
 }
 
 DISAGREEMENT_MARKERS = [
-    "لا", "مش صح", "غلط", "كذاب", "مش مظبوط", "يا عم", "انت فاهم غلط", "مستحيل", "كلام فارغ",
-    "no", "not true", "wrong", "false", "disagree", "actually", "bullshit", "no way", "impossible"
+    "لا", "مش صح", "غلط", "كذاب", "مش مظبوط", "يا عم", "انت فاهم غلط", "أنت فاهم غلط", "مستحيل", "كلام فارغ",
+    "مش حقيقي", "أنت غلطان", "انت غلطان", "مش كده", "انت بتهزر", "أنت بتهزر", "مش مضبوط", "مين قال كده", "لا لا",
+    "no", "not true", "wrong", "false", "disagree", "actually", "no way", "impossible", "you're wrong", "thats wrong",
+    "not really", "incorrect"
 ]
 
 CLAIM_MARKERS = [
@@ -52,12 +54,15 @@ class ConversationAnalyzerService:
 
         # 2. Intent Detection
         is_disagreement = any(dm in text_lower for dm in DISAGREEMENT_MARKERS)
-        has_question = "?" in text or "؟" in text or text_lower.startswith(("ليه", "ازاي", "مين", "فين", "why", "how", "who", "where", "when"))
+        has_question = "?" in text or "؟" in text or text_lower.startswith(("ليه", "ازاي", "مين", "فين", "كام", "متى", "هل", "why", "how", "who", "where", "when", "what", "is it"))
         
-        # Check if contains numbers, years, dates, or factual verbs
-        has_year = bool(re.search(r'\b(19\d\d|20\d\d)\b', text))
+        words_count = len(text.strip().split())
+        has_numbers = bool(re.search(r'\d+', text))
         has_claim_marker = any(cm in text_lower for cm in CLAIM_MARKERS)
-        is_claim = has_year or has_claim_marker
+        is_short_filler = text_lower in ["تمام", "اه", "اوك", "ماشى", "حبيبي", "شكرا", "يا هلا", "yes", "ok", "cool", "yeah", "sure", "nice", "hello", "hi"]
+
+        # Any substantive statement that is not a question or simple filler is treated as a factual assertion
+        is_claim = not has_question and not is_short_filler and words_count >= 3
 
         if is_disagreement:
             intent = "disagreement"

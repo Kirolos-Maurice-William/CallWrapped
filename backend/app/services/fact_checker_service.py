@@ -95,28 +95,32 @@ class FactCheckerService:
         return verification
 
     def _build_search_query(self, claim_a: str, claim_b: str, topic: str) -> str:
-        combined = f"{claim_a} {claim_b}"
-        noise_words = [
-            "بص", "يا", "عم", "أنا", "انت", "أنت", "متأكد", "فاهم", "غلط", "صح", "حبيبي", "كلام",
-            "bro", "man", "no", "not", "actually", "sure", "think", "telling", "you", "i'm", "im"
-        ]
+        """Dynamically builds search query from contested claims without topic hardcoding."""
+        noise_words = {
+            "بص", "يا", "عم", "أنا", "انا", "انت", "أنت", "متأكد", "فاهم", "غلط", "صح", "لا", "مش", "في", "من", "على",
+            "هو", "هي", "ده", "دي", "حبيبي", "كلام", "فارغ", "عارف", "شايف", "يعني", "أصلا", "اصلا", "بقى",
+            "bro", "man", "no", "not", "wrong", "actually", "sure", "think", "telling", "you", "i'm", "im", "the",
+            "is", "was", "are", "were", "that", "this", "it", "they", "in", "on", "at", "to", "for", "with"
+        }
 
-        english_entities = re.findall(r'[A-Za-z0-9\-\']+', combined)
-        filtered_en = [w for w in english_entities if w.lower() not in noise_words and len(w) > 2 and not w.isdigit()]
+        tokens_a = [w for w in re.findall(r'[\w\d]+', claim_a) if w.lower() not in noise_words and len(w) > 1]
+        tokens_b = [w for w in re.findall(r'[\w\d]+', claim_b) if w.lower() not in noise_words and len(w) > 1]
 
-        arabic_words = re.findall(r'[\u0600-\u06FF]+', combined)
-        filtered_ar = [w for w in arabic_words if w not in noise_words and len(w) > 2 and not w.isdigit()]
+        set_a = set(w.lower() for w in tokens_a)
+        set_b = set(w.lower() for w in tokens_b)
 
-        if topic == "movies":
-            title = " ".join(filtered_en) if filtered_en else " ".join(filtered_ar[:2])
-            return f"{title} movie release year".strip()
-        elif topic == "football":
-            player = " ".join(filtered_en) if filtered_en else " ".join(filtered_ar[:2])
-            return f"{player} transfer history contract year".strip()
+        common_subject = [w for w in tokens_a if w.lower() in set_b]
+        diff_a = [w for w in tokens_a if w.lower() not in set_b]
+        diff_b = [w for w in tokens_b if w.lower() not in set_a]
 
-        main_terms = (filtered_en + filtered_ar[:3])[:5]
-        query = " ".join(main_terms)
-        return query if query else f"{claim_a} fact check"
+        if common_subject:
+            subj = " ".join(common_subject[:4])
+            diffs = " ".join((diff_a[:2] + diff_b[:2]))
+            return f"{subj} {diffs}".strip()
+
+        # Fallback: extract distinct meaningful entities
+        combined = (tokens_a[:3] + tokens_b[:3])
+        return " ".join(combined) if combined else f"{claim_a} fact check"
 
     async def _search_web_fast(self, query: str) -> List[Dict[str, str]]:
         """Executes search with fallback strategy."""
@@ -180,10 +184,10 @@ class FactCheckerService:
     async def _evaluate_evidence(
         self, claim_a: str, claim_b: str, sources: List[Dict[str, str]]
     ) -> Dict[str, Any]:
-        """Low-token structured evidence evaluation."""
-        snippets_combined = "\n".join([f"- {s['title']}: {s['snippet']}" for s in sources[:3]])
+        """Grounded evidence evaluation across any domain with semantic proximity arbitration."""
+        snippets_combined = "\n".join([f"- {s['title']}: {s['snippet']}" for s in sources[:4]])
 
-        # Fast path with Gemini 2.5 Flash
+        # Fast path with Gemini if available and has active quota
         if settings.GEMINI_API_KEY:
             try:
                 from google import genai
@@ -195,7 +199,7 @@ class FactCheckerService:
                     f"- result: 'supported', 'contradicted', or 'inconclusive'\n"
                     f"- confidence: float 0.0-1.0\n"
                     f"- evidence: 1 sentence summary\n"
-                    f"- factual_truth: exact truth statement\n"
+                    f"- factual_truth: exact truth statement (<= 12 words)\n"
                     f"- correct_speaker: 'speaker_a', 'speaker_b', or 'neither'"
                 )
                 resp = await client.aio.models.generate_content(
@@ -211,32 +215,96 @@ class FactCheckerService:
                 parsed["sources"] = sources
                 return parsed
             except Exception as e:
-                logger.warning(f"[FactChecker] Gemini error, using heuristic: {e}")
+                logger.warning(f"[FactChecker] Gemini unavailable, using linguistic arbitrator: {e}")
 
-        # High-Speed Heuristic Evaluator (< 1ms)
-        all_text = snippets_combined.lower()
-        years_a = re.findall(r'\b(19\d\d|20\d\d)\b', claim_a)
-        years_b = re.findall(r'\b(19\d\d|20\d\d)\b', claim_b)
+        # High-Speed Linguistic & Proximity Arbitrator (Universal, zero-dependency)
+        def normalize_w(w: str) -> str:
+            w = w.lower()
+            w = re.sub(r'[أإآ]', 'ا', w)
+            w = re.sub(r'ة', 'ه', w)
+            w = re.sub(r'ى', 'ي', w)
+            if w.startswith('ال') and len(w) > 3:
+                w = w[2:]
+            return w
+
+        noise = {
+            "بص", "يا", "عم", "أنا", "انا", "انت", "أنت", "متأكد", "فاهم", "غلط", "صح", "لا", "مش", "في", "من", "على",
+            "هو", "هي", "ده", "دي", "bro", "no", "not", "wrong", "the", "is", "was", "in", "at", "that", "actually"
+        }
+
+        raw_a = [w for w in re.findall(r'[\w\d]+', claim_a) if len(w) > 1 and w.lower() not in noise]
+        raw_b = [w for w in re.findall(r'[\w\d]+', claim_b) if len(w) > 1 and w.lower() not in noise]
+
+        norm_a = {normalize_w(w): w for w in raw_a}
+        norm_b = {normalize_w(w): w for w in raw_b}
+
+        diff_a_norm = set(norm_a.keys()) - set(norm_b.keys())
+        diff_b_norm = set(norm_b.keys()) - set(norm_a.keys())
+        common_norm = set(norm_a.keys()) & set(norm_b.keys())
+
+        numbers_a = set(re.findall(r'\d+', claim_a))
+        numbers_b = set(re.findall(r'\d+', claim_b))
+
+        score_a = 0
+        score_b = 0
+        best_sentence = ""
+
+        for s in sources:
+            full_text = f"{s.get('title', '')}. {s.get('snippet', '')}"
+            sentences = re.split(r'[\.\!\?\n\r]+', full_text)
+            for sentence in sentences:
+                sent_clean = sentence.strip()
+                if not sent_clean:
+                    continue
+                tokens = [normalize_w(w) for w in re.findall(r'[\w\d]+', sent_clean)]
+                sent_norm = set(tokens)
+
+                # 1. Number & Year matching
+                has_num_a = any(n in sent_clean for n in numbers_a)
+                has_num_b = any(n in sent_clean for n in numbers_b)
+                if has_num_a and not has_num_b:
+                    score_a += 6
+                    best_sentence = sent_clean
+                elif has_num_b and not has_num_a:
+                    score_b += 6
+                    best_sentence = sent_clean
+
+                # 2. Proximity scoring between common subject and contested targets
+                if common_norm and (diff_a_norm or diff_b_norm):
+                    sub_pos = [i for i, w in enumerate(tokens) if w in common_norm]
+                    tar_pos_a = [i for i, w in enumerate(tokens) if w in diff_a_norm]
+                    tar_pos_b = [i for i, w in enumerate(tokens) if w in diff_b_norm]
+
+                    if sub_pos and tar_pos_a:
+                        min_dist_a = min(abs(sp - tp) for sp in sub_pos for tp in tar_pos_a)
+                        score_a += max(1, 10 - min_dist_a)
+                        if not best_sentence or score_a > score_b:
+                            best_sentence = sent_clean
+
+                    if sub_pos and tar_pos_b:
+                        min_dist_b = min(abs(sp - tp) for sp in sub_pos for tp in tar_pos_b)
+                        score_b += max(1, 10 - min_dist_b)
+                        if not best_sentence or score_b > score_a:
+                            best_sentence = sent_clean
+
+        # Clean best sentence to concise snippet
+        if len(best_sentence) > 130:
+            best_sentence = best_sentence[:130].rsplit(' ', 1)[0] + "..."
 
         winner = None
         factual_truth = ""
-        for y in years_a:
-            if y in all_text:
-                winner = "speaker_a"
-                factual_truth = f"Official sources confirm the date was {y}."
-                break
-        if not winner:
-            for y in years_b:
-                if y in all_text:
-                    winner = "speaker_b"
-                    factual_truth = f"Official sources confirm the date was {y}."
-                    break
+        if score_a > score_b and score_a >= 4:
+            winner = "speaker_a"
+            factual_truth = best_sentence or f"تأكيد صحة كلام الطرف الأول: {claim_a}"
+        elif score_b > score_a and score_b >= 4:
+            winner = "speaker_b"
+            factual_truth = best_sentence or f"تأكيد صحة كلام الطرف الثاني: {claim_b}"
 
         if winner:
             return {
                 "result": "supported",
-                "confidence": 0.92,
-                "evidence": f"Web sources confirm {factual_truth}",
+                "confidence": min(0.96, 0.80 + (0.02 * max(score_a, score_b))),
+                "evidence": f"المصادر الرسمية تؤكد: {factual_truth}",
                 "factual_truth": factual_truth,
                 "correct_speaker": winner,
                 "sources": sources

@@ -39,23 +39,39 @@ class ClaimDetectorService:
             if len(history) > 10:
                 history.pop(0)
 
-        # Case 2: Speaker disagrees with a previous speaker's recent factual claim
-        if is_disagreement and history:
-            # Look for the most recent claim made by the OTHER speaker
+        # Case 2: Speaker disagrees with a previous speaker's recent factual claim or states a conflicting claim
+        if history:
+            import re
             for prev_claim in reversed(history):
                 if prev_claim["speaker_name"] != speaker_name:
-                    logger.info(f"[ClaimDetector] Factual disagreement detected! Claim A: '{prev_claim['text']}', Speaker B response: '{text}'")
-                    return {
-                        "type": "disagreement",
-                        "topic": topic if topic != "other" else prev_claim["topic"],
-                        "speaker_a": prev_claim["speaker_name"],
-                        "claim_a": prev_claim["text"],
-                        "speaker_b": speaker_name,
-                        "claim_b": text,
-                        "start_ms": prev_claim["start_ms"],
-                        "end_ms": turn.get("end_ms", 0),
-                        "fact_check_required": True
-                    }
+                    dispute_found = False
+                    # Condition A: Explicit disagreement marker
+                    if is_disagreement:
+                        dispute_found = True
+                    # Condition B: Overlapping subject entities with conflicting asserted details
+                    elif current_claim:
+                        words_prev = set(re.findall(r'[\w\d]+', prev_claim["text"].lower()))
+                        words_curr = set(re.findall(r'[\w\d]+', text.lower()))
+                        noise = {'في', 'من', 'على', 'هو', 'هي', 'ده', 'دي', 'the', 'is', 'was', 'in', 'at', 'a', 'an'}
+                        common = (words_prev & words_curr) - noise
+                        diff_prev = (words_prev - words_curr) - noise
+                        diff_curr = (words_curr - words_prev) - noise
+                        if len(common) >= 2 and diff_prev and diff_curr:
+                            dispute_found = True
+
+                    if dispute_found:
+                        logger.info(f"[ClaimDetector] Factual disagreement detected! Claim A: '{prev_claim['text']}', Speaker B: '{text}'")
+                        return {
+                            "type": "disagreement",
+                            "topic": topic if topic != "other" else prev_claim["topic"],
+                            "speaker_a": prev_claim["speaker_name"],
+                            "claim_a": prev_claim["text"],
+                            "speaker_b": speaker_name,
+                            "claim_b": text,
+                            "start_ms": prev_claim["start_ms"],
+                            "end_ms": turn.get("end_ms", 0),
+                            "fact_check_required": True
+                        }
 
         # If it's a stand-alone claim without disagreement yet
         if current_claim:
