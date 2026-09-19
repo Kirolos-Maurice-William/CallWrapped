@@ -1,119 +1,122 @@
-import json
 import logging
-from typing import Dict, Any, List, Optional
-import httpx
-from bot.config import config
+from urllib.parse import urlparse
+from typing import Dict, Any, Optional, Tuple, List
+from bot.ai.tavily import tavily_client
+from bot.ai.groq import groq_client
 
-logger = logging.getLogger("FactVerifier")
+logger = logging.getLogger("ArbitrationVerifier")
 
-ARBITRATION_PROMPT = """You are an authoritative real-time fact-checking arbitrator.
-Given two disputed claims from a voice call and authoritative web evidence snippets:
-Determine:
-1. Is the fact conclusively confirmed or contradicted? ('supported' if evidence proves one speaker right, 'inconclusive' if web snippets don't clearly prove either).
-2. Confidence score (0 to 100).
-3. Factual truth statement: A concise, natural Egyptian Arabic sentence (under 12 words) stating the exact verified fact.
-4. Correct speaker: 'speaker_a', 'speaker_b', or 'neither'.
-5. Short 1-sentence explanation of evidence.
+VERIFICATION_SYNTHESIS_PROMPT = """You are an objective evidence-based fact-checking engine.
+Evaluate two conversational statements against the retrieved ground-truth web search snippets.
+Do NOT guess or hallucinate facts not supported by the evidence.
 
-Respond STRICTLY in JSON format:
+RULES:
+1. 'speaker_a_status' and 'speaker_b_status': Must each be 'SUPPORTED', 'CONTRADICTED', or 'UNVERIFIABLE'.
+2. 'evidence_strength': 'HIGH' (official manufacturer/gov/peer-reviewed docs), 'MEDIUM' (reputable tech media/encyclopedia), or 'LOW' (indirect/sparse).
+3. 'correct_fact': Exactly 1 objective, concise factual sentence drawn directly from the evidence snippets.
+4. 'selected_source_url': The most authoritative source URL from the provided evidence list.
+5. 'selected_source_title': Title of that source.
+
+Respond STRICTLY in JSON:
 {
-  "status": "supported" / "inconclusive",
+  "speaker_a_status": "CONTRADICTED" | "SUPPORTED" | "UNVERIFIABLE",
+  "speaker_b_status": "CONTRADICTED" | "SUPPORTED" | "UNVERIFIABLE",
+  "evidence_strength": "HIGH" | "MEDIUM" | "LOW",
   "confidence": 95,
-  "factual_truth": "ميسي اتولد سنة 1987 في الأرجنتين",
-  "correct_speaker": "speaker_a" / "speaker_b" / "neither",
-  "explanation": "Official FIFA and biographical records confirm Lionel Messi's birth date as June 24, 1987."
+  "correct_fact": "NVIDIA RTX 5070 has 12GB of GDDR7 memory, while the RTX 5070 Ti has 16GB.",
+  "selected_source_url": "https://www.nvidia.com/...",
+  "selected_source_title": "NVIDIA Official Product Specifications"
 }"""
 
 
-class FactVerifier:
-    """Queries live web sources (Tavily / DuckDuckGo) and synthesizes verified verdicts via Groq LPU."""
+class ArbitrationVerifier:
+    """Queries Tavily and synthesizes evidence into an objective verdict without hallucination."""
 
-    def __init__(self):
-        self.tavily_key = config.TAVILY_API_KEY
-        self.groq_key = config.GROQ_API_KEY
+    def format_intervention_template(
+        self,
+        assessment: Dict[str, Any],
+        is_arabic: bool = False
+    ) -> str:
+        """
+        Builds a strict template-based spoken intervention:
+        CONTRADICTED: 'Correction: {fact}. Source: {domain}'
+        SUPPORTED: 'That claim is verified: {fact}. Source: {domain}'
+        UNVERIFIABLE: 'I could not verify that claim from a reliable source.'
+        """
+        fact = assessment.get("correct_fact", "").strip()
+        url = assessment.get("selected_source_url", "")
+        domain = urlparse(url).netloc.replace("www.", "") if url else "Official Documentation"
 
-    async def search_evidence(self, query: str) -> List[Dict[str, str]]:
-        if not query:
-            return []
+        a_status = assessment.get("speaker_a_status")
+        b_status = assessment.get("speaker_b_status")
 
-        # 1. Try Tavily API if key exists
-        if self.tavily_key:
-            try:
-                async with httpx.AsyncClient(timeout=4.0) as client:
-                    resp = await client.post(
-                        "https://api.tavily.com/search",
-                        json={
-                            "api_key": self.tavily_key,
-                            "query": query,
-                            "search_depth": "basic",
-                            "max_results": 3
-                        }
-                    )
-                    if resp.status_code == 200:
-                        results = resp.json().get("results", [])
-                        return [{"title": r.get("title", ""), "url": r.get("url", ""), "snippet": r.get("content", "")} for r in results]
-            except Exception as e:
-                logger.debug(f"[Tavily] Notice: {e}")
+        has_contradiction = "CONTRADICTED" in (a_status, b_status)
+        has_supported = "SUPPORTED" in (a_status, b_status)
 
-        # 2. Free DuckDuckGo instant fallback (zero key needed)
-        try:
-            async with httpx.AsyncClient(timeout=4.0) as client:
-                ddg_url = f"https://api.duckduckgo.com/?q={query}&format=json&no_html=1&skip_disambig=1"
-                resp = await client.get(ddg_url)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    abstract = data.get("AbstractText", "")
-                    src_url = data.get("AbstractURL", "")
-                    if abstract:
-                        return [{"title": data.get("Heading", "Wikipedia"), "url": src_url, "snippet": abstract}]
-        except Exception as e:
-            logger.debug(f"[DDG] Notice: {e}")
+        if has_contradiction:
+            return f"Correction: {fact} Source: {domain}."
+        elif has_supported:
+            return f"That claim is verified: {fact} Source: {domain}."
+        else:
+            return "Unable to verify this claim from reliable sources."
 
-        return []
-
-    async def verify_and_arbitrate(
+    async def verify_dispute(
         self,
         speaker_a: str,
         claim_a: str,
         speaker_b: str,
         claim_b: str,
-        search_query: str
-    ) -> Optional[Dict[str, Any]]:
-        evidence = await self.search_evidence(search_query)
-        if not evidence or not self.groq_key:
-            return None
+        search_query: str,
+        target_domains: Optional[List[str]] = None
+    ) -> Tuple[Optional[Dict[str, Any]], int, int, List[Dict[str, Any]]]:
+        """
+        Returns (assessment_dict, search_ms, llm_ms, sources).
+        """
+        # Step 1: Search using Tiered Source Policy
+        sources, search_ms = await tavily_client.search(search_query, target_domains=target_domains)
+        if not sources:
+            return None, search_ms, 0, []
 
-        evidence_text = "\n".join([f"- [{e['title']}]: {e['snippet']}" for e in evidence])
+        # Format Evidence Snippets
+        evidence_snippets = "\n".join([
+            f"[Source {i+1} - Tier {s.get('source_tier', 3)}] {s['title']} ({s['domain']}):\n{s['snippet']}\nURL: {s['url']}"
+            for i, s in enumerate(sources[:4])
+        ])
+
         user_prompt = (
-            f'Speaker A ({speaker_a}): "{claim_a}"\n'
-            f'Speaker B ({speaker_b}): "{claim_b}"\n\n'
-            f'Search Evidence for "{search_query}":\n{evidence_text}'
+            f"Conversation Context:\n"
+            f"- {speaker_a} claimed: \"{claim_a}\"\n"
+            f"- {speaker_b} claimed: \"{claim_b}\"\n\n"
+            f"Authoritative Web Evidence (Sorted by Trust Tier):\n{evidence_snippets}"
         )
 
-        headers = {
-            "Authorization": f"Bearer {self.groq_key}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "model": config.GROQ_MODEL,
-            "messages": [
-                {"role": "system", "content": ARBITRATION_PROMPT},
-                {"role": "user", "content": user_prompt}
-            ],
-            "temperature": 0.0,
-            "response_format": {"type": "json_object"}
-        }
+        # Step 2: Groq LPU evaluates evidence
+        assessment, llm_ms = await groq_client.complete_json(VERIFICATION_SYNTHESIS_PROMPT, user_prompt)
+        if assessment:
+            assessment["sources"] = sources
+            if not assessment.get("selected_source_url") and sources:
+                assessment["selected_source_url"] = sources[0].get("url")
+                assessment["selected_source_title"] = sources[0].get("title", "Official Source")
 
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
-                if resp.status_code == 200:
-                    verdict = json.loads(resp.json()["choices"][0]["message"]["content"])
-                    verdict["sources"] = evidence
-                    return verdict
-        except Exception as e:
-            logger.error(f"[FactVerifier] Error: {e}")
-        return None
+            # Check if conversation has Arabic characters
+            has_arabic = any("\u0600" <= c <= "\u06FF" for c in (claim_a + claim_b))
+
+            # Step 3: Enforce template-based intervention
+            spoken_text = self.format_intervention_template(assessment, is_arabic=has_arabic)
+            assessment["spoken_intervention"] = spoken_text
+
+            # Map status for backward/frontend compatibility
+            if "CONTRADICTED" in (assessment.get("speaker_a_status"), assessment.get("speaker_b_status")):
+                assessment["status"] = "CONTRADICTED"
+            elif "SUPPORTED" in (assessment.get("speaker_a_status"), assessment.get("speaker_b_status")):
+                assessment["status"] = "SUPPORTED"
+            else:
+                assessment["status"] = "UNVERIFIABLE"
+
+            logger.info(f"🏆 [Verdict] ({search_ms}ms search, {llm_ms}ms LLM): {spoken_text}")
+            return assessment, search_ms, llm_ms, sources
+
+        return None, search_ms, llm_ms, sources
 
 
-fact_verifier = FactVerifier()
+arbitration_verifier = ArbitrationVerifier()

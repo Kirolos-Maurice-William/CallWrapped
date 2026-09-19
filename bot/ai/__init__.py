@@ -1,5 +1,6 @@
-from .stt import transcriber
-from .dialect import dialect_corrector
-from .tts import voice_speaker
+from .assemblyai import assemblyai_client
+from .groq import groq_client
+from .tavily import tavily_client
+from .tts import speaker
 
-__all__ = ["transcriber", "dialect_corrector", "voice_speaker"]
+__all__ = ["assemblyai_client", "groq_client", "tavily_client", "speaker"]

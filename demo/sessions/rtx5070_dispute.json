@@ -1,0 +1,114 @@
+{
+  "session_id": "demo_session_rtx5070",
+  "title": "NVIDIA RTX 5070 VRAM Disagreement",
+  "description": "Benchmark demonstration of Voice Arbitrator detecting, verifying, and resolving a factual hardware dispute.",
+  "events": [
+    {
+      "delay_seconds": 1.0,
+      "event": {
+        "event_id": "demo_turn_1",
+        "session_id": "demo_session_rtx5070",
+        "type": "transcript",
+        "speaker_name": "Ahmed",
+        "text": "Bro, I'm pretty sure the RTX 5070 has 16 gigs of VRAM.",
+        "latency": { "stt_ms": 272 }
+      }
+    },
+    {
+      "delay_seconds": 1.5,
+      "event": {
+        "event_id": "demo_claim_1",
+        "session_id": "demo_session_rtx5070",
+        "type": "claim",
+        "speaker_name": "Ahmed",
+        "text": "Bro, I'm pretty sure the RTX 5070 has 16 gigs of VRAM.",
+        "latency": { "stt_ms": 272, "llm_ms": 194 },
+        "payload": {
+          "entity": "NVIDIA RTX 5070",
+          "topic": "hardware",
+          "metric": "VRAM"
+        }
+      }
+    },
+    {
+      "delay_seconds": 2.0,
+      "event": {
+        "event_id": "demo_turn_2",
+        "session_id": "demo_session_rtx5070",
+        "type": "transcript",
+        "speaker_name": "Mohamed",
+        "text": "No, the 5070 is 12 gigs. The Ti is 16.",
+        "latency": { "stt_ms": 258 }
+      }
+    },
+    {
+      "delay_seconds": 1.2,
+      "event": {
+        "event_id": "demo_claim_2",
+        "session_id": "demo_session_rtx5070",
+        "type": "claim",
+        "speaker_name": "Mohamed",
+        "text": "No, the 5070 is 12 gigs. The Ti is 16.",
+        "latency": { "stt_ms": 258, "llm_ms": 182 },
+        "payload": {
+          "entity": "NVIDIA RTX 5070",
+          "topic": "hardware",
+          "metric": "VRAM"
+        }
+      }
+    },
+    {
+      "delay_seconds": 2.0,
+      "event": {
+        "event_id": "demo_turn_3",
+        "session_id": "demo_session_rtx5070",
+        "type": "transcript",
+        "speaker_name": "Ahmed",
+        "text": "Nah, both are 16. Check the leak from yesterday.",
+        "latency": { "stt_ms": 265 }
+      }
+    },
+    {
+      "delay_seconds": 1.5,
+      "event": {
+        "event_id": "demo_intervention_1",
+        "session_id": "demo_session_rtx5070",
+        "type": "intervention",
+        "speaker_name": "Voice Arbitrator",
+        "text": "Correction: the RTX 5070 has 12GB of GDDR7 memory. The RTX 5070 Ti has 16GB. Source is on the dashboard.",
+        "latency": {
+          "stt_ms": 265,
+          "llm_ms": 210,
+          "search_ms": 520,
+          "tts_ms": 185,
+          "total_ms": 1180
+        },
+        "payload": {
+          "status": "CONTRADICTED",
+          "confidence": 99,
+          "evidence_strength": "HIGH",
+          "correct_fact": "NVIDIA GeForce RTX 5070 has 12GB GDDR7 memory (192-bit bus), while RTX 5070 Ti has 16GB GDDR7 (256-bit bus).",
+          "speaker_a": "Ahmed",
+          "claim_a": "RTX 5070 has 16 gigs of VRAM, both are 16.",
+          "speaker_a_status": "CONTRADICTED",
+          "speaker_b": "Mohamed",
+          "claim_b": "The 5070 is 12 gigs. The Ti is 16.",
+          "speaker_b_status": "SUPPORTED",
+          "winner": "Mohamed",
+          "loser": "Ahmed",
+          "source_url": "https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/rtx-5070-family/",
+          "source_title": "NVIDIA GeForce RTX 5070 Family Official Specifications",
+          "source_tier": 1,
+          "spoken_intervention": "Correction: the RTX 5070 has 12GB of GDDR7 memory. The RTX 5070 Ti has 16GB. Source is on the dashboard.",
+          "why_i_spoke": [
+            "Factual claim detected regarding GPU memory capacity",
+            "Direct contradiction between Ahmed (16GB) and Mohamed (12GB)",
+            "Tier-1 official manufacturer source verified (nvidia.com)",
+            "Confidence 99% — Evidence strength: HIGH",
+            "Autonomous voice intervention triggered"
+          ]
+        }
+      }
+    }
+  ]
+}

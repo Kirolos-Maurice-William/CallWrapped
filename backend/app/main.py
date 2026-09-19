@@ -1,17 +1,27 @@
+import os
+import sys
+from pathlib import Path
+import logging
+from contextlib import asynccontextmanager
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-import logging
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import init_db
-from app.routers import calls, audio_stream, dashboard, sync
+from app.routes import router as api_router
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-logger = logging.getLogger("ai_third_participant")
+logger = logging.getLogger("voice_arbitrator")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,10 +29,11 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized successfully.")
     yield
-    logger.info("Shutting down AI Third Participant backend.")
+    logger.info("Shutting down Voice Arbitrator backend.")
+
 
 app = FastAPI(
-    title=settings.PROJECT_NAME,
+    title="Voice Arbitrator API",
     version=settings.VERSION,
     lifespan=lifespan
 )
@@ -30,34 +41,31 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all for development & local IP testing
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include Routers
-app.include_router(calls.router)
-app.include_router(audio_stream.router)
-app.include_router(dashboard.router)
-app.include_router(sync.router)
+# Include API Router
+app.include_router(api_router)
+
 
 @app.get("/health")
 async def health_check():
     return {
         "status": "online",
-        "service": settings.PROJECT_NAME,
+        "service": "Voice Arbitrator",
         "version": settings.VERSION,
         "assemblyai_model": settings.ASSEMBLYAI_MODEL
     }
 
-# Mount Next.js static export directly so whole app runs on single port
-import os
-from fastapi.staticfiles import StaticFiles
 
+# Mount Next.js static export directly so whole app runs on single port (8000)
 frontend_out = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend/out"))
 if os.path.exists(frontend_out):
     app.mount("/", StaticFiles(directory=frontend_out, html=True), name="frontend")
+
 
 if __name__ == "__main__":
     import uvicorn

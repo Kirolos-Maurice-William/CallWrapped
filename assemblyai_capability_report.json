@@ -1,0 +1,71 @@
+[
+  {
+    "model_tested": "universal-3-5-pro",
+    "negotiated_model": "universal-3-5-pro",
+    "status": "success",
+    "connect_latency_ms": 737.7,
+    "config": {
+      "model": "universal-3-5-pro",
+      "mode": "balanced",
+      "api_version": "2025-05-12",
+      "speaker_labels": false,
+      "redact_pii": false,
+      "filter_profanity": false,
+      "domain": null,
+      "voice_focus": null
+    }
+  },
+  {
+    "model_tested": "universal-3-5-pro",
+    "negotiated_model": "universal-3-5-pro",
+    "status": "success",
+    "connect_latency_ms": 827.4,
+    "config": {
+      "model": "universal-3-5-pro",
+      "mode": "balanced",
+      "api_version": "2025-05-12",
+      "speaker_labels": false,
+      "redact_pii": false,
+      "filter_profanity": false,
+      "domain": null,
+      "voice_focus": null
+    }
+  },
+  {
+    "model_tested": "u3-rt-pro",
+    "negotiated_model": "u3-rt-pro",
+    "status": "success",
+    "connect_latency_ms": 465.9,
+    "config": {
+      "model": "u3-rt-pro",
+      "mode": "balanced",
+      "api_version": "2025-05-12",
+      "speaker_labels": false,
+      "redact_pii": false,
+      "filter_profanity": false,
+      "domain": null,
+      "voice_focus": null
+    }
+  },
+  {
+    "model_tested": "u3-rt-pro",
+    "negotiated_model": "u3-rt-pro",
+    "status": "success",
+    "connect_latency_ms": 1178.9,
+    "config": {
+      "model": "u3-rt-pro",
+      "mode": "balanced",
+      "api_version": "2025-05-12",
+      "speaker_labels": false,
+      "redact_pii": false,
+      "filter_profanity": false,
+      "domain": null,
+      "voice_focus": null
+    }
+  },
+  {
+    "model_tested": "universal-2",
+    "status": "error",
+    "error": "received 3006 (registered) See Error message for details; then sent 3006 (registered) See Error message for details"
+  }
+]
