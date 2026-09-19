@@ -50,6 +50,14 @@ async def health_check():
         "assemblyai_model": settings.ASSEMBLYAI_MODEL
     }
 
+# Mount Next.js static export directly so whole app runs on single port
+import os
+from fastapi.staticfiles import StaticFiles
+
+frontend_out = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend/out"))
+if os.path.exists(frontend_out):
+    app.mount("/", StaticFiles(directory=frontend_out, html=True), name="frontend")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
