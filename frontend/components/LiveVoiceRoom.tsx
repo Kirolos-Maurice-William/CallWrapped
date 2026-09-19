@@ -153,6 +153,9 @@ export default function LiveVoiceRoom({
             audioPlayerRef.current.src = data.audio_data;
             audioPlayerRef.current.play().catch((e) => console.log("Audio autoplay prevented:", e));
           }
+        } else if (type === "call_ended") {
+          stopAllAudio();
+          onEndCall();
         }
       } catch (e) {
         console.error("Error handling room ws message:", e);
@@ -160,9 +163,19 @@ export default function LiveVoiceRoom({
     };
 
     return () => {
+      stopAllAudio();
       ws.close();
     };
   }, [callId]);
+
+  const stopAllAudio = () => {
+    if (streamerRef.current) {
+      streamerRef.current.stop();
+      streamerRef.current = null;
+    }
+    setIsMicActive(false);
+    setMicAudioLevel(0);
+  };
 
   const handleCopyInviteLink = () => {
     if (typeof window === "undefined") return;
@@ -281,7 +294,10 @@ export default function LiveVoiceRoom({
           </button>
 
           <button
-            onClick={onEndCall}
+            onClick={() => {
+              stopAllAudio();
+              onEndCall();
+            }}
             className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-950/40 transition-colors"
           >
             <Square className="w-4 h-4 fill-white" />

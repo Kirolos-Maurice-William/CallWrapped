@@ -96,3 +96,17 @@ async def audio_stream_websocket(websocket: WebSocket, call_id: str, speaker_id:
             del active_audio_sockets[call_id][speaker_id]
         if call_id in active_audio_sockets and not active_audio_sockets[call_id]:
             del active_audio_sockets[call_id]
+
+
+async def close_call_audio_sockets(call_id: str):
+    """Closes all peer audio sockets for a call session so no audio streams remain active."""
+    if call_id in active_audio_sockets:
+        sockets = list(active_audio_sockets[call_id].values())
+        active_audio_sockets[call_id].clear()
+        del active_audio_sockets[call_id]
+        for ws in sockets:
+            try:
+                await ws.close(code=1000)
+            except Exception:
+                pass
+        logger.info(f"[WS Audio] Closed all audio sockets for call {call_id}")

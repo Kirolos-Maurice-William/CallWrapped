@@ -89,7 +89,11 @@ export class AudioStreamer {
         };
 
         source.connect(this.workletNode);
-        this.workletNode.connect(this.audioContext.destination);
+        // Route through zero-gain mute node: guarantees worklet processing without playing mic into local speakers
+        const muteNode = this.audioContext.createGain();
+        muteNode.gain.value = 0;
+        this.workletNode.connect(muteNode);
+        muteNode.connect(this.audioContext.destination);
         this.isStreaming = true;
         return;
       } catch (workletError) {
@@ -118,48 +122,66 @@ export class AudioStreamer {
     };
 
     source.connect(this.fallbackProcessor);
-    this.fallbackProcessor.connect(this.audioContext.destination);
+    const fallbackMute = this.audioContext.createGain();
+    fallbackMute.gain.value = 0;
+    this.fallbackProcessor.connect(fallbackMute);
+    fallbackMute.connect(this.audioContext.destination);
     this.isStreaming = true;
   }
 
+  private nextPlaybackTime: number = 0;
+
   private playPeerAudioChunk(buffer: ArrayBuffer): void {
-    if (!this.audioContext || this.audioContext.state === "suspended") {
-      this.audioContext?.resume();
+    if (!this.audioContext) return;
+    if (this.audioContext.state === "suspended") {
+      this.audioContext.resume();
     }
     const pcm16 = new Int16Array(buffer);
-    const audioBuffer = this.audioContext!.createBuffer(1, pcm16.length, 16000);
+    if (pcm16.length === 0) return;
+
+    const audioBuffer = this.audioContext.createBuffer(1, pcm16.length, 16000);
     const channelData = audioBuffer.getChannelData(0);
 
     for (let i = 0; i < pcm16.length; i++) {
       channelData[i] = pcm16[i] / 32768.0;
     }
 
-    const sourceNode = this.audioContext!.createBufferSource();
+    const sourceNode = this.audioContext.createBufferSource();
     sourceNode.buffer = audioBuffer;
-    sourceNode.connect(this.audioContext!.destination);
-    sourceNode.start();
+    sourceNode.connect(this.audioContext.destination);
+
+    // Smooth sample-accurate scheduling to eliminate crackling and overlapping echo
+    const currentTime = this.audioContext.currentTime;
+    if (this.nextPlaybackTime < currentTime) {
+      this.nextPlaybackTime = currentTime + 0.02; // 20ms jitter buffer
+    }
+    sourceNode.start(this.nextPlaybackTime);
+    this.nextPlaybackTime += audioBuffer.duration;
   }
 
   stop(): void {
     this.isStreaming = false;
+    this.nextPlaybackTime = 0;
     if (this.workletNode) {
-      this.workletNode.disconnect();
+      try { this.workletNode.disconnect(); } catch (e) {}
       this.workletNode = null;
     }
     if (this.fallbackProcessor) {
-      this.fallbackProcessor.disconnect();
+      try { this.fallbackProcessor.disconnect(); } catch (e) {}
       this.fallbackProcessor = null;
     }
-    if (this.audioContext) {
-      this.audioContext.close();
-      this.audioContext = null;
-    }
     if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => track.stop());
+      try {
+        this.mediaStream.getTracks().forEach((track) => track.stop());
+      } catch (e) {}
       this.mediaStream = null;
     }
+    if (this.audioContext) {
+      try { this.audioContext.close(); } catch (e) {}
+      this.audioContext = null;
+    }
     if (this.socket) {
-      this.socket.close();
+      try { this.socket.close(); } catch (e) {}
       this.socket = null;
     }
   }

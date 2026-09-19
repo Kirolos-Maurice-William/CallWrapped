@@ -90,7 +90,9 @@ async def end_call(call_id: str, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(call)
 
-    # Clean up active session orchestrator
+    # Clean up active session orchestrator and peer audio sockets
+    from app.routers.audio_stream import close_call_audio_sockets
+    await close_call_audio_sockets(call_id)
     if call_id in active_sessions:
         await active_sessions[call_id].close()
         del active_sessions[call_id]

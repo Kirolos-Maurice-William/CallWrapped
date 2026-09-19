@@ -62,13 +62,21 @@ async def get_call_dashboard(call_id: str, db: AsyncSession = Depends(get_db)):
 
     # --- Deterministic Calculations ---
     # Total Speaking Time
-    total_speaking_ms = sum(p.speaking_time_ms for p in participants) or 1
+    participant_durations = {p.name: p.speaking_time_ms for p in participants}
+    if sum(participant_durations.values()) == 0 and turns:
+        for t in turns:
+            sp_name = t.speaker_name or "Unknown"
+            dur = max(0, t.end_ms - t.start_ms)
+            participant_durations[sp_name] = participant_durations.get(sp_name, 0) + dur
+
+    total_speaking_ms = sum(participant_durations.values()) or 1
     speakers_stat = []
     for p in participants:
-        pct = round((p.speaking_time_ms / total_speaking_ms) * 100, 1)
+        sp_ms = participant_durations.get(p.name, 0)
+        pct = round((sp_ms / total_speaking_ms) * 100, 1)
         speakers_stat.append(SpeakerStat(
             name=p.name,
-            duration_ms=p.speaking_time_ms,
+            duration_ms=sp_ms,
             percentage=pct
         ))
 

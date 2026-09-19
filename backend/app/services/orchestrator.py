@@ -4,7 +4,7 @@ import time
 import uuid
 from typing import Dict, Any, List, Optional
 from sqlalchemy.future import select
-from sqlalchemy import update
+from sqlalchemy import update, or_
 
 try:
     import orjson
@@ -181,7 +181,7 @@ class CallSessionOrchestrator:
                 if speaker_id:
                     stmt = (
                         update(Participant)
-                        .where(Participant.id == speaker_id)
+                        .where(or_(Participant.audio_stream_id == speaker_id, Participant.id == speaker_id))
                         .values(speaking_time_ms=Participant.speaking_time_ms + turn_duration)
                     )
                     await db.execute(stmt)
@@ -343,6 +343,10 @@ class CallSessionOrchestrator:
             logger.error(f"[Orchestrator] Error persisting disagreement in background: {e}")
 
     async def close(self):
+        try:
+            await self.broadcast("call_ended", {})
+        except Exception:
+            pass
         for session in self.audio_sessions.values():
             await session.close()
         self.audio_sessions.clear()

@@ -70,46 +70,41 @@ class AssemblyAIRealtimeSession:
         }
 
         try:
-            self.ws = await websockets.connect(
-                url,
-                extra_headers=headers,
-                ping_interval=20,
-                ping_timeout=10,
-                max_size=2**24
-            )
+            try:
+                self.ws = await websockets.connect(
+                    url,
+                    additional_headers=headers,
+                    ping_interval=20,
+                    ping_timeout=10,
+                    max_size=2**24
+                )
+            except TypeError:
+                self.ws = await websockets.connect(
+                    url,
+                    extra_headers=headers,
+                    ping_interval=20,
+                    ping_timeout=10,
+                    max_size=2**24
+                )
             self.is_running = True
             self.use_raw_binary = True
             logger.info(f"[AssemblyAI V3] Connected to Anycast Edge STT for {self.speaker_name}")
 
-            # Send session configuration with contextual prompt & keyterms
-            config_msg = {
-                "prompt": EGYPTIAN_ARABIC_CONTEXT_PROMPT,
-                "word_boost": DEFAULT_KEYTERMS
-            }
-            await self.ws.send(fast_json_dumps(config_msg))
+            # Send agent context configuration for bilingual Egyptian Arabic / English
+            try:
+                config_msg = {
+                    "type": "UpdateConfiguration",
+                    "agent_context": EGYPTIAN_ARABIC_CONTEXT_PROMPT
+                }
+                await self.ws.send(fast_json_dumps(config_msg))
+            except Exception:
+                pass
+
             self._receive_task = asyncio.create_task(self._listen())
             self._heartbeat_task = asyncio.create_task(self._heartbeat())
             return
         except Exception as e_v3:
-            logger.warning(f"[AssemblyAI] V3 connect error: {e_v3}. Falling back to v2 endpoint...")
-
-        # V2 Fallback
-        try:
-            url_v2 = f"wss://api.assemblyai.com/v2/realtime/ws?sample_rate={self.sample_rate}"
-            self.ws = await websockets.connect(url_v2, extra_headers=headers)
-            self.is_running = True
-            self.use_raw_binary = False
-            logger.info(f"[AssemblyAI V2] Connected as fallback for {self.speaker_name}")
-
-            config_msg = {
-                "prompt": EGYPTIAN_ARABIC_CONTEXT_PROMPT,
-                "word_boost": DEFAULT_KEYTERMS
-            }
-            await self.ws.send(fast_json_dumps(config_msg))
-            self._receive_task = asyncio.create_task(self._listen())
-            self._heartbeat_task = asyncio.create_task(self._heartbeat())
-        except Exception as e_v2:
-            logger.error(f"[AssemblyAI] Connection failed: {e_v2}")
+            logger.error(f"[AssemblyAI V3] Connection failed for {self.speaker_name}: {e_v3}")
             self.is_running = False
 
     async def send_audio(self, audio_chunk: bytes):
@@ -122,7 +117,6 @@ class AssemblyAIRealtimeSession:
                 # V3 accepts direct binary frame
                 await self.ws.send(audio_chunk)
             else:
-                # V2 base64 json encapsulation
                 import base64
                 b64_audio = base64.b64encode(audio_chunk).decode("utf-8")
                 await self.ws.send(fast_json_dumps({"audio_data": b64_audio}))
@@ -150,8 +144,46 @@ class AssemblyAIRealtimeSession:
                 data = fast_json_loads(message)
                 msg_type = data.get("message_type") or data.get("type")
 
-                if msg_type in ("PartialTranscript", "partial"):
-                    text = data.get("text", "").strip()
+                # 1. Handle AssemblyAI V3 'Turn' messages
+                if msg_type == "Turn":
+                    text = (data.get("transcript") or data.get("text") or "").strip()
+                    end_of_turn = data.get("end_of_turn", False)
+                    if text:
+                        words = data.get("words", [])
+                        start_ms = words[0]["start"] if (words and "start" in words[0]) else 0
+                        end_ms = words[-1]["end"] if (words and "end" in words[-1]) else 0
+
+                        # Language detection
+                        has_arabic = any('\u0600' <= char <= '\u06FF' for char in text)
+                        has_english = any('a' <= char.lower() <= 'z' for char in text)
+                        lang = "mixed" if (has_arabic and has_english) else ("ar" if has_arabic else "en")
+
+                        if end_of_turn:
+                            logger.info(f"[AssemblyAI Turn Final] ({self.speaker_name}): {text}")
+                            self.on_final({
+                                "call_id": self.call_id,
+                                "speaker_id": self.speaker_id,
+                                "speaker_name": self.speaker_name,
+                                "start_ms": start_ms,
+                                "end_ms": end_ms,
+                                "text": text,
+                                "language": lang,
+                                "is_final": True,
+                                "t_stt_recv": t_recv
+                            })
+                        else:
+                            self.on_partial({
+                                "call_id": self.call_id,
+                                "speaker_id": self.speaker_id,
+                                "speaker_name": self.speaker_name,
+                                "text": text,
+                                "is_final": False,
+                                "t_stt_recv": t_recv
+                            })
+
+                # 2. Backwards compatibility with V2 PartialTranscript
+                elif msg_type in ("PartialTranscript", "partial"):
+                    text = (data.get("text") or data.get("transcript") or "").strip()
                     if text:
                         self.on_partial({
                             "call_id": self.call_id,
@@ -162,14 +194,14 @@ class AssemblyAIRealtimeSession:
                             "t_stt_recv": t_recv
                         })
 
+                # 3. Backwards compatibility with V2 FinalTranscript
                 elif msg_type in ("FinalTranscript", "final"):
-                    text = data.get("text", "").strip()
+                    text = (data.get("text") or data.get("transcript") or "").strip()
                     if text:
                         words = data.get("words", [])
-                        start_ms = words[0]["start"] if words else 0
-                        end_ms = words[-1]["end"] if words else 0
+                        start_ms = words[0]["start"] if (words and "start" in words[0]) else 0
+                        end_ms = words[-1]["end"] if (words and "end" in words[-1]) else 0
 
-                        # Fast script detection
                         has_arabic = any('\u0600' <= char <= '\u06FF' for char in text)
                         has_english = any('a' <= char.lower() <= 'z' for char in text)
                         lang = "mixed" if (has_arabic and has_english) else ("ar" if has_arabic else "en")
@@ -186,10 +218,10 @@ class AssemblyAIRealtimeSession:
                             "t_stt_recv": t_recv
                         })
 
-                elif msg_type == "SessionBegins":
-                    logger.info(f"[AssemblyAI] Session started for {self.speaker_name}: {data.get('session_id')}")
+                elif msg_type in ("Begin", "SessionBegins"):
+                    logger.info(f"[AssemblyAI] Session started for {self.speaker_name}: {data.get('id') or data.get('session_id')}")
 
-                elif msg_type == "SessionTerminated":
+                elif msg_type in ("Termination", "SessionTerminated"):
                     logger.info(f"[AssemblyAI] Session terminated for {self.speaker_name}")
                     break
 
@@ -208,7 +240,8 @@ class AssemblyAIRealtimeSession:
             self._receive_task.cancel()
         if self.ws:
             try:
-                await self.ws.send(fast_json_dumps({"terminate_session": True}))
+                await self.ws.send(fast_json_dumps({"type": "Terminate"}))
                 await self.ws.close()
             except Exception:
                 pass
+            self.ws = None
