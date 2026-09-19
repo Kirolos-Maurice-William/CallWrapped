@@ -7,7 +7,7 @@
 class PCMProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.bufferSize = 640; // 40ms chunks at 16kHz for ultra-low latency
+    this.bufferSize = 1600; // 100ms chunks at 16kHz (AssemblyAI requires 50ms - 1000ms chunks)
     this.pcmBuffer = new Int16Array(this.bufferSize);
     this.bufferIndex = 0;
   }

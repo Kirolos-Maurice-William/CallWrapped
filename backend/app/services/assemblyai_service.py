@@ -233,6 +233,9 @@ class AssemblyAIRealtimeSession:
                     logger.info(f"[AssemblyAI] Session terminated for {self.speaker_name}")
                     break
 
+                elif msg_type == "Error" or "error" in data:
+                    logger.error(f"[AssemblyAI] Server Error for {self.speaker_name}: {data}")
+
         except websockets.exceptions.ConnectionClosed:
             logger.info(f"[AssemblyAI] WebSocket closed for {self.speaker_name}")
         except Exception as e:
