@@ -43,7 +43,10 @@ def convert_discord_pcm_to_wav(pcm_chunks: List[bytes]) -> bytes:
 
 
 class UserSpeechBuffer:
-    """Tracks active speaking state, PCM frame buffer, and silence timing for a specific user."""
+    """Tracks active speaking state, PCM frame buffer, and silence timing for a specific user.
+    Includes a pre-roll ring buffer (last 5 silent frames) so speech onset is never clipped."""
+    PRE_ROLL_FRAMES = 5  # ~100ms of audio before speech onset
+
     def __init__(self, user_id: int, user_name: str):
         self.user_id = user_id
         self.user_name = user_name
@@ -51,17 +54,27 @@ class UserSpeechBuffer:
         self.speech_start_time: float = 0.0
         self.last_speech_time: float = 0.0
         self.is_speaking: bool = False
+        self._pre_roll: List[bytes] = []  # ring buffer for pre-speech audio
 
     def add_frame(self, pcm_bytes: bytes, rms: float, now: float):
         if rms >= config.SILENCE_THRESHOLD_RMS:
             if not self.is_speaking:
                 self.is_speaking = True
                 self.speech_start_time = now
+                # Prepend buffered pre-roll frames so we capture the speech onset
+                if self._pre_roll:
+                    self.pcm_chunks.extend(self._pre_roll)
+                    self._pre_roll.clear()
             self.last_speech_time = now
             self.pcm_chunks.append(pcm_bytes)
         elif self.is_speaking:
             # Trailing audio after speaking (keep recording briefly)
             self.pcm_chunks.append(pcm_bytes)
+        else:
+            # Not speaking yet — keep a rolling pre-roll buffer
+            self._pre_roll.append(pcm_bytes)
+            if len(self._pre_roll) > self.PRE_ROLL_FRAMES:
+                self._pre_roll.pop(0)
 
     def duration(self) -> float:
         # 1 frame = 3840 bytes = 0.02 seconds
@@ -72,6 +85,7 @@ class UserSpeechBuffer:
         self.is_speaking = False
         self.speech_start_time = 0.0
         self.last_speech_time = 0.0
+        self._pre_roll.clear()
 
 
 class MultiUserAudioSink(voice_recv.AudioSink):
@@ -186,9 +200,19 @@ class MultiUserAudioSink(voice_recv.AudioSink):
         buf.reset()
 
         if duration >= config.MIN_SPEECH_DURATION_SEC and len(chunks) > 5:
-            logger.info(f"📤 [Utterance Finished] انتهى كلام {user_name} ({duration:.1f}s). جاري الإرسال للتفريغ...")
+            logger.info(f"📤 [Utterance Finished] انتهى كلام {user_name} ({duration:.1f}s, {len(chunks)} frames). جاري الإرسال للتفريغ...")
             wav_bytes = convert_discord_pcm_to_wav(chunks)
             if wav_bytes:
+                # Debug: save the last audio to disk for manual inspection
+                try:
+                    import os
+                    debug_path = os.path.join(os.path.dirname(__file__), "debug_last_audio.wav")
+                    with open(debug_path, "wb") as f:
+                        f.write(wav_bytes)
+                    logger.info(f"💾 [Debug] Saved {len(wav_bytes)} bytes to {debug_path}")
+                except Exception as e:
+                    logger.warning(f"[Debug] Could not save debug audio: {e}")
+
                 asyncio.run_coroutine_threadsafe(
                     self.on_utterance(user_id, user_name, wav_bytes),
                     self.loop

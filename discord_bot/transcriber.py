@@ -90,9 +90,28 @@ class AssemblyAITranscriber:
                         status = data.get("status")
                         if status == "completed":
                             text = data.get("text", "").strip()
+                            words = data.get("words", [])
                             duration = data.get("audio_duration", 0)
                             elapsed = (time.perf_counter() - t0) * 1000
-                            logger.info(f"✅ [AssemblyAI API] Transcribed {duration}s in {elapsed:.0f}ms (Credit Consumed): {text}")
+
+                            # Calculate average word confidence
+                            avg_conf = 0.0
+                            if words:
+                                avg_conf = sum(w.get("confidence", 0) for w in words) / len(words)
+
+                            logger.info(
+                                f"✅ [AssemblyAI API] Transcribed {duration}s in {elapsed:.0f}ms "
+                                f"(Confidence: {avg_conf:.0%}, Words: {len(words)}): {text}"
+                            )
+
+                            # Filter out low-confidence short guesses (noise artifacts like "أنا.")
+                            if text and len(text) <= 5 and avg_conf < 0.55:
+                                logger.info(
+                                    f"🛡️ [Low Confidence Filter] Rejected '{text}' "
+                                    f"(conf={avg_conf:.0%}, len={len(text)})"
+                                )
+                                return ""
+
                             # Return text (even if empty string) to indicate successful processing!
                             return text
                         elif status == "error":
