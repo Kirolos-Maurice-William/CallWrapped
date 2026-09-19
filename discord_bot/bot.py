@@ -21,9 +21,13 @@ if str(backend_path) not in sys.path:
 from discord_bot.config import config
 from discord_bot.transcriber import transcriber
 from discord_bot.audio_sink import MultiUserAudioSink
+from discord_bot.dave_patch import apply_dave_patch
 from app.services.groq_service import GroqService
 from app.services.fact_checker_service import FactCheckerService
 import edge_tts
+
+# Apply DAVE E2EE decryption patch
+apply_dave_patch()
 
 # Configure logging
 logging.basicConfig(
@@ -66,6 +70,38 @@ def get_guild_state(guild_id: int) -> GuildCallState:
     return guild_states[guild_id]
 
 
+async def speak_text_in_voice(state: GuildCallState, text_to_speak: str):
+    """Synthesizes text with Microsoft Edge-TTS (Salma) and speaks it into the Discord voice channel."""
+    if not state.voice_client or not state.voice_client.is_connected():
+        return
+    try:
+        temp_dir = Path(tempfile.gettempdir())
+        temp_audio = temp_dir / f"tts_repeat_{int(time.time()*1000)}.mp3"
+        communicate = edge_tts.Communicate(text_to_speak, config.TTS_VOICE)
+        await communicate.save(str(temp_audio))
+
+        # Wait if bot is already speaking
+        for _ in range(40):
+            if not state.voice_client.is_playing():
+                break
+            await asyncio.sleep(0.1)
+
+        def after_play(error):
+            if error:
+                logger.error(f"Error playing voice repeat: {error}")
+            try:
+                if temp_audio.exists():
+                    temp_audio.unlink()
+            except Exception:
+                pass
+
+        audio_source = discord.FFmpegPCMAudio(str(temp_audio))
+        state.voice_client.play(audio_source, after=after_play)
+        logger.info(f"🔊 [Voice Echo] Spoke in call: '{text_to_speak}'")
+    except Exception as e:
+        logger.error(f"Failed to speak in voice: {e}")
+
+
 async def on_user_speech_finished(guild_id: int, user_id: int, user_name: str, wav_bytes: bytes):
     """
     Called whenever a user finishes an utterance in the Discord voice channel.
@@ -100,7 +136,12 @@ async def on_user_speech_finished(guild_id: int, user_id: int, user_name: str, w
         except Exception as e:
             logger.warning(f"Could not send speech to text channel: {e}")
 
-    # 3. Add to sliding dialogue history
+    # 3. Test Echo Mode: Repeat what the user said verbally into the call so they can verify!
+    asyncio.create_task(
+        speak_text_in_voice(state, f"أنت قولت: {text}")
+    )
+
+    # 4. Add to sliding dialogue history
     current_turn = {
         "speaker_id": str(user_id),
         "speaker_name": user_name,

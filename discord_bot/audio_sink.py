@@ -129,6 +129,8 @@ class MultiUserAudioSink(voice_recv.AudioSink):
         display_name: str = "المتحدث"
 
         if resolved_user:
+            if getattr(resolved_user, "bot", False):
+                return
             user_id = resolved_user.id
             display_name = getattr(resolved_user, "display_name", getattr(resolved_user, "name", str(user_id)))
         elif self.voice_client:
@@ -139,6 +141,8 @@ class MultiUserAudioSink(voice_recv.AudioSink):
                 if user_id and channel:
                     for m in channel.members:
                         if m.id == user_id:
+                            if m.bot:
+                                return
                             display_name = m.display_name
                             break
                 elif not user_id and channel:
@@ -150,6 +154,9 @@ class MultiUserAudioSink(voice_recv.AudioSink):
                     else:
                         user_id = ssrc
                         display_name = f"المتحدث_{ssrc % 1000}"
+
+        if self.voice_client and getattr(self.voice_client, "user", None) and user_id == self.voice_client.user.id:
+            return
 
         if not user_id:
             user_id = 9999
