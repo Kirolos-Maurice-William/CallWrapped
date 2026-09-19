@@ -70,45 +70,46 @@ def get_guild_state(guild_id: int) -> GuildCallState:
     return guild_states[guild_id]
 
 
+tts_lock = asyncio.Lock()
+
 async def speak_text_in_voice(state: GuildCallState, text_to_speak: str):
     """Synthesizes text with Microsoft Edge-TTS (Salma) and speaks it into the Discord voice channel."""
     if not state.voice_client or not state.voice_client.is_connected():
         return
-    try:
-        temp_dir = Path(tempfile.gettempdir())
-        temp_audio = temp_dir / f"tts_repeat_{int(time.time()*1000)}.mp3"
-        communicate = edge_tts.Communicate(text_to_speak, config.TTS_VOICE)
-        await communicate.save(str(temp_audio))
+    async with tts_lock:
+        try:
+            temp_dir = Path(tempfile.gettempdir())
+            temp_audio = temp_dir / f"tts_repeat_{int(time.time()*1000)}.mp3"
+            communicate = edge_tts.Communicate(text_to_speak, config.TTS_VOICE)
+            await communicate.save(str(temp_audio))
 
-        # Wait if bot is already speaking
-        for _ in range(40):
-            if not state.voice_client.is_playing():
-                break
-            await asyncio.sleep(0.1)
+            # Wait if bot is already playing audio
+            while state.voice_client.is_playing():
+                await asyncio.sleep(0.1)
 
-        def after_play(error):
-            if error:
-                logger.error(f"Error playing voice repeat: {error}")
-            try:
-                if temp_audio.exists():
-                    temp_audio.unlink()
-            except Exception:
-                pass
+            def after_play(error):
+                if error:
+                    logger.error(f"Error playing voice repeat: {error}")
+                try:
+                    if temp_audio.exists():
+                        temp_audio.unlink()
+                except Exception:
+                    pass
 
-        audio_source = discord.FFmpegPCMAudio(str(temp_audio))
-        state.voice_client.play(audio_source, after=after_play)
-        logger.info(f"🔊 [Voice Echo] Spoke in call: '{text_to_speak}'")
-    except Exception as e:
-        logger.error(f"Failed to speak in voice: {e}")
+            audio_source = discord.FFmpegPCMAudio(str(temp_audio))
+            state.voice_client.play(audio_source, after=after_play)
+            logger.info(f"🔊 [Voice Echo] Spoke in call: '{text_to_speak}'")
+            # Brief pause after speaking before next audio
+            while state.voice_client.is_playing():
+                await asyncio.sleep(0.1)
+        except Exception as e:
+            logger.error(f"Failed to speak in voice: {e}")
 
 
 async def on_user_speech_finished(guild_id: int, user_id: int, user_name: str, wav_bytes: bytes):
     """
     Called whenever a user finishes an utterance in the Discord voice channel.
-    1. Transcribes speech with Groq Whisper Large v3 Turbo.
-    2. Identifies the speaker by name.
-    3. Analyzes dialogue for multi-party factual disputes.
-    4. Speaks verified verdict into Discord voice channel via Salma TTS.
+    Executes fully asynchronously & concurrently per user.
     """
     state = get_guild_state(guild_id)
     if not state.voice_client or not state.voice_client.is_connected():
@@ -138,7 +139,7 @@ async def on_user_speech_finished(guild_id: int, user_id: int, user_name: str, w
 
     # 3. Test Echo Mode: Repeat what the user said verbally into the call so they can verify!
     asyncio.create_task(
-        speak_text_in_voice(state, f"أنت قولت: {text}")
+        speak_text_in_voice(state, f"{user_name} قال: {text}")
     )
 
     # 4. Add to sliding dialogue history

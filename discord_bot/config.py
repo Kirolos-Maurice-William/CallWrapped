@@ -36,11 +36,20 @@ class BotConfig:
         "ميسي، رونالدو، الأهلي، الزمالك، ومصطلحات إنجليزية مثل bro, actually, basically."
     )
     
-    # Audio VAD (Voice Activity Detection) Parameters
-    SILENCE_THRESHOLD_RMS: int = 80        # Catches Arabic unvoiced consonants (س,ت,ف,ك have RMS 40-90)
-    SILENCE_DURATION_SEC: float = 0.75     # Snappy turn-taking (saves ~700ms latency)
-    MIN_SPEECH_DURATION_SEC: float = 0.5   # Minimum duration (ignores short clicks/bumps)
-    MAX_SPEECH_DURATION_SEC: float = 12.0  # Max utterance duration before auto-transcribing
+    # =========================================================================
+    # Audio VAD (Voice Activity Detection) Parameters - سهلة التعديل هنا أو في .env
+    # =========================================================================
+    # مدة السكوت (بالثواني) قبل ما البوت يعتبر الشخص خلص كلامه ويبدأ يفرغ الجملة
+    SILENCE_DURATION_SEC: float = float(os.getenv("SILENCE_DURATION_SEC", "1.5"))
+
+    # حساسية التقاط الصوت (RMS): أقل = يلقط الهمس، أعلى = يتجاهل التنفس والضوضاء
+    SILENCE_THRESHOLD_RMS: int = int(os.getenv("SILENCE_THRESHOLD_RMS", "80"))
+
+    # أقل مدة كلام مقبولة (بالثواني) لتجاهل النقرات السريعة أو الكيبورد
+    MIN_SPEECH_DURATION_SEC: float = float(os.getenv("MIN_SPEECH_DURATION_SEC", "0.5"))
+
+    # أقصى مدة للكلام المتواصل (بالثواني) قبل التفريغ التلقائي
+    MAX_SPEECH_DURATION_SEC: float = float(os.getenv("MAX_SPEECH_DURATION_SEC", "15.0"))
     
     # TTS Settings
     TTS_VOICE: str = os.getenv("TTS_VOICE_AR", "ar-EG-SalmaNeural")
