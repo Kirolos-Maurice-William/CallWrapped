@@ -2,7 +2,7 @@
 
 # ⚖️ Voice Arbitrator — Autonomous Real-Time Factual Referee
 ### Built for the [AssemblyAI Voice Agent Hackathon](https://lablab.ai/ai-hackathons/assemblyai-voice-agent-hackathon) (Sept 1–30, 2026)
-### Created & Maintained by **Mostafa Abdallah**
+### Developed by Team **Aang & Bumi**
 
 ![Voice Arbitrator Banner](./assets/banner.jpg)
 
@@ -195,13 +195,14 @@ We empirically probed AssemblyAI's newest streaming endpoints and real-time mode
 
 ---
 
-## 👨‍💻 Author & Developer
+## 👥 The Team: Aang & Bumi
 
-**Mostafa Abdallah**
-- **Role:** AI & Machine Learning Engineer | Computer Vision & Deep Learning Specialist
-- **Education:** Faculty of Artificial Intelligence, Egyptian Chinese University (ECU)
-- **GitHub:** [@Mostafa23](https://github.com/Mostafa23)
-- **Email:** tofa201714@gmail.com
+Voice Arbitrator was engineered from the ground up for the **AssemblyAI Voice Agent Hackathon** by **Team Aang & Bumi**:
+
+| Team Member | Role & Expertise | Focus Areas |
+| :--- | :--- | :--- |
+| **Mostafa Abdallah** | AI & Machine Learning Engineer<br>Computer Vision & Deep Learning Specialist<br>Faculty of AI, Egyptian Chinese University (ECU)<br>GitHub: [@Mostafa23](https://github.com/Mostafa23) • Email: `tofa201714@gmail.com` | • System Architecture & End-to-End Orchestration<br>• Real-Time AssemblyAI Universal-3.5 Pro Streaming<br>• Discord DAVE E2EE Decryption Engine |
+| **Kirollos Maurice** | AI & Software Engineer | • Epistemic Verification & FastGate Logic<br>• Groq LPU Reasoning & Tavily Search Pipelines<br>• Real-Time Event Bus & Web Dashboard |
 
 ---
 
