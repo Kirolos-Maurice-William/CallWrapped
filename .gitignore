@@ -1,0 +1,24 @@
+# Environment variables (NEVER commit secrets!)
+.env
+backend/.env
+frontend/.env*.local
+
+# Python
+backend/venv/
+backend/call_intelligence.db
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Node & Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+.npm
+*.log
+
+# Operating System
+.DS_Store
+Thumbs.db
