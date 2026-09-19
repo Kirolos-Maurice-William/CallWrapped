@@ -51,8 +51,10 @@ class BotConfig:
     # أقصى مدة للكلام المتواصل (بالثواني) قبل التفريغ التلقائي
     MAX_SPEECH_DURATION_SEC: float = float(os.getenv("MAX_SPEECH_DURATION_SEC", "15.0"))
     
-    # TTS Settings
-    TTS_VOICE: str = os.getenv("TTS_VOICE_AR", "ar-EG-SalmaNeural")
+    # TTS Settings - أصوات مايكروسوفت العصبية الطبيعية (ممكن تغيرها لـ ar-EG-SalmaNeural)
+    TTS_VOICE: str = os.getenv("TTS_VOICE_AR", "ar-EG-ShakirNeural")
+    TTS_RATE: str = os.getenv("TTS_RATE", "-3%")      # سرعة الكلام (-3% تعطي هدوء ونبرة بشرية طبيعية)
+    TTS_PITCH: str = os.getenv("TTS_PITCH", "+0Hz")   # طبقة الصوت
     
     # Discord Embed Customization
     EMBED_COLOR_INFO: int = 0x5865F2      # Blurple

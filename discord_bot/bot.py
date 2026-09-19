@@ -80,7 +80,12 @@ async def speak_text_in_voice(state: GuildCallState, text_to_speak: str):
         try:
             temp_dir = Path(tempfile.gettempdir())
             temp_audio = temp_dir / f"tts_repeat_{int(time.time()*1000)}.mp3"
-            communicate = edge_tts.Communicate(text_to_speak, config.TTS_VOICE)
+            communicate = edge_tts.Communicate(
+                text_to_speak,
+                config.TTS_VOICE,
+                rate=config.TTS_RATE,
+                pitch=config.TTS_PITCH
+            )
             await communicate.save(str(temp_audio))
 
             # Wait if bot is already playing audio
@@ -263,10 +268,15 @@ async def process_potential_dispute(
             embed_verdict.set_footer(text="تم التحكيم الصوتي الحي بواسطة الطرف الثالث")
             await state.text_channel.send(embed=embed_verdict)
 
-        # 9. Synthesize Voice with Microsoft Edge-TTS (Salma)
+        # 9. Synthesize Voice with Microsoft Edge-TTS
         temp_dir = Path(tempfile.gettempdir())
         temp_audio = temp_dir / f"verdict_{int(time.time()*1000)}.mp3"
-        communicate = edge_tts.Communicate(spoken_text, config.TTS_VOICE)
+        communicate = edge_tts.Communicate(
+            spoken_text,
+            config.TTS_VOICE,
+            rate=config.TTS_RATE,
+            pitch=config.TTS_PITCH
+        )
         await communicate.save(str(temp_audio))
 
         # 10. Play Audio directly into Discord Voice Channel
