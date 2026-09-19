@@ -79,8 +79,11 @@ export default function LiveVoiceRoom({
     if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
     if (typeof window !== "undefined") {
       const isHttps = window.location.protocol === "https:";
-      // If deployed or tunneled on same host or port 8000
-      return `${isHttps ? "wss" : "ws"}://${window.location.hostname}:8000`;
+      const wsProtocol = isHttps ? "wss:" : "ws:";
+      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        return `${wsProtocol}//${window.location.hostname}:8000`;
+      }
+      return `${wsProtocol}//${window.location.host}`;
     }
     return "ws://localhost:8000";
   };

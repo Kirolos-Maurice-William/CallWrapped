@@ -12,11 +12,27 @@ export class AudioStreamer {
   private socket: WebSocket | null = null;
   public isStreaming = false;
 
+  private serverWsUrl: string;
+
   constructor(
     private callId: string,
     private speakerId: string,
-    private serverWsUrl: string = "ws://localhost:8000"
-  ) {}
+    serverWsUrl?: string
+  ) {
+    if (serverWsUrl) {
+      this.serverWsUrl = serverWsUrl;
+    } else if (typeof window !== "undefined") {
+      const isHttps = window.location.protocol === "https:";
+      const wsProtocol = isHttps ? "wss:" : "ws:";
+      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        this.serverWsUrl = `${wsProtocol}//${window.location.hostname}:8000`;
+      } else {
+        this.serverWsUrl = `${wsProtocol}//${window.location.host}`;
+      }
+    } else {
+      this.serverWsUrl = "ws://localhost:8000";
+    }
+  }
 
   async start(onAudioData?: (level: number) => void): Promise<void> {
     if (this.isStreaming) return;
