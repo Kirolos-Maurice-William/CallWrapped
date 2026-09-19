@@ -234,7 +234,27 @@ class CallSessionOrchestrator:
 
     async def _process_factual_disagreement(self, dispute: Dict[str, Any], turn_id: str, speaker_id: str, t_pipeline_start: float):
         """Executes sub-second fact-checking and low-latency voice intervention."""
-        logger.info(f"[Orchestrator] Sub-second fact checking dispute: {dispute}")
+        # 1. Epistemic Gatekeeper: Filter out subjective/casual banter using Groq LPU (~150ms)
+        custom_query = None
+        if settings.GROQ_API_KEY:
+            try:
+                from app.services.groq_service import groq_service
+                epistemic_check = await groq_service.classify_epistemic_dispute(
+                    dispute["speaker_a"], dispute["claim_a"],
+                    dispute["speaker_b"], dispute["claim_b"]
+                )
+                if epistemic_check:
+                    if not epistemic_check.get("is_verifiable_dispute", False):
+                        logger.info(f"[Orchestrator] Groq filtered out non-verifiable conversational banter: '{dispute['claim_a']}' vs '{dispute['claim_b']}'")
+                        return
+                    if epistemic_check.get("topic"):
+                        dispute["topic"] = epistemic_check["topic"]
+                    if epistemic_check.get("search_query"):
+                        custom_query = epistemic_check["search_query"]
+            except Exception as e:
+                logger.warning(f"[Orchestrator] Epistemic dispute check error: {e}")
+
+        logger.info(f"[Orchestrator] Sub-second fact checking dispute: {dispute} (custom_query={custom_query})")
 
         # Broadcast argument started immediately
         await self.broadcast("argument_started", {
@@ -244,8 +264,8 @@ class CallSessionOrchestrator:
             "claim_b": dispute["claim_b"]
         })
 
-        # Asynchronously verify with external sources
-        fact_result = await self.fact_checker.verify_disagreement(dispute)
+        # Asynchronously verify with external sources using targeted query
+        fact_result = await self.fact_checker.verify_disagreement(dispute, custom_query=custom_query)
         t_fact_checked = time.perf_counter()
 
         fact_check_latency_ms = round((t_fact_checked - t_pipeline_start) * 1000, 1)

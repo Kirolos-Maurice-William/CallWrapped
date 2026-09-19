@@ -34,7 +34,7 @@ class FactCheckerService:
             task = asyncio.create_task(self._search_web_fast(query))
             self._speculative_searches[query] = task
 
-    async def verify_disagreement(self, dispute: Dict[str, Any]) -> Dict[str, Any]:
+    async def verify_disagreement(self, dispute: Dict[str, Any], custom_query: Optional[str] = None) -> Dict[str, Any]:
         """
         Executes external fact-checking with sub-second latency:
         1. Checks cache (0ms)
@@ -46,7 +46,7 @@ class FactCheckerService:
         claim_b = dispute.get("claim_b", "")
         topic = dispute.get("topic", "general")
 
-        search_query = self._build_search_query(claim_a, claim_b, topic)
+        search_query = custom_query or self._build_search_query(claim_a, claim_b, topic)
 
         # 1. Cache Hit
         if search_query in self._cache:
@@ -203,7 +203,18 @@ class FactCheckerService:
         """Grounded evidence evaluation across any domain with semantic proximity arbitration."""
         snippets_combined = "\n".join([f"- {s['title']}: {s['snippet']}" for s in sources[:4]])
 
-        # Fast path with Gemini if available and has active quota
+        # 1. High-Speed Groq LPU Arbitrator (Zero quota issues, ~200ms latency, high Arabic accuracy)
+        if settings.GROQ_API_KEY:
+            try:
+                from app.services.groq_service import groq_service
+                groq_result = await groq_service.arbitrate_facts(claim_a, claim_b, sources)
+                if groq_result and groq_result.get("result"):
+                    logger.info(f"[FactChecker] Groq arbitration succeeded with {groq_result.get('confidence')} confidence")
+                    return groq_result
+            except Exception as e:
+                logger.warning(f"[FactChecker] Groq arbitration fallback: {e}")
+
+        # 2. Gemini fallback
         if settings.GEMINI_API_KEY:
             try:
                 from google import genai

@@ -123,8 +123,8 @@ export class AudioStreamer {
       }
     }
 
-    // Fallback: ScriptProcessorNode
-    this.fallbackProcessor = this.audioContext.createScriptProcessor(2048, 1, 1);
+    // Fallback: ScriptProcessorNode (1024 samples = 64ms for low latency)
+    this.fallbackProcessor = this.audioContext.createScriptProcessor(1024, 1, 1);
     this.fallbackProcessor.onaudioprocess = (e) => {
       if (!this.isStreaming || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
 
@@ -176,10 +176,11 @@ export class AudioStreamer {
       sourceNode.connect(this.audioContext.destination);
     }
 
-    // Smooth sample-accurate scheduling to eliminate crackling and overlapping echo
+    // Ultra-low latency scheduling with anti-drift catch-up
     const currentTime = this.audioContext.currentTime;
-    if (this.nextPlaybackTime < currentTime) {
-      this.nextPlaybackTime = currentTime + 0.02; // 20ms jitter buffer
+    // Catch-up: if buffer lag drifted more than 50ms, immediately resync to real-time!
+    if (this.nextPlaybackTime < currentTime || this.nextPlaybackTime > currentTime + 0.05) {
+      this.nextPlaybackTime = currentTime + 0.01; // 10ms minimal jitter buffer
     }
     sourceNode.start(this.nextPlaybackTime);
     this.nextPlaybackTime += audioBuffer.duration;
