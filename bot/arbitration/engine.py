@@ -1,7 +1,7 @@
 import time
 import uuid
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 import discord
 from bot.ai.tts import speaker
@@ -9,15 +9,17 @@ from bot.arbitration.claim_detector import claim_detector
 from bot.arbitration.conflict_detector import conflict_detector
 from bot.arbitration.verifier import arbitration_verifier
 from bot.arbitration.claim_memory import ClaimMemory, StoredClaim
+from bot.arbitration.stats import SessionStatsTracker
 from bot.events.models import VoiceEvent, LatencyBreakdown
 from bot.events.publisher import publisher
 from bot.config import config
+import asyncio
 
 logger = logging.getLogger("ArbitrationEngine")
 
 
 class SessionState:
-    """Tracks sliding dialogue turns, indexed claim memory, and server statistics."""
+    """Tracks sliding dialogue turns, indexed claim memory, server statistics, and talk/anger stats."""
 
     def __init__(self, guild_id: int):
         self.guild_id = guild_id
@@ -30,6 +32,8 @@ class SessionState:
         self.is_arbitrating: bool = False
         self.pending_utterances: List[Dict[str, Any]] = []
         self.is_draining: bool = False
+        self.stats_tracker = SessionStatsTracker(session_id=str(guild_id))
+        self.analyzed_utterances: set = set()
 
     def add_turn(self, speaker_name: str, text: str, user_id: int):
         self.turns.append({
@@ -52,15 +56,134 @@ class ArbitrationEngine:
     Raw Speech -> FastGate -> Claim Detection -> Claim Memory Indexing ->
     Scoped Conflict Detection -> Ground Truth Search (Source Policy) ->
     Template Intervention & Event Broadcast.
+    Also fans out to Analytics path for per-speaker talk & anger tracking.
     """
 
     def __init__(self):
         self.sessions: Dict[int, SessionState] = {}
+        self._in_flight_classifications: Dict[str, asyncio.Task] = {}
 
     def get_session(self, guild_id: int) -> SessionState:
         if guild_id not in self.sessions:
             self.sessions[guild_id] = SessionState(guild_id)
         return self.sessions[guild_id]
+
+    async def _classify_utterance(self, raw_text: str) -> Tuple[bool, Optional[Dict[str, Any]], int]:
+        """
+        Deduplicates in-flight classification so each utterance is classified by Groq EXACTLY ONCE,
+        even though it feeds both the analytics path and the arbitrator path concurrently.
+        """
+        cache_key = raw_text.strip()
+        if cache_key in self._in_flight_classifications:
+            return await self._in_flight_classifications[cache_key]
+
+        task = asyncio.create_task(claim_detector.check_claim(raw_text))
+        self._in_flight_classifications[cache_key] = task
+        try:
+            return await task
+        finally:
+            self._in_flight_classifications.pop(cache_key, None)
+
+    async def _run_analytics(
+        self,
+        guild_id: int,
+        user_id: int,
+        speaker_name: str,
+        raw_text: str,
+        speech_start: float,
+        speech_end: float,
+        correlation_id: str
+    ):
+        """
+        Analytics Path (isolated):
+        Classifies utterance -> updates talk-time stats & anger episodes ->
+        publishes VoiceEvent(type="analytics_update").
+        Runs completely isolated in background via asyncio.create_task.
+        """
+        session = self.get_session(guild_id)
+        try:
+            is_claim, classification_data, latency_ms = await self._classify_utterance(raw_text)
+            if not classification_data:
+                classification_data = {
+                    "is_factual_claim": False,
+                    "claim": None,
+                    "entity": None,
+                    "metric": None,
+                    "topic": "other",
+                    "anger": "none",
+                    "anger_evidence": None
+                }
+
+            # Handle talk timestamps
+            duration = max(0.0, speech_end - speech_start)
+            if speech_start == 0.0 and speech_end == 0.0:
+                speech_start = time.time()
+                word_count = len(raw_text.split())
+                duration = max(1.5, word_count * 0.4)
+                speech_end = speech_start + duration
+
+            spk_key = str(user_id)
+            spk_stats_before = session.stats_tracker.get_speaker(spk_key)
+            prev_total = spk_stats_before.total_speak_seconds if spk_stats_before else 0.0
+
+            stats = session.stats_tracker.record_utterance(
+                speaker_id=spk_key,
+                speech_start=speech_start,
+                speech_end=speech_end,
+                speaker_name=speaker_name,
+                classification=classification_data
+            )
+            talk_delta_seconds = round(stats.total_speak_seconds - prev_total, 3)
+            streak_seconds = round(stats.current_streak, 3)
+            angry_episodes = stats.angry_episodes
+
+            topic = classification_data.get("topic")
+            anger = classification_data.get("anger")
+            anger_evidence = classification_data.get("anger_evidence")
+
+            tokens = classification_data.get("_tokens", {})
+            prompt_tokens = tokens.get("prompt_tokens", 0)
+            completion_tokens = tokens.get("completion_tokens", 0)
+            total_tokens = tokens.get("total_tokens", prompt_tokens + completion_tokens)
+
+            logger.info(
+                f"📈 [Analytics Update] {speaker_name} | topic={topic} | anger={anger} | "
+                f"talk_delta={talk_delta_seconds}s | total_talk={stats.total_speak_seconds:.2f}s | "
+                f"streak={streak_seconds}s | angry_episodes={angry_episodes} | "
+                f"tokens: prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}"
+            )
+
+            # Publish VoiceEvent(type="analytics_update")
+            analytics_event = VoiceEvent(
+                session_id=str(guild_id),
+                correlation_id=correlation_id,
+                type="analytics_update",
+                speaker_id=spk_key,
+                speaker_name=speaker_name,
+                text=raw_text,
+                topic=topic,
+                anger=anger,
+                anger_evidence=anger_evidence,
+                talk_delta_seconds=talk_delta_seconds,
+                streak_seconds=streak_seconds,
+                angry_episodes=angry_episodes,
+                payload={
+                    "topic": topic,
+                    "anger": anger,
+                    "anger_evidence": anger_evidence,
+                    "talk_delta_seconds": talk_delta_seconds,
+                    "streak_seconds": streak_seconds,
+                    "angry_episodes": angry_episodes,
+                    "total_speak_seconds": round(stats.total_speak_seconds, 3),
+                    "utterance_count": stats.utterance_count,
+                    "first_anger_quote": stats.first_anger_quote,
+                    "tokens": tokens,
+                    "classification": {k: v for k, v in classification_data.items() if k != "_tokens"}
+                }
+            )
+            publisher.publish_sync_task(analytics_event)
+        except Exception as e:
+            logger.error(f"❌ [Analytics Error] Failed processing analytics for {speaker_name}: {e}", exc_info=True)
 
     async def process_utterance(
         self,
@@ -71,7 +194,10 @@ class ArbitrationEngine:
         stt_ms: int,
         voice_client: Optional[discord.VoiceClient],
         text_channel: Optional[discord.TextChannel],
-        mode: str = "referee"
+        mode: str = "referee",
+        speech_start: float = 0.0,
+        speech_end: float = 0.0,
+        is_drained: bool = False
     ):
         t_start = time.monotonic()
         correlation_id = f"arb_{uuid.uuid4().hex[:8]}"
@@ -102,6 +228,26 @@ class ArbitrationEngine:
             except Exception as e:
                 logger.debug(f"Could not post to text channel: {e}")
 
+        # FAN-OUT DISPATCHER: Trigger analytics path via asyncio.create_task
+        # Must NOT wait on arbitration; arbitration must NOT wait on analytics
+        t_fanout_start = time.perf_counter()
+        utterance_key = f"{user_id}_{speech_start}_{raw_text.strip()}"
+        if getattr(config, "ANALYTICS_ENABLED", 1) != 0 and utterance_key not in session.analyzed_utterances and not is_drained:
+            session.analyzed_utterances.add(utterance_key)
+            asyncio.create_task(
+                self._run_analytics(
+                    guild_id=guild_id,
+                    user_id=user_id,
+                    speaker_name=speaker_name,
+                    raw_text=raw_text,
+                    speech_start=speech_start,
+                    speech_end=speech_end,
+                    correlation_id=correlation_id
+                )
+            )
+        fanout_overhead_ms = (time.perf_counter() - t_fanout_start) * 1000
+        logger.info(f"⚡ [Fan-out Dispatcher] Analytics spawned in {fanout_overhead_ms:.3f}ms (non-blocking, arbitrator path running)")
+
         # Echo Mode (Diagnostic testing only)
         if mode == "echo":
             await speaker.speak(voice_client, f"{speaker_name} said: {raw_text}")
@@ -129,7 +275,10 @@ class ArbitrationEngine:
                 "text_channel": text_channel,
                 "mode": mode,
                 "t_start": t_start,
-                "correlation_id": correlation_id
+                "correlation_id": correlation_id,
+                "speech_start": speech_start,
+                "speech_end": speech_end,
+                "is_drained": True
             })
             logger.info(
                 f"📥 [Queued Utterance] Session {guild_id} is arbitrating. "
@@ -168,7 +317,7 @@ class ArbitrationEngine:
 
         # Step A: FastGate + Groq Claim Detector
         t_claim_start = time.monotonic()
-        is_claim, claim_data, claim_ms = await claim_detector.check_claim(raw_text)
+        is_claim, claim_data, claim_ms = await self._classify_utterance(raw_text)
         t_claim_end = time.monotonic()
 
         if not is_claim or not claim_data:

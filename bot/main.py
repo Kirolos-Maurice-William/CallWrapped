@@ -87,7 +87,9 @@ async def on_user_utterance(
         stt_ms=stt_ms,
         voice_client=ctx.voice_client,
         text_channel=ctx.text_channel,
-        mode=ctx.mode
+        mode=ctx.mode,
+        speech_start=speech_start,
+        speech_end=speech_end
     )
 
 
@@ -431,6 +433,8 @@ async def clear_session(ctx: commands.Context):
     session.verified_claims_count = 0
     session.disputed_claims_count = 0
     session.speaker_stats.clear()
+    if hasattr(session, "stats_tracker"):
+        session.stats_tracker.reset()
     await ctx.send("🧹 Session history and arbitration statistics have been reset.")
 
 
