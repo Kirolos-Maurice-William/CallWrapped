@@ -571,7 +571,7 @@ class ArbitrationEngine:
                     ),
                     color=config.EMBED_COLOR_VERDICT
                 )
-                embed.set_footer(text="AssemblyAI Universal-3.5 Pro • Groq LPU • Tavily")
+                embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
                 await text_channel.send(embed=embed)
 
             # Step H: Broadcast Unified Intervention Event with Explainability

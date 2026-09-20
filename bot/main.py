@@ -157,7 +157,7 @@ async def join_channel(ctx: commands.Context):
             ),
             color=config.EMBED_COLOR_INFO
         )
-        embed.set_footer(text="AssemblyAI Universal-3.5 Pro • Groq LPU • Tavily")
+        embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
         await ctx.send(embed=embed)
 
     except Exception as e:
@@ -389,7 +389,7 @@ async def show_help(ctx: commands.Context):
         ),
         inline=False
     )
-    embed.set_footer(text="AssemblyAI Universal-3.5 Pro • Groq LPU • Tavily Ground-Truth • Edge-TTS")
+    embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily Ground-Truth • Edge-TTS")
     await ctx.send(embed=embed)
 
 
@@ -413,7 +413,7 @@ async def show_status(ctx: commands.Context):
     embed.add_field(
         name="🧠 Cloud AI Pipeline",
         value=(
-            "• **AssemblyAI Universal-3.5 Pro:** ✅ Active (Native Code-Switching)\n"
+            f"• **AssemblyAI {config.speech_model_display}:** ✅ Active (Native Code-Switching)\n"
             "• **Groq LPU (Llama-3.3-70b):** ✅ Active (~200ms)\n"
             "• **Tavily Web Search:** ✅ Active (Ground Truth)\n"
             "• **Edge-TTS (ar-EG-Shakir):** ✅ Active"
@@ -554,7 +554,7 @@ async def simulate_demo(ctx: commands.Context):
         ),
         color=0x57F287
     )
-    embed.set_footer(text="AssemblyAI Universal-3.5 Pro • Groq LPU • Tavily")
+    embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
     await ctx.send(embed=embed)
 
     publisher.publish_sync_task(VoiceEvent(
@@ -617,7 +617,7 @@ async def on_ready():
     print(f"  Voice Arbitrator Bot is ONLINE! (AssemblyAI Hackathon)")
     print(f"  Logged in as: {bot.user.name}")
     print(f"  Mode: Silent Referee (Intervention Only)")
-    print(f"  Ears: AssemblyAI Universal-3.5 Pro Code-Switching")
+    print(f"  Ears: AssemblyAI {config.speech_model_display} Code-Switching")
     print(f"  Brain: Groq LPU Epistemic Analyzer")
     print(f"  Evidence: Tavily Ground-Truth Search")
     print("=" * 55 + "\n")

@@ -7,6 +7,7 @@ import discord
 from discord.ext import voice_recv
 from bot.config import config
 from bot.audio.pcm import UserSpeechBuffer, convert_discord_pcm_to_wav
+from bot.ai.tts import speaker
 
 logger = logging.getLogger("AudioReceiver")
 
@@ -76,7 +77,8 @@ class AudioReceiver(voice_recv.AudioSink):
                         user_id = ssrc
                         display_name = f"Speaker_{ssrc % 1000}"
 
-        if self.voice_client and getattr(self.voice_client, "user", None) and user_id == self.voice_client.user.id:
+        vc = self._voice_client or getattr(self, "voice_client", None)
+        if vc and getattr(vc, "user", None) and user_id == vc.user.id:
             return
 
         if not user_id:
@@ -96,6 +98,13 @@ class AudioReceiver(voice_recv.AudioSink):
             rms = float(np.sqrt(np.mean(samples.astype(np.float32) ** 2)))
         except Exception:
             rms = 0.0
+
+        # Barge-in: immediately stop bot playback if ANY user crosses the speech threshold
+        if vc and vc.is_playing() and rms >= config.SILENCE_THRESHOLD_RMS:
+            user_label = display_name if display_name and display_name != "Speaker" else (
+                getattr(user, "display_name", None) or getattr(user, "name", None) or (str(user) if user else f"User_{user_id}")
+            )
+            speaker.stop(vc, user_label)
 
         now = time.time()
         buf.add_frame(pcm_bytes, rms, now)

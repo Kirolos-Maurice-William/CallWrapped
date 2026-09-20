@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
+from app.config import settings
 
 logger = logging.getLogger("AppRoutes")
 
@@ -44,6 +45,8 @@ LIVE_STATE: Dict[str, Any] = {
         "Disputed Claims": 0,
         "Speakers": {}
     },
+    "assemblyai_model": settings.ASSEMBLYAI_MODEL,
+    "discord_invite_url": settings.discord_invite_url,
     "analytics": ANALYTICS_STATE
 }
 

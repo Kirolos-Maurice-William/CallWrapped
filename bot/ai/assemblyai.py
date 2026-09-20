@@ -27,6 +27,9 @@ ASSEMBLYAI_KEYTERMS = [
 ]
 
 
+VALID_ASSEMBLYAI_MODELS = {"universal-3-5-pro", "universal-3-pro", "universal-2"}
+
+
 class AssemblyAIClient:
     """
     AssemblyAI Universal-3.5 Pro Client.
@@ -52,14 +55,20 @@ class AssemblyAIClient:
                 # 1. Fast upload
                 upload_resp = await client.post(self.upload_url, headers=headers, content=wav_bytes)
                 if upload_resp.status_code != 200:
+                    logger.error(f"[AssemblyAI] Upload failed ({upload_resp.status_code}): {upload_resp.text}")
                     return None, 0
                 upload_url = upload_resp.json().get("upload_url")
+
+                # Sanitize models list to protect against 400 Bad Request
+                valid_models = [m for m in config.SPEECH_MODELS if m in VALID_ASSEMBLYAI_MODELS]
+                if not valid_models:
+                    valid_models = ["universal-3-5-pro", "universal-2"]
 
                 # 2. Submit transcription job with code-switching prompts
                 job_payload = {
                     "audio_url": upload_url,
                     "language_code": config.SPEECH_LANGUAGE,
-                    "speech_models": config.SPEECH_MODELS,
+                    "speech_models": valid_models,
                     "punctuate": True,
                     "format_text": True,
                     "prompt": ASSEMBLYAI_CONTEXT_PROMPT,
@@ -67,6 +76,7 @@ class AssemblyAIClient:
                 }
                 job_resp = await client.post(self.transcript_url, headers=headers, json=job_payload)
                 if job_resp.status_code != 200:
+                    logger.error(f"[AssemblyAI] Job submission failed ({job_resp.status_code}) for {speaker_name}: {job_resp.text}")
                     return None, 0
 
                 job_id = job_resp.json().get("id")

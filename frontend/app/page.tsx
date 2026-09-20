@@ -108,6 +108,21 @@ export default function VoiceArbitratorDashboard() {
     Speakers: {},
   });
   const [isSimulating, setIsSimulating] = useState(false);
+  const [speechModel, setSpeechModel] = useState<string>("Universal-3.5 Pro");
+  const [discordInviteUrl, setDiscordInviteUrl] = useState<string>(
+    "https://discord.com/oauth2/authorize?client_id=1550926707517558864&permissions=36718592&scope=bot%20applications.commands"
+  );
+
+  const formatModelName = (modelId?: string) => {
+    if (!modelId) return "Universal-3.6 Pro";
+    const parts = modelId.split("-");
+    if (parts.length >= 3 && parts[0] === "universal") {
+      const version = parts.length >= 3 && /^\d+$/.test(parts[2]) ? `${parts[1]}.${parts[2]}` : parts[1];
+      const rest = parts.length >= 4 ? parts.slice(3).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" ") : (parts.includes("pro") ? "Pro" : "");
+      return `Universal-${version} ${rest}`.trim();
+    }
+    return modelId.replace("-", " ");
+  };
 
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -204,6 +219,8 @@ export default function VoiceArbitratorDashboard() {
           const data = await resLive.json();
           if (isMounted) {
             setIsConnected(true);
+            if (data.assemblyai_model) setSpeechModel(formatModelName(data.assemblyai_model));
+            if (data.discord_invite_url) setDiscordInviteUrl(data.discord_invite_url);
             if (data.latency) setLatency(data.latency);
             if (data.turns) setTurns(data.turns);
             if (data.active_dispute) setActiveDispute(data.active_dispute);
@@ -241,6 +258,8 @@ export default function VoiceArbitratorDashboard() {
             const msg = JSON.parse(event.data);
             if (msg.type === "initial_state" && msg.data) {
               const d = msg.data;
+              if (d.assemblyai_model) setSpeechModel(formatModelName(d.assemblyai_model));
+              if (d.discord_invite_url) setDiscordInviteUrl(d.discord_invite_url);
               if (d.latency) setLatency(d.latency);
               if (d.turns) setTurns(d.turns);
               if (d.active_dispute) setActiveDispute(d.active_dispute);
@@ -249,6 +268,8 @@ export default function VoiceArbitratorDashboard() {
               if (d.analytics) applyAnalytics(d.analytics);
             } else if (msg.live_state) {
               const d = msg.live_state;
+              if (d.assemblyai_model) setSpeechModel(formatModelName(d.assemblyai_model));
+              if (d.discord_invite_url) setDiscordInviteUrl(d.discord_invite_url);
               if (d.latency) setLatency(d.latency);
               if (d.turns) setTurns(d.turns);
               if (d.active_dispute) setActiveDispute(d.active_dispute);
@@ -389,7 +410,7 @@ export default function VoiceArbitratorDashboard() {
               </span>
             </div>
             <p className="text-xs text-slate-400 hidden sm:block">
-              Multi-Speaker Discord E2EE • Universal-3.5 Pro Code-Switching • Groq LPU • Tavily Ground-Truth
+              Multi-Speaker Discord E2EE • {speechModel} Code-Switching • Groq LPU • Tavily Ground-Truth
             </p>
           </div>
         </div>
@@ -402,6 +423,21 @@ export default function VoiceArbitratorDashboard() {
               {isConnected ? (connectionType === "ws" ? "LIVE STREAMING" : "POLLING ACTIVE") : "DISCONNECTED"}
             </span>
           </div>
+
+          {/* Discord Bot Invite */}
+          <a
+            href={discordInviteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-semibold shadow-md shadow-[#5865F2]/25 transition-all cursor-pointer"
+            title="Invite Voice Arbitrator Bot to your Discord Server"
+          >
+            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+              <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+            </svg>
+            <span className="hidden sm:inline">Add to Discord</span>
+            <span className="sm:hidden">Invite</span>
+          </a>
 
           <button
             onClick={handleTriggerReplay}
@@ -444,7 +480,7 @@ export default function VoiceArbitratorDashboard() {
             {/* Stage 1: STT */}
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-cyan-950/40 border border-cyan-800/40 text-cyan-300">
               <span className="text-[10px] text-cyan-500 font-mono">1. STT</span>
-              <span className="font-semibold">AssemblyAI Universal-3.5:</span>
+              <span className="font-semibold">AssemblyAI {speechModel}:</span>
               <span className="font-mono font-bold text-white">{latency.stt_ms ?? 0}ms</span>
             </div>
 
@@ -663,13 +699,26 @@ export default function VoiceArbitratorDashboard() {
                     The bot listens silently to multi-speaker conversation in Discord. When an objective factual disagreement is detected, it queries Tavily and intervenes with the verified facts.
                   </p>
                 </div>
-                <button
-                  onClick={handleTriggerReplay}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  <span>Run Demo Replay (RTX 5070 Dispute)</span>
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={handleTriggerReplay}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>Run Demo Replay (RTX 5070 Dispute)</span>
+                  </button>
+                  <a
+                    href={discordInviteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-semibold shadow-lg shadow-[#5865F2]/25 transition-all cursor-pointer"
+                  >
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                    </svg>
+                    <span>Invite Bot to Discord Server</span>
+                  </a>
+                </div>
               </div>
             )}
           </div>
@@ -821,7 +870,7 @@ export default function VoiceArbitratorDashboard() {
           <div className="p-3 border-t border-slate-800/80 bg-slate-950/50 flex items-center justify-between text-[11px] text-slate-400 font-mono">
             <span className="flex items-center gap-1">
               <Cpu className="w-3 h-3 text-cyan-400" />
-              <span>Universal-3.5 Pro Code-Switching</span>
+              <span>{speechModel} Code-Switching</span>
             </span>
             <span>Raw Verbatim Evidence</span>
           </div>
