@@ -39,7 +39,7 @@ class AssemblyAIClient:
         self.upload_url = "https://api.assemblyai.com/v2/upload"
         self.transcript_url = "https://api.assemblyai.com/v2/transcript"
 
-    async def transcribe(self, wav_bytes: bytes) -> Tuple[Optional[str], int]:
+    async def transcribe(self, wav_bytes: bytes, speaker_name: str = "unknown") -> Tuple[Optional[str], int]:
         """Transcribes audio and returns (raw_text, latency_ms)."""
         if not self.api_key or not wav_bytes or len(wav_bytes) < 1000:
             return None, 0
@@ -47,7 +47,7 @@ class AssemblyAIClient:
         t0 = time.perf_counter()
         headers = {"Authorization": self.api_key}
 
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             try:
                 # 1. Fast upload
                 upload_resp = await client.post(self.upload_url, headers=headers, content=wav_bytes)
@@ -72,9 +72,11 @@ class AssemblyAIClient:
                 job_id = job_resp.json().get("id")
                 poll_url = f"{self.transcript_url}/{job_id}"
 
-                # 3. Poll for completion (responsive 0.25s intervals)
-                for _ in range(24):
-                    await asyncio.sleep(0.25)
+                # 3. Poll for completion (budget from config: default 40 attempts * 0.5s = 20s)
+                attempts = getattr(config, "ASSEMBLYAI_POLL_ATTEMPTS", 40)
+                interval = getattr(config, "ASSEMBLYAI_POLL_INTERVAL_SEC", 0.5)
+                for _ in range(attempts):
+                    await asyncio.sleep(interval)
                     poll_resp = await client.get(poll_url, headers=headers)
                     if poll_resp.status_code == 200:
                         data = poll_resp.json()
@@ -98,9 +100,13 @@ class AssemblyAIClient:
                             logger.info(f"✅ [AssemblyAI Raw] ({latency_ms}ms, conf={avg_conf:.0%}): {text}")
                             return text, latency_ms
                         elif status == "error":
+                            err_msg = data.get("error", "Unknown error")
+                            logger.warning(f"[AssemblyAI] Transcription error for {speaker_name}: {err_msg}")
                             return None, 0
 
-                return None, 0
+                latency_ms = int((time.perf_counter() - t0) * 1000)
+                logger.warning(f"[AssemblyAI] STT timeout, utterance dropped for {speaker_name} ({latency_ms}ms, {attempts} attempts)")
+                return None, latency_ms
             except Exception as e:
                 logger.warning(f"[AssemblyAI] Network error: {e}")
                 return None, 0

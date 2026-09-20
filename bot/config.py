@@ -27,6 +27,8 @@ class BotConfig:
     PRIMARY_STT_PROVIDER: str = os.getenv("PRIMARY_STT_PROVIDER", "assemblyai")
     SPEECH_LANGUAGE: str = "ar"
     SPEECH_MODELS: list = ["universal-3-5-pro", "universal-2"]
+    ASSEMBLYAI_POLL_ATTEMPTS: int = int(os.getenv("ASSEMBLYAI_POLL_ATTEMPTS", "40"))
+    ASSEMBLYAI_POLL_INTERVAL_SEC: float = float(os.getenv("ASSEMBLYAI_POLL_INTERVAL_SEC", "0.5"))
 
     # Intelligence & Fact-Checking APIs
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")

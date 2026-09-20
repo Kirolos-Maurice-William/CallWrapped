@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 import discord
 from discord.ext import commands, voice_recv
@@ -18,6 +18,23 @@ from bot.ai import assemblyai_client, speaker
 from bot.arbitration import arbitration_engine, arbitration_verifier
 from bot.events.models import VoiceEvent, LatencyBreakdown
 from bot.events.publisher import publisher
+
+# Hook publisher to track topics per session for !recap
+_original_publish_sync = publisher.publish_sync_task
+
+def _on_event_published(event: VoiceEvent):
+    if event.type == "analytics_update" and event.topic and event.session_id:
+        try:
+            guild_id = int(event.session_id)
+            session = arbitration_engine.get_session(guild_id)
+            if not hasattr(session, "topic_counts"):
+                session.topic_counts = {}
+            session.topic_counts[event.topic] = session.topic_counts.get(event.topic, 0) + 1
+        except (ValueError, TypeError):
+            pass
+    _original_publish_sync(event)
+
+publisher.publish_sync_task = _on_event_published
 
 # 1. Install isolated DAVE E2EE decryption adapter immediately
 install_dave_adapter()
@@ -74,7 +91,7 @@ async def on_user_utterance(
         return
 
     # 1. Transcribe speech using AssemblyAI Universal-3.5 Pro (Preserves raw transcript as evidence!)
-    raw_text, stt_ms = await assemblyai_client.transcribe(wav_bytes)
+    raw_text, stt_ms = await assemblyai_client.transcribe(wav_bytes, speaker_name=speaker_name)
     if not raw_text or len(raw_text.strip()) < 2:
         return
 
@@ -194,6 +211,147 @@ async def show_stats(ctx: commands.Context):
     await ctx.send(embed=embed)
 
 
+def format_streak_mmss(seconds: float) -> str:
+    """Formats duration in seconds as m:ss (e.g. 83.0s -> '1:23')."""
+    total_sec = int(round(seconds))
+    mins = total_sec // 60
+    secs = total_sec % 60
+    return f"{mins}:{secs:02d}"
+
+
+def render_recap(session_state: Any) -> str:
+    """
+    Pure function rendering real session recap text in Egyptian Arabic.
+    Shows:
+    - Per-speaker talk minutes + % share bar (▰▱)
+    - Longest streak record holder (formatted as m:ss)
+    - Anger leaderboard (episode count + first anger quote as "receipts")
+    - Top-3 topics with %
+    Returns 'No data yet in this call.' if the session is empty.
+    Never fabricates or default-fills numbers.
+    """
+    if not session_state:
+        return "No data yet in this call."
+
+    # 1. Extract speakers from session_state
+    speakers = []
+    stats_tracker = getattr(session_state, "stats_tracker", None)
+    if stats_tracker is None and isinstance(session_state, dict):
+        stats_tracker = session_state.get("stats_tracker")
+
+    if stats_tracker and hasattr(stats_tracker, "speakers"):
+        speakers = list(stats_tracker.speakers.values())
+    elif hasattr(session_state, "speakers"):
+        spks = getattr(session_state, "speakers")
+        speakers = list(spks.values()) if isinstance(spks, dict) else list(spks)
+    elif isinstance(session_state, dict) and "speakers" in session_state:
+        spks = session_state["speakers"]
+        speakers = list(spks.values()) if isinstance(spks, dict) else list(spks)
+
+    total_talk_sec = sum(s.total_speak_seconds for s in speakers)
+    total_utterances = sum(s.utterance_count for s in speakers)
+
+    # Empty session check: render ONLY from real session data
+    if not speakers or (total_talk_sec == 0.0 and total_utterances == 0):
+        return "No data yet in this call."
+
+    # 2. Extract topics from session_state
+    topic_counts: Dict[str, int] = {}
+    if hasattr(session_state, "topic_counts") and session_state.topic_counts:
+        for t, c in session_state.topic_counts.items():
+            if t:
+                topic_counts[t] = topic_counts.get(t, 0) + c
+    elif isinstance(session_state, dict) and "topic_counts" in session_state:
+        for t, c in session_state["topic_counts"].items():
+            if t:
+                topic_counts[t] = topic_counts.get(t, 0) + c
+
+    if not topic_counts:
+        topics_attr = getattr(session_state, "topics", None)
+        if topics_attr is None and isinstance(session_state, dict):
+            topics_attr = session_state.get("topics")
+        if topics_attr:
+            if isinstance(topics_attr, dict):
+                for t, c in topics_attr.items():
+                    if t:
+                        topic_counts[t] = topic_counts.get(t, 0) + c
+            elif isinstance(topics_attr, (list, tuple)):
+                for t in topics_attr:
+                    if t:
+                        topic_counts[t] = topic_counts.get(t, 0) + 1
+
+    if not topic_counts and hasattr(session_state, "turns") and session_state.turns:
+        for turn in session_state.turns:
+            t = turn.get("topic")
+            if t:
+                topic_counts[t] = topic_counts.get(t, 0) + 1
+
+    if not topic_counts and hasattr(session_state, "claim_memory") and session_state.claim_memory:
+        for claim in getattr(session_state.claim_memory, "claims", []):
+            if claim.topic:
+                topic_counts[claim.topic] = topic_counts.get(claim.topic, 0) + 1
+
+    lines = ["🎙️ **ملخص المكالمة**\n"]
+
+    # Section A: Per-speaker talk minutes + % share bar (▰▱)
+    lines.append("🗣️ **وقت الكلام ونسبة المشاركة:**")
+    sorted_speakers = sorted(speakers, key=lambda s: s.total_speak_seconds, reverse=True)
+    for spk in sorted_speakers:
+        name = spk.speaker_name or spk.speaker_id
+        talk_sec = spk.total_speak_seconds
+        talk_min = talk_sec / 60.0
+        pct = (talk_sec / total_talk_sec * 100.0) if total_talk_sec > 0 else 0.0
+        filled_blocks = int(round(pct / 10.0))
+        filled_blocks = max(0, min(10, filled_blocks))
+        bar = "▰" * filled_blocks + "▱" * (10 - filled_blocks)
+        lines.append(f"• **{name}**: {talk_min:.1f}m {bar} ({pct:.1f}%)")
+
+    # Section B: Longest streak record holder (formatted as m:ss)
+    lines.append("\n🔥 **صاحب أطول ريكورد كلام متواصل:**")
+    streak_holder = max(speakers, key=lambda s: s.longest_streak_seconds)
+    if streak_holder.longest_streak_seconds > 0:
+        s_name = streak_holder.speaker_name or streak_holder.speaker_id
+        streak_str = format_streak_mmss(streak_holder.longest_streak_seconds)
+        lines.append(f"👑 **{s_name}** ({streak_str})")
+    else:
+        lines.append("None")
+
+    # Section C: Anger leaderboard (episode count + first anger quote as "receipts")
+    # If zero angry episodes for everyone, replace with: "😡 Nobody got angry this call... suspicious."
+    angry_speakers = [s for s in sorted_speakers if s.angry_episodes > 0]
+    if angry_speakers:
+        lines.append("\n😡 **ليدربورد العصبية:**")
+        angry_speakers.sort(key=lambda s: s.angry_episodes, reverse=True)
+        for s in angry_speakers:
+            name = s.speaker_name or s.speaker_id
+            quote_str = f' | Receipts: "{s.first_anger_quote}"' if s.first_anger_quote else ""
+            ep_word = "episode" if s.angry_episodes == 1 else "episodes"
+            lines.append(f"• **{name}**: {s.angry_episodes} {ep_word}{quote_str}")
+    else:
+        lines.append("\n😡 Nobody got angry this call... suspicious.")
+
+    # Section D: Top-3 topics with %
+    lines.append("\n🏷️ **أكتر مواضيع اتكلمتوا فيها:**")
+    total_topics_count = sum(topic_counts.values())
+    if total_topics_count > 0:
+        top_3 = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+        for rank, (top_name, top_cnt) in enumerate(top_3, 1):
+            t_pct = (top_cnt / total_topics_count) * 100.0
+            lines.append(f"{rank}. **{top_name}**: {t_pct:.1f}% ({top_cnt})")
+    else:
+        lines.append("مفيش مواضيع مسجلة لسه.")
+
+    return "\n".join(lines)
+
+
+@bot.command(name="recap")
+async def recap_command(ctx: commands.Context):
+    """Displays real-time session recap."""
+    session = arbitration_engine.get_session(ctx.guild.id)
+    recap_text = render_recap(session)
+    await ctx.send(recap_text)
+
+
 @bot.command(name="help")
 async def show_help(ctx: commands.Context):
     """Displays comprehensive help and hackathon judging instructions."""
@@ -223,6 +381,7 @@ async def show_help(ctx: commands.Context):
         value=(
             "• `!arbitrate <query>`: On-demand fact verification query (e.g. `!arbitrate RTX 5070 VRAM`).\n"
             "• `!simulate`: Executes the RTX 5070 16GB vs 12GB Golden Demo scenario.\n"
+            "• `!recap`: Displays real-time session recap (talk minutes, streaks, anger leaderboard, top topics).\n"
             "• `!stats`: Displays the server evidence & speaker accuracy leaderboard.\n"
             "• `!status`: Checks latency, API connections, and voice channel state.\n"
             "• `!dashboard`: Link to the live Next.js Judge Dashboard.\n"
