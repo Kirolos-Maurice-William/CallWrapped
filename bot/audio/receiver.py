@@ -22,7 +22,7 @@ class AudioReceiver(voice_recv.AudioSink):
     def __init__(
         self,
         loop: asyncio.AbstractEventLoop,
-        on_utterance: Callable[[int, str, bytes], Awaitable[None]],
+        on_utterance: Callable[..., Awaitable[None]],
         voice_client: Optional[voice_recv.VoiceRecvClient] = None
     ):
         super().__init__()
@@ -120,15 +120,17 @@ class AudioReceiver(voice_recv.AudioSink):
         chunks = buf.pcm_chunks
         user_id = buf.user_id
         user_name = buf.user_name
+        speech_start = buf.speech_start_time
+        speech_end = buf.last_speech_time
         duration = buf.duration()
         buf.reset()
 
         if duration >= config.MIN_SPEECH_DURATION_SEC and len(chunks) > 5:
-            logger.info(f"🎙️ [Speech Finished] {user_name} ({duration:.1f}s, {len(chunks)} frames). Processing...")
+            logger.info(f"🎙️ [Speech Finished] {user_name} ({duration:.1f}s, {len(chunks)} frames, window={speech_start:.2f}-{speech_end:.2f}). Processing...")
             wav_bytes = convert_discord_pcm_to_wav(chunks)
             if wav_bytes:
                 asyncio.run_coroutine_threadsafe(
-                    self.on_utterance(user_id, user_name, wav_bytes),
+                    self.on_utterance(user_id, user_name, wav_bytes, speech_start, speech_end),
                     self.loop
                 )
 

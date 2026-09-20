@@ -57,7 +57,14 @@ def get_guild_context(guild_id: int) -> GuildContext:
     return guild_contexts[guild_id]
 
 
-async def on_user_utterance(guild_id: int, user_id: int, speaker_name: str, wav_bytes: bytes):
+async def on_user_utterance(
+    guild_id: int,
+    user_id: int,
+    speaker_name: str,
+    wav_bytes: bytes,
+    speech_start: float = 0.0,
+    speech_end: float = 0.0
+):
     """
     Asynchronous per-speaker utterance callback.
     Captures raw verbatim speech with code-switching, routes through arbitration state machine.
@@ -106,8 +113,8 @@ async def join_channel(ctx: commands.Context):
             guild_ctx.voice_client = await voice_channel.connect(cls=voice_recv.VoiceRecvClient)
 
         def make_handler(g_id: int):
-            async def handler(u_id: int, u_name: str, wav: bytes):
-                await on_user_utterance(g_id, u_id, u_name, wav)
+            async def handler(u_id: int, u_name: str, wav: bytes, speech_start: float = 0.0, speech_end: float = 0.0):
+                await on_user_utterance(g_id, u_id, u_name, wav, speech_start, speech_end)
             return handler
 
         sink = AudioReceiver(

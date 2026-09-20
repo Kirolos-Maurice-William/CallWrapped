@@ -1,0 +1,92 @@
+<USER_REQUEST>
+# TASK: READ-ONLY Project Audit + Live API Fact Verification
+
+You are auditing our Voice Arbitration Discord bot. Produce ONE report file: `audit/PROJECT_AUDIT.md`.
+DO NOT modify, refactor, or "improve" ANY existing source file. You may create files ONLY inside `audit/`.
+
+## GROUND RULES (non-negotiable)
+1. READ-ONLY on the codebase. No dependency installs except the official SDKs already in requirements.
+2. Never print API keys. Read .env to learn WHICH keys exist; print only key names + last 4 chars.
+3. HONESTY OVER COMPLETION: if a test fails or can't run (missing key, no credits, no audio sample), write the exact error and mark that item `BLOCKED: <reason>`. NEVER invent, extrapolate, or estimate a number you did not measure.
+4. Every latency figure must include: n (sample count), p50, p95, and a raw output excerpt.
+5. Timing protocol: run each timed test at least 5 times; report run #1 separately as "cold", use runs 2..n for p50/p95.
+6. Do NOT start the Discord bot. Only direct API calls to Groq / AssemblyAI / Tavily / Edge-TTS are allowed.
+
+---
+
+## PHASE 1 — CODEBASE INVENTORY
+Answer each precisely. Cite `file:line` for everything. Paste verbatim where asked.
+
+1.1 Directory tree, 2 levels deep, excluding node_modules/.git/venv/__pycache__.
+1.2 Audio receiver: how is speech endpointing done? (built-in Discord/silero/other VAD?) Report the silence threshold value, buffer size, sample rate, and exactly where the silence timer is enforced.
+1.3 STT integration: which AssemblyAI product is used (batch upload vs real-time websocket)? Which model name/params (language detection, code-switching)? Is transcription blocking the audio receive loop, or handed off (asyncio.create_task / queue)? Trace the actual call chain and state it.
+1.4 Search ALL *.py for hardcoded model IDs (regex: llama|gpt-oss|qwen|whisper|deepseek|mixtral). List every hit with file:line.
+1.5 Paste the FULL verbatim text of every LLM prompt in the project: claim detector, conflict analyzer, verdict/epistemic prompt. (I need the exact wording, not a summary.)
+1.6 How are LLM responses parsed: json_schema response_format, json_object mode, function calling, or regex-on-plain-text? Is stream=True used anywhere?
+1.7 ClaimMemory: paste the matching logic verbatim (find_relevant_prior_claim or equivalent). Report window size, max entries, eviction policy, and whether matching is exact string / keyword / embedding.
+1.8 Tavily call: exact params used (search_depth, max_results, include_answer, include_domains, topic). file:line.
+1.9 TTS: edge-tts voice(s) used, and how audio reaches Discord (streamed chunks vs full file vs FFmpeg pipe). Is playback cancellable mid-utterance?
+1.10 Error handling: list every try/except around an external API call, and report whether ANY LLM/search/STT call has a timeout set. If none, say "NO TIMEOUTS ANYWHERE".
+1.11 Existing telemetry/logging: what timing or structured logs exist today, if any?
+1.12 Stats: where speaker_stats / counters are written and read. file:line.
+1.13 Environment: python version, OS, and whether this machine is a local dev box (home internet) or a cloud server (which region if known).
+1.14 Full dependency list (requirements.txt / pyproject). Flag anything using unofficial/reverse-engineered packages.
+1.15 Existing tests: list any test files. If zero, say "ZERO TESTS".
+1.16 Git: current branch, last 10 commit subjects, uncommitted changes summary.
+
+---
+
+## PHASE 2 — LIVE API VERIFICATION TESTS
+Write one script per test in audit/, run it, and include raw output excerpts in the report.
+
+T1 — GROQ MODEL LIST
+GET https://api.groq.com/openai/v1/models. Print ALL model IDs, grouped.
+Specifically answer: (a) which llama-3.x chat models exist today, (b) exact ID of any qwen model — is it `qwen3-32b`, `qwen3.8-27b`, or something else, (c) which gpt-oss IDs exist, (d) which whisper/STT IDs exist.
+
+T2 — PROMPT CACHING BEHAVIOR
+Use OUR actual claim-detector prompt (from 1.5) on gpt-oss-20b:
+- Send identical request twice. Record full `usage` object each time (especially any x.prompt_tokens / cached_tokens fields).
+- Send a 3rd request with ONE character changed at the very START of the prompt. Record usage.
+Report: does usage expose cached tokens? Did the changed prefix look like a cache miss? Paste all three usage objects.
+
+T3 — STRUCTURED OUTPUTS
+(a) response_format json_schema (strict) on gpt-oss-20b, stream=false, using a schema shaped like our claim detector output → success? Validate output against the schema.
+(b) Same request with stream=true → paste the EXACT error/status code.
+(c) Repeat (a) 5 times — count how many outputs are schema-valid.
+(d) Repeat (a)–(c) on the model we actually use in production for claims (from 1.4).
+
+T4 — REASONING EFFORT
+On gpt-oss-20b with our claim prompt: send reasoning_effort = low, medium, high, and "minimal" (expect 400). Record which return 2xx vs 4xx, paste error bodies. Then n=5 latency for low vs medium on the same prompt: report p50/p95 and note any visible quality difference in the JSON output.
+
+T5 — RATE LIMIT HEADERS
+One chat.completions call with `-sD -` equivalent; list ALL x-ratelimit-* headers and values verbatim.
+
+T6 — END-TO-END LATENCY FROM THIS MACHINE (our real prompts/params)
+a) Groq claim detection, our prompt, a real-sounding transcript sample: n=10 → p50/p95 ms + tokens/sec.
+b) Groq conflict analysis, our prompt, two plausible claims: n=10 → p50/p95.
+c) AssemblyAI STT: use a speech WAV found in the repo if one exists (report duration); otherwise state NO SAMPLE AVAILABLE and skip. Upload with the same params our code uses: n=5 → p50/p95 to completed transcript.
+d) Tavily, our real query style: basic vs advanced depth, n=5 each → p50/p95. Then probe: does search_depth="fast" or "ultra-fast" get accepted (2xx) or rejected? Paste response/error. Also test include_answer=true: latency + is the answer field populated + does it look accurate for the query.
+e) edge-tts: synthesize a 15-word sentence → measure time to first audio chunk, n=5 → p50/p95.
+f) Raw network RTT via curl timing: time_connect and time_appconnect to api.groq.com, api.assemblyai.com, api.tavily.com — n=3 each.
+
+T7 — TAVILY CLIENT CAPABILITIES
+Check installed tavily-python version + its source for supported search_depth values and parameters (include_answer, include_domains, auto_parameters?). List what the CURRENT client actually supports.
+
+---
+
+## PHASE 3 — REPORT FORMAT
+`audit/PROJECT_AUDIT.md` structure:
+1. CLAIM VERDICT TABLE (top of file): one row per claim tested → CONFIRMED / REFUTED / PARTIAL / BLOCKED + pointer to evidence section.
+2. Phase 1 inventory answers (with file:line citations).
+3. Phase 2 test results with raw outputs.
+4. "PROBLEMS NOTICED" — anything you observed while reading that looks wrong: blocking calls in the audio path, missing timeouts, hardcoded model IDs, race conditions, unclosed resources, dead code. Facts only, no fixes.
+5. "BLOCKED ITEMS" list with reasons.
+
+Begin with Phase 1. Ask me nothing unless a key is missing entirely.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-20T14:24:46+03:00.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from Gemini 3.8 Flash (High) to Claude Opus 4.6 (Thinking). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>
