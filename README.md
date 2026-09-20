@@ -199,10 +199,10 @@ We empirically probed AssemblyAI's newest streaming endpoints and real-time mode
 
 Voice Arbitrator was engineered from the ground up for the **AssemblyAI Voice Agent Hackathon** by **Team Aang & Bumi**:
 
-| Team Member | Role & Expertise | Focus Areas |
-| :--- | :--- | :--- |
-| **Mostafa Abdallah** | AI & Machine Learning Engineer<br>Computer Vision & Deep Learning Specialist<br>Faculty of AI, Egyptian Chinese University (ECU)<br>GitHub: [@Mostafa23](https://github.com/Mostafa23) • Email: `tofa201714@gmail.com` | • System Architecture & End-to-End Orchestration<br>• Real-Time AssemblyAI Universal-3.5 Pro Streaming<br>• Discord DAVE E2EE Decryption Engine |
-| **Kirolos Maurice William** | AI & Software Engineer<br>GitHub: [@Kirolos-Maurice-William](https://github.com/Kirolos-Maurice-William) | • Epistemic Verification & FastGate Logic<br>• Groq LPU Reasoning & Tavily Search Pipelines<br>• Real-Time Event Bus & Web Dashboard |
+| Team Member | Role & Education | Connect & Profiles | Focus Areas |
+| :--- | :--- | :--- | :--- |
+| **Mostafa Abdallah** | **AI & Machine Learning Engineer**<br>Computer Vision & Deep Learning Specialist<br>Faculty of AI, Egyptian Chinese University (ECU) | [![GitHub](https://img.shields.io/badge/GitHub-Mostafa23-181717?style=flat&logo=github)](https://github.com/Mostafa23)<br>[![LinkedIn](https://img.shields.io/badge/LinkedIn-Mostafa_Abdallah-0A66C2?style=flat&logo=linkedin)](https://www.linkedin.com/in/mostafa%D9%90abdallah/)<br>📧 `tofa201714@gmail.com` | • System Architecture & Pipeline Orchestration<br>• Real-Time AssemblyAI Universal-3.5 Pro Streaming<br>• Discord DAVE E2EE Decryption Engine |
+| **Kirolos Maurice William** | **AI & Software Engineer**<br>Software & Machine Learning Systems<br>Egyptian Chinese University (ECU) | [![GitHub](https://img.shields.io/badge/GitHub-Kirolos--Maurice--William-181717?style=flat&logo=github)](https://github.com/Kirolos-Maurice-William)<br>[![LinkedIn](https://img.shields.io/badge/LinkedIn-Kirolos_Maurice-0A66C2?style=flat&logo=linkedin)](https://www.linkedin.com/in/kirolos-maurice-william/) | • Epistemic Verification & FastGate Engine<br>• Groq LPU Reasoning & Tavily Search Pipelines<br>• Real-Time Event Bus & Web Dashboard |
 
 ---
 
