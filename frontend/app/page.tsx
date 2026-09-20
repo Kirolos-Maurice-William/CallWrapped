@@ -24,6 +24,12 @@ import {
   Check
 } from "lucide-react";
 
+import {
+  AnalyticsWidgets,
+  AnalyticsState,
+  SpeakerAnalytics
+} from "../components/AnalyticsWidgets";
+
 interface LatencyMetrics {
   stt_ms?: number;
   llm_ms?: number;
@@ -73,11 +79,21 @@ export default function VoiceArbitratorDashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionType, setConnectionType] = useState<"ws" | "poll">("poll");
   const [latency, setLatency] = useState<LatencyMetrics>({
-    stt_ms: 272,
-    llm_ms: 198,
-    search_ms: 540,
-    tts_ms: 180,
-    total_ms: 1190,
+    stt_ms: 0,
+    llm_ms: 0,
+    search_ms: 0,
+    tts_ms: 0,
+    total_ms: 0,
+  });
+  const [analytics, setAnalytics] = useState<AnalyticsState>({
+    topic_totals: {},
+    speakers: {},
+    total_talk_seconds: 0,
+    total_angry_episodes: 0,
+    longest_streak: {
+      speaker_name: null,
+      streak_seconds: 0,
+    },
   });
   const [turns, setTurns] = useState<Turn[]>([]);
   const [activeDispute, setActiveDispute] = useState<DisputeInfo | null>(null);
@@ -119,11 +135,73 @@ export default function VoiceArbitratorDashboard() {
     let pollInterval: NodeJS.Timeout | null = null;
     const { http, ws } = getBackendBase();
 
+    const getReceiptsCache = (): Record<string, string> => {
+      if (typeof window === "undefined") return {};
+      try {
+        return JSON.parse(localStorage.getItem("receipts_cache") || "{}");
+      } catch {
+        return {};
+      }
+    };
+
+    const saveReceiptToCache = (speaker: string, quote: string) => {
+      if (typeof window === "undefined" || !speaker || !quote) return;
+      try {
+        const cache = getReceiptsCache();
+        cache[speaker] = quote;
+        localStorage.setItem("receipts_cache", JSON.stringify(cache));
+      } catch {
+        // ignore
+      }
+    };
+
+    const applyAnalytics = (rawAnalytics: any, rawEvent?: any) => {
+      if (!rawAnalytics) return;
+      const cache = getReceiptsCache();
+
+      // If an event carries anger_evidence or first_anger_quote, cache it
+      if (rawEvent) {
+        const quote = rawEvent.anger_evidence || rawEvent.payload?.anger_evidence || rawEvent.payload?.first_anger_quote;
+        if (quote && rawEvent.speaker_name) {
+          saveReceiptToCache(rawEvent.speaker_name, quote);
+          cache[rawEvent.speaker_name] = quote;
+        }
+      }
+
+      const mergedSpeakers: Record<string, SpeakerAnalytics> = {};
+      if (rawAnalytics.speakers) {
+        for (const [name, spk] of Object.entries(rawAnalytics.speakers as Record<string, any>)) {
+          mergedSpeakers[name] = {
+            speaker_name: spk.speaker_name || name,
+            talk_seconds: Number(spk.talk_seconds || 0),
+            longest_streak_seconds: Number(spk.longest_streak_seconds || 0),
+            angry_episodes: Number(spk.angry_episodes || 0),
+            anger_evidence: spk.anger_evidence || spk.first_anger_quote || cache[name] || undefined
+          };
+        }
+      }
+
+      setAnalytics({
+        topic_totals: rawAnalytics.topic_totals || {},
+        speakers: mergedSpeakers,
+        total_talk_seconds: Number(rawAnalytics.total_talk_seconds || 0),
+        total_angry_episodes: Number(rawAnalytics.total_angry_episodes || 0),
+        longest_streak: {
+          speaker_name: rawAnalytics.longest_streak?.speaker_name || null,
+          streak_seconds: Number(rawAnalytics.longest_streak?.streak_seconds || 0)
+        }
+      });
+    };
+
     const fetchLiveSnapshot = async () => {
       try {
-        const res = await fetch(`${http}/api/live`);
-        if (res.ok) {
-          const data = await res.json();
+        const [resLive, resAnalytics] = await Promise.all([
+          fetch(`${http}/api/live`),
+          fetch(`${http}/api/analytics`)
+        ]);
+
+        if (resLive.ok) {
+          const data = await resLive.json();
           if (isMounted) {
             setIsConnected(true);
             if (data.latency) setLatency(data.latency);
@@ -131,6 +209,14 @@ export default function VoiceArbitratorDashboard() {
             if (data.active_dispute) setActiveDispute(data.active_dispute);
             if (data.disputes_history) setDisputesHistory(data.disputes_history);
             if (data.leaderboard) setLeaderboard(data.leaderboard);
+            if (data.analytics) applyAnalytics(data.analytics);
+          }
+        }
+
+        if (resAnalytics.ok) {
+          const aData = await resAnalytics.json();
+          if (isMounted && aData) {
+            applyAnalytics(aData);
           }
         }
       } catch (err) {
@@ -160,6 +246,7 @@ export default function VoiceArbitratorDashboard() {
               if (d.active_dispute) setActiveDispute(d.active_dispute);
               if (d.disputes_history) setDisputesHistory(d.disputes_history);
               if (d.leaderboard) setLeaderboard(d.leaderboard);
+              if (d.analytics) applyAnalytics(d.analytics);
             } else if (msg.live_state) {
               const d = msg.live_state;
               if (d.latency) setLatency(d.latency);
@@ -167,6 +254,16 @@ export default function VoiceArbitratorDashboard() {
               if (d.active_dispute) setActiveDispute(d.active_dispute);
               if (d.disputes_history) setDisputesHistory(d.disputes_history);
               if (d.leaderboard) setLeaderboard(d.leaderboard);
+              if (d.analytics) applyAnalytics(d.analytics, msg.event);
+            }
+
+            if (msg.analytics) {
+              applyAnalytics(msg.analytics, msg.event);
+            }
+
+            if (msg.type === "analytics_update" && msg.event) {
+              // Direct analytics update event
+              applyAnalytics(msg.analytics || analytics, msg.event);
             }
           } catch (e) {
             console.error("WS message parse error:", e);
@@ -227,6 +324,26 @@ export default function VoiceArbitratorDashboard() {
         "Disputed Claims": 0,
         Speakers: {},
       });
+      setLatency({
+        stt_ms: 0,
+        llm_ms: 0,
+        search_ms: 0,
+        tts_ms: 0,
+        total_ms: 0,
+      });
+      setAnalytics({
+        topic_totals: {},
+        speakers: {},
+        total_talk_seconds: 0,
+        total_angry_episodes: 0,
+        longest_streak: {
+          speaker_name: null,
+          streak_seconds: 0,
+        },
+      });
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("receipts_cache");
+      }
     } catch (e) {
       console.error("Failed to reset:", e);
     }
@@ -328,28 +445,28 @@ export default function VoiceArbitratorDashboard() {
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-cyan-950/40 border border-cyan-800/40 text-cyan-300">
               <span className="text-[10px] text-cyan-500 font-mono">1. STT</span>
               <span className="font-semibold">AssemblyAI Universal-3.5:</span>
-              <span className="font-mono font-bold text-white">{latency.stt_ms || 272}ms</span>
+              <span className="font-mono font-bold text-white">{latency.stt_ms ?? 0}ms</span>
             </div>
 
             {/* Stage 2: Groq LLM */}
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-950/40 border border-purple-800/40 text-purple-300">
               <span className="text-[10px] text-purple-500 font-mono">2. LPU</span>
               <span className="font-semibold">Groq Epistemic Engine:</span>
-              <span className="font-mono font-bold text-white">{latency.llm_ms || 198}ms</span>
+              <span className="font-mono font-bold text-white">{latency.llm_ms ?? 0}ms</span>
             </div>
 
             {/* Stage 3: Tavily Search */}
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-950/40 border border-amber-800/40 text-amber-300">
               <span className="text-[10px] text-amber-500 font-mono">3. WEB</span>
               <span className="font-semibold">Tavily Tier-1 Search:</span>
-              <span className="font-mono font-bold text-white">{latency.search_ms || 540}ms</span>
+              <span className="font-mono font-bold text-white">{latency.search_ms ?? 0}ms</span>
             </div>
 
             {/* Stage 4: Neural TTS */}
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-950/40 border border-emerald-800/40 text-emerald-300">
               <span className="text-[10px] text-emerald-500 font-mono">4. VOICE</span>
               <span className="font-semibold">Edge Neural Shakir:</span>
-              <span className="font-mono font-bold text-white">{latency.tts_ms || 180}ms</span>
+              <span className="font-mono font-bold text-white">{latency.tts_ms ?? 0}ms</span>
             </div>
 
             {/* Total */}
@@ -361,10 +478,13 @@ export default function VoiceArbitratorDashboard() {
       </section>
 
       {/* 3. MAIN DASHBOARD CONTENT */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col space-y-6">
+        {/* REAL-TIME CALL ANALYTICS WIDGETS */}
+        <AnalyticsWidgets analytics={analytics} />
 
-        {/* LEFT/CENTER: HERO ACTIVE DISPUTE CARD & PAST DISPUTES (7 COLS) */}
-        <div className="lg:col-span-7 flex flex-col space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* LEFT/CENTER: HERO ACTIVE DISPUTE CARD & PAST DISPUTES (7 COLS) */}
+          <div className="lg:col-span-7 flex flex-col space-y-6">
 
           {/* ACTIVE DISPUTE CARD */}
           <div className="relative rounded-2xl bg-gradient-to-b from-slate-900/90 to-slate-950/90 border-2 border-emerald-500/40 shadow-2xl shadow-emerald-500/10 p-5 md:p-6 overflow-hidden">
@@ -707,6 +827,7 @@ export default function VoiceArbitratorDashboard() {
           </div>
         </div>
 
+        </div>
       </main>
     </div>
   );
