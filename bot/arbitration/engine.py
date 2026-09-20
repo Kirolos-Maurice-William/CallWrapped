@@ -28,6 +28,8 @@ class SessionState:
         self.unverifiable_count: int = 0
         self.speaker_stats: Dict[str, Dict[str, int]] = {}
         self.is_arbitrating: bool = False
+        self.pending_utterances: List[Dict[str, Any]] = []
+        self.is_draining: bool = False
 
     def add_turn(self, speaker_name: str, text: str, user_id: int):
         self.turns.append({
@@ -113,7 +115,56 @@ class ArbitrationEngine:
 
         # 3. Mode is Referee: Proceed with Filtered Pipeline
         if session.is_arbitrating:
+            if len(session.pending_utterances) >= 3:
+                dropped = session.pending_utterances.pop(0)
+                logger.warning(
+                    f"⚠️ [Queue Overflow] Dropped oldest queued utterance from {dropped['speaker_name']}: '{dropped['raw_text']}'"
+                )
+            session.pending_utterances.append({
+                "user_id": user_id,
+                "speaker_name": speaker_name,
+                "raw_text": raw_text,
+                "stt_ms": stt_ms,
+                "voice_client": voice_client,
+                "text_channel": text_channel,
+                "mode": mode,
+                "t_start": t_start,
+                "correlation_id": correlation_id
+            })
+            logger.info(
+                f"📥 [Queued Utterance] Session {guild_id} is arbitrating. "
+                f"Queued utterance from {speaker_name} (queue size: {len(session.pending_utterances)}/3)"
+            )
             return
+
+        await self._run_pipeline(
+            guild_id=guild_id,
+            session=session,
+            user_id=user_id,
+            speaker_name=speaker_name,
+            raw_text=raw_text,
+            stt_ms=stt_ms,
+            voice_client=voice_client,
+            text_channel=text_channel,
+            mode=mode,
+            t_start=t_start,
+            correlation_id=correlation_id
+        )
+
+    async def _run_pipeline(
+        self,
+        guild_id: int,
+        session: SessionState,
+        user_id: int,
+        speaker_name: str,
+        raw_text: str,
+        stt_ms: int,
+        voice_client: Optional[discord.VoiceClient],
+        text_channel: Optional[discord.TextChannel],
+        mode: str,
+        t_start: float,
+        correlation_id: str
+    ):
 
         # Step A: FastGate + Groq Claim Detector
         t_claim_start = time.monotonic()
@@ -313,6 +364,40 @@ class ArbitrationEngine:
             logger.error(f"Arbitration cycle failed: {err}", exc_info=True)
         finally:
             session.is_arbitrating = False
+            await self._drain_queue(guild_id, session)
+
+    async def _drain_queue(self, guild_id: int, session: SessionState):
+        """Drains pending queued utterances through the normal pipeline after arbitration ends."""
+        if session.is_draining:
+            return
+        session.is_draining = True
+        try:
+            while session.pending_utterances and not session.is_arbitrating:
+                queued = session.pending_utterances.pop(0)
+                logger.info(
+                    f"📤 [Draining Queue] Processing queued utterance from {queued['speaker_name']}: '{queued['raw_text']}'"
+                )
+                try:
+                    await self._run_pipeline(
+                        guild_id=guild_id,
+                        session=session,
+                        user_id=queued["user_id"],
+                        speaker_name=queued["speaker_name"],
+                        raw_text=queued["raw_text"],
+                        stt_ms=queued["stt_ms"],
+                        voice_client=queued["voice_client"],
+                        text_channel=queued["text_channel"],
+                        mode=queued["mode"],
+                        t_start=queued.get("t_start", time.monotonic()),
+                        correlation_id=queued.get("correlation_id", f"arb_{uuid.uuid4().hex[:8]}")
+                    )
+                except Exception as ex:
+                    logger.error(
+                        f"Error processing queued utterance from {queued['speaker_name']}: {ex}",
+                        exc_info=True
+                    )
+        finally:
+            session.is_draining = False
 
 
 arbitration_engine = ArbitrationEngine()
