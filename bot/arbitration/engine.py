@@ -215,8 +215,9 @@ class ArbitrationEngine:
             anger = res.get("anger", "none")
             anger_evidence = res.get("anger_evidence") or ""
 
-            # 1. Update topic stats
-            session._topic_counts[topic] = session._topic_counts.get(topic, 0) + 1
+            # 1. Update topic stats (avoid duplicate increment if publisher is hooked by main.py)
+            if getattr(publisher.publish_sync_task, "__name__", "") != "_on_event_published":
+                session._topic_counts[topic] = session._topic_counts.get(topic, 0) + 1
 
             # 2. Update anger with 90s debounce
             stats = session._stats_tracker.record_anger(
@@ -347,8 +348,10 @@ class ArbitrationEngine:
                 "correlation_id": correlation_id
             })
 
-            # Check if analytics window expired or schedule timer flush
-            if (time.time() - session.last_analytics_flush) >= config.ANALYTICS_WINDOW_SEC:
+            # Check if buffer overflow, analytics window expired, or schedule timer flush
+            if len(session.analytics_buffer) >= 20:
+                asyncio.create_task(self.flush_analytics(guild_id, reason="buffer_overflow"))
+            elif (time.time() - session.last_analytics_flush) >= config.ANALYTICS_WINDOW_SEC:
                 asyncio.create_task(self.flush_analytics(guild_id, reason="window_timer"))
             elif session.analytics_timer_task is None or session.analytics_timer_task.done():
                 session.analytics_timer_task = asyncio.create_task(

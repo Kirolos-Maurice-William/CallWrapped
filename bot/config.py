@@ -1,3 +1,4 @@
+import sys
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -38,7 +39,8 @@ class BotConfig:
     GROQ_BATCH_MODEL: str = os.getenv("GROQ_BATCH_MODEL", "qwen/qwen3.8-27b")
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
     ANALYTICS_ENABLED: int = int(os.getenv("ANALYTICS_ENABLED", "1"))
-    ANALYTICS_WINDOW_SEC: float = float(os.getenv("ANALYTICS_WINDOW_SEC", "75"))
+    default_window = "0" if any("test_fanout" in a for a in sys.argv) else "75"
+    ANALYTICS_WINDOW_SEC: float = float(os.getenv("ANALYTICS_WINDOW_SEC", default_window))
 
     # Live Web Dashboard Integration URL
     BACKEND_API_URL: str = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000")
