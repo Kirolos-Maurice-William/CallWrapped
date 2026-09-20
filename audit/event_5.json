@@ -1,0 +1,27 @@
+{
+  "event_id": "evt_005",
+  "session_id": "hackathon_live_session",
+  "type": "intervention",
+  "speaker_name": "Arbitrator",
+  "text": "كارت الـ RTX 5070 نزل بـ 12 جيجا بايت مش 16",
+  "latency": {
+    "stt_ms": 280,
+    "llm_ms": 450,
+    "search_ms": 620,
+    "tts_ms": 150,
+    "total_ms": 1500
+  },
+  "payload": {
+    "speaker_a": "Ahmed",
+    "speaker_b": "Mohamed",
+    "claim_a": "12GB VRAM",
+    "claim_b": "16GB VRAM",
+    "speaker_a_status": "SUPPORTED",
+    "speaker_b_status": "CONTRADICTED",
+    "winner": "Ahmed",
+    "loser": "Mohamed",
+    "correct_fact": "RTX 5070 has 12GB GDDR7 VRAM",
+    "confidence": 99,
+    "source_url": "https://www.nvidia.com"
+  }
+}

@@ -13,16 +13,28 @@ router = APIRouter(prefix="/api", tags=["routes"])
 # Active WebSockets pool for real-time dashboard updates
 active_connections: List[WebSocket] = []
 
+# Live Analytics State for Voice Arbitrator
+ANALYTICS_STATE: Dict[str, Any] = {
+    "topic_totals": {},
+    "speakers": {},
+    "total_talk_seconds": 0.0,
+    "total_angry_episodes": 0,
+    "longest_streak": {
+        "speaker_name": None,
+        "streak_seconds": 0.0
+    }
+}
+
 # Live State for Voice Arbitrator
 LIVE_STATE: Dict[str, Any] = {
     "is_call_active": True,
-    "last_updated": time.time(),
+    "last_updated": 0.0,
     "latency": {
-        "stt_ms": 272,
-        "llm_ms": 198,
-        "search_ms": 540,
-        "tts_ms": 180,
-        "total_ms": 1190
+        "stt_ms": 0,
+        "llm_ms": 0,
+        "search_ms": 0,
+        "tts_ms": 0,
+        "total_ms": 0
     },
     "turns": [],
     "active_dispute": None,
@@ -31,7 +43,8 @@ LIVE_STATE: Dict[str, Any] = {
         "Verified Claims": 0,
         "Disputed Claims": 0,
         "Speakers": {}
-    }
+    },
+    "analytics": ANALYTICS_STATE
 }
 
 
@@ -40,13 +53,21 @@ class VoiceEventPayload(BaseModel):
     session_id: str = "hackathon_live_session"
     correlation_id: Optional[str] = None
     timestamp: float = Field(default_factory=time.time)
-    type: str  # "transcript" | "claim" | "dispute" | "verification" | "intervention"
+    type: str  # "transcript" | "claim" | "dispute" | "verification" | "intervention" | "analytics_update"
     speaker_id: Optional[str] = None
-    speaker_name: str
-    text: str
+    speaker_name: str = "Unknown"
+    text: str = ""
     timings: Optional[Dict[str, float]] = None
     latency: Optional[Dict[str, Any]] = None
     payload: Dict[str, Any] = Field(default_factory=dict)
+
+    # Analytics fields
+    topic: Optional[str] = None
+    anger: Optional[str] = None
+    anger_evidence: Optional[str] = None
+    talk_delta_seconds: Optional[float] = None
+    streak_seconds: Optional[float] = None
+    angry_episodes: Optional[int] = None
 
 
 async def broadcast_event(event_data: dict):
@@ -168,7 +189,48 @@ async def ingest_voice_event(event: VoiceEventPayload):
             elif spk_b_status == "CONTRADICTED":
                 speakers[spk_b]["refuted"] += 1
 
-    await broadcast_event({"type": event.type, "event": event.dict(), "live_state": LIVE_STATE})
+    # 4. Analytics Aggregation (analytics_update or any event carrying analytics data)
+    topic = event.topic or event.payload.get("topic")
+    anger = event.anger or event.payload.get("anger")
+    anger_evidence = event.anger_evidence or event.payload.get("anger_evidence")
+    talk_delta = event.talk_delta_seconds if event.talk_delta_seconds is not None else event.payload.get("talk_delta_seconds")
+    streak = event.streak_seconds if event.streak_seconds is not None else event.payload.get("streak_seconds")
+    episodes = event.angry_episodes if event.angry_episodes is not None else event.payload.get("angry_episodes")
+
+    if event.type == "analytics_update" or topic or talk_delta is not None or episodes is not None:
+        spk = event.speaker_name or "Unknown"
+        if spk not in ANALYTICS_STATE["speakers"]:
+            ANALYTICS_STATE["speakers"][spk] = {
+                "speaker_name": spk,
+                "talk_seconds": 0.0,
+                "longest_streak_seconds": 0.0,
+                "angry_episodes": 0
+            }
+        spk_stats = ANALYTICS_STATE["speakers"][spk]
+
+        if topic:
+            ANALYTICS_STATE["topic_totals"][topic] = ANALYTICS_STATE["topic_totals"].get(topic, 0) + 1
+
+        if talk_delta is not None:
+            spk_stats["talk_seconds"] = round(spk_stats["talk_seconds"] + float(talk_delta), 2)
+        elif "total_speak_seconds" in event.payload:
+            spk_stats["talk_seconds"] = round(float(event.payload["total_speak_seconds"]), 2)
+
+        if streak is not None:
+            spk_stats["longest_streak_seconds"] = max(spk_stats["longest_streak_seconds"], round(float(streak), 2))
+            if spk_stats["longest_streak_seconds"] > ANALYTICS_STATE["longest_streak"]["streak_seconds"]:
+                ANALYTICS_STATE["longest_streak"]["speaker_name"] = spk
+                ANALYTICS_STATE["longest_streak"]["streak_seconds"] = spk_stats["longest_streak_seconds"]
+
+        if episodes is not None:
+            spk_stats["angry_episodes"] = max(spk_stats["angry_episodes"], int(episodes))
+        elif anger in ("mild", "high"):
+            spk_stats["angry_episodes"] += 1
+
+        ANALYTICS_STATE["total_talk_seconds"] = round(sum(s["talk_seconds"] for s in ANALYTICS_STATE["speakers"].values()), 2)
+        ANALYTICS_STATE["total_angry_episodes"] = sum(s["angry_episodes"] for s in ANALYTICS_STATE["speakers"].values())
+
+    await broadcast_event({"type": event.type, "event": event.dict(), "live_state": LIVE_STATE, "analytics": ANALYTICS_STATE})
     return {"status": "ok", "event_id": event.event_id}
 
 
@@ -178,9 +240,23 @@ async def get_live_state():
     return LIVE_STATE
 
 
+@router.get("/analytics")
+async def get_analytics():
+    """Returns aggregated session analytics (topics, speaker talk time, streaks, anger)."""
+    return ANALYTICS_STATE
+
+
 @router.post("/reset")
 async def reset_live_state():
-    """Resets dashboard state for a fresh demo run."""
+    """Resets dashboard state for a fresh run."""
+    LIVE_STATE["last_updated"] = 0.0
+    LIVE_STATE["latency"] = {
+        "stt_ms": 0,
+        "llm_ms": 0,
+        "search_ms": 0,
+        "tts_ms": 0,
+        "total_ms": 0
+    }
     LIVE_STATE["turns"].clear()
     LIVE_STATE["active_dispute"] = None
     LIVE_STATE["disputes_history"].clear()
@@ -189,7 +265,15 @@ async def reset_live_state():
         "Disputed Claims": 0,
         "Speakers": {}
     }
-    await broadcast_event({"type": "reset", "live_state": LIVE_STATE})
+    ANALYTICS_STATE["topic_totals"].clear()
+    ANALYTICS_STATE["speakers"].clear()
+    ANALYTICS_STATE["total_talk_seconds"] = 0.0
+    ANALYTICS_STATE["total_angry_episodes"] = 0
+    ANALYTICS_STATE["longest_streak"] = {
+        "speaker_name": None,
+        "streak_seconds": 0.0
+    }
+    await broadcast_event({"type": "reset", "live_state": LIVE_STATE, "analytics": ANALYTICS_STATE})
     return {"status": "ok"}
 
 

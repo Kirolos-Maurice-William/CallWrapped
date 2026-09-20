@@ -1,0 +1,13 @@
+{
+  "event_id": "evt_003",
+  "session_id": "hackathon_live_session",
+  "type": "claim",
+  "speaker_name": "Mohamed",
+  "text": "كارت الـ 5070 نازل بـ 16 جيجا",
+  "topic": "tech",
+  "payload": {
+    "entity": "RTX 5070",
+    "metric": "16GB",
+    "topic": "tech"
+  }
+}

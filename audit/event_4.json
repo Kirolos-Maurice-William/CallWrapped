@@ -1,0 +1,21 @@
+{
+  "event_id": "evt_004",
+  "session_id": "hackathon_live_session",
+  "type": "analytics_update",
+  "speaker_name": "Ahmed",
+  "text": "للسط مرتين علطول يا خسارة الدبيل ده زهقت خلاص",
+  "topic": "gaming",
+  "anger": "mild",
+  "anger_evidence": "زهقت خلاص",
+  "talk_delta_seconds": 12.5,
+  "streak_seconds": 12.5,
+  "angry_episodes": 1,
+  "payload": {
+    "topic": "gaming",
+    "anger": "mild",
+    "anger_evidence": "زهقت خلاص",
+    "talk_delta_seconds": 12.5,
+    "streak_seconds": 12.5,
+    "angry_episodes": 1
+  }
+}

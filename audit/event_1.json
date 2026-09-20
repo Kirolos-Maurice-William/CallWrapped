@@ -1,0 +1,11 @@
+{
+  "event_id": "evt_001",
+  "session_id": "hackathon_live_session",
+  "type": "transcript",
+  "speaker_name": "Ahmed",
+  "text": "يا جماعة كارت الـ 5070 نازل بـ 12 جيجا رام",
+  "latency": {
+    "stt_ms": 240
+  },
+  "payload": {}
+}

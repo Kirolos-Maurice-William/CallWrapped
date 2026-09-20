@@ -1,0 +1,11 @@
+{
+  "event_id": "evt_002",
+  "session_id": "hackathon_live_session",
+  "type": "transcript",
+  "speaker_name": "Mohamed",
+  "text": "لا يا عم ده نازل بـ 16 جيجا رسمي",
+  "latency": {
+    "stt_ms": 310
+  },
+  "payload": {}
+}
