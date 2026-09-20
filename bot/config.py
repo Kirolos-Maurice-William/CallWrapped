@@ -32,6 +32,7 @@ class BotConfig:
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
+    ANALYTICS_ENABLED: int = int(os.getenv("ANALYTICS_ENABLED", "1"))
 
     # Live Web Dashboard Integration URL
     BACKEND_API_URL: str = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000")
