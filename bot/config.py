@@ -32,9 +32,13 @@ class BotConfig:
 
     # Intelligence & Fact-Checking APIs
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    GROQ_API_KEY_2: str = os.getenv("GROQ_API_KEY_2", "")
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
+    GROQ_INSTANT_MODEL: str = os.getenv("GROQ_INSTANT_MODEL", os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"))
+    GROQ_BATCH_MODEL: str = os.getenv("GROQ_BATCH_MODEL", "qwen/qwen3.8-27b")
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
     ANALYTICS_ENABLED: int = int(os.getenv("ANALYTICS_ENABLED", "1"))
+    ANALYTICS_WINDOW_SEC: float = float(os.getenv("ANALYTICS_WINDOW_SEC", "75"))
 
     # Live Web Dashboard Integration URL
     BACKEND_API_URL: str = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000")

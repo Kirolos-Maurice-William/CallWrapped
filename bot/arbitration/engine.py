@@ -19,7 +19,7 @@ logger = logging.getLogger("ArbitrationEngine")
 
 
 class SessionState:
-    """Tracks sliding dialogue turns, indexed claim memory, server statistics, and talk/anger stats."""
+    """Tracks sliding dialogue turns, indexed claim memory, server statistics, and batched analytics."""
 
     def __init__(self, guild_id: int):
         self.guild_id = guild_id
@@ -32,8 +32,34 @@ class SessionState:
         self.is_arbitrating: bool = False
         self.pending_utterances: List[Dict[str, Any]] = []
         self.is_draining: bool = False
-        self.stats_tracker = SessionStatsTracker(session_id=str(guild_id))
+        self._stats_tracker = SessionStatsTracker(session_id=str(guild_id))
         self.analyzed_utterances: set = set()
+        self.analytics_buffer: List[Dict[str, Any]] = []
+        self.last_analytics_flush: float = time.time()
+        self._topic_counts: Dict[str, int] = {}
+        self._flush_lock = asyncio.Lock()
+        self._is_sync_flushing: bool = False
+        self.analytics_timer_task: Optional[asyncio.Task] = None
+
+    @property
+    def stats_tracker(self) -> SessionStatsTracker:
+        if self.analytics_buffer and not self._is_sync_flushing:
+            arbitration_engine.flush_analytics_sync(self.guild_id, reason="stats_tracker_read")
+        return self._stats_tracker
+
+    @stats_tracker.setter
+    def stats_tracker(self, val: SessionStatsTracker):
+        self._stats_tracker = val
+
+    @property
+    def topic_counts(self) -> Dict[str, int]:
+        if self.analytics_buffer and not self._is_sync_flushing:
+            arbitration_engine.flush_analytics_sync(self.guild_id, reason="recap_render")
+        return self._topic_counts
+
+    @topic_counts.setter
+    def topic_counts(self, val: Dict[str, int]):
+        self._topic_counts = val
 
     def add_turn(self, speaker_name: str, text: str, user_id: int):
         self.turns.append({
@@ -48,6 +74,25 @@ class SessionState:
         if speaker_name not in self.speaker_stats:
             self.speaker_stats[speaker_name] = {"turns": 0, "verified": 0, "refuted": 0}
         self.speaker_stats[speaker_name]["turns"] += 1
+
+    def reset(self):
+        """Flushes pending analytics buffer and resets all session statistics."""
+        if self.analytics_buffer:
+            arbitration_engine.flush_analytics_sync(self.guild_id, reason="session_reset")
+        self.turns.clear()
+        self.analytics_buffer.clear()
+        self._topic_counts.clear()
+        self.verified_claims_count = 0
+        self.disputed_claims_count = 0
+        self.unverifiable_count = 0
+        self.speaker_stats.clear()
+        self.is_arbitrating = False
+        self.pending_utterances.clear()
+        self.is_draining = False
+        self._stats_tracker.reset()
+        self.analyzed_utterances.clear()
+        if self.analytics_timer_task and not self.analytics_timer_task.done():
+            self.analytics_timer_task.cancel()
 
 
 class ArbitrationEngine:
@@ -84,106 +129,143 @@ class ArbitrationEngine:
         finally:
             self._in_flight_classifications.pop(cache_key, None)
 
-    async def _run_analytics(
-        self,
-        guild_id: int,
-        user_id: int,
-        speaker_name: str,
-        raw_text: str,
-        speech_start: float,
-        speech_end: float,
-        correlation_id: str
-    ):
+    async def _delayed_flush(self, guild_id: int, delay: float):
+        """Asynchronously flushes analytics after the window delay without blocking."""
+        try:
+            await asyncio.sleep(delay)
+            await self.flush_analytics(guild_id, reason="window_timer")
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.warning(f"[ArbitrationEngine] Delayed flush error: {e}")
+
+    async def flush_analytics(self, guild_id: int, reason: str = "flush"):
         """
-        Analytics Path (isolated):
-        Classifies utterance -> updates talk-time stats & anger episodes ->
-        publishes VoiceEvent(type="analytics_update").
-        Runs completely isolated in background via asyncio.create_task.
+        Batched Path (async): Flushes pending analytics buffer via a single Groq call.
+        Updates topic stats, records anger episodes (90s debounce), and publishes events.
+        On batch failure or 429: retries once, then KEEPS the buffer for the next window.
         """
         session = self.get_session(guild_id)
+        if not session.analytics_buffer:
+            return
+
+        async with session._flush_lock:
+            if not session.analytics_buffer:
+                return
+            buffer_to_process = list(session.analytics_buffer)
+            try:
+                results, tokens, latency_ms = await claim_detector.batch_classify(buffer_to_process)
+            except Exception as e:
+                logger.warning(
+                    f"⚠️ [BatchAnalytics] Batch classification failed after retry: {e}. "
+                    f"Keeping {len(buffer_to_process)} buffered items for next window."
+                )
+                return
+
+            # On success: drain processed items and update timestamp
+            session.analytics_buffer = session.analytics_buffer[len(buffer_to_process):]
+            session.last_analytics_flush = time.time()
+
+            self._apply_batch_results(session, guild_id, buffer_to_process, results, tokens, reason)
+
+    def flush_analytics_sync(self, guild_id: int, reason: str = "sync_flush"):
+        """
+        Batched Path (sync): Synchronously flushes pending buffer before !recap rendering or session end.
+        On failure or 429: retries once, then KEEPS the buffer.
+        """
+        session = self.get_session(guild_id)
+        if not session.analytics_buffer:
+            return
+
+        if session._is_sync_flushing:
+            return
+        session._is_sync_flushing = True
         try:
-            is_claim, classification_data, latency_ms = await self._classify_utterance(raw_text)
-            if not classification_data:
-                classification_data = {
-                    "is_factual_claim": False,
-                    "claim": None,
-                    "entity": None,
-                    "metric": None,
-                    "topic": "other",
-                    "anger": "none",
-                    "anger_evidence": None
-                }
+            buffer_to_process = list(session.analytics_buffer)
+            try:
+                results, tokens, latency_ms = claim_detector.batch_classify_sync(buffer_to_process)
+            except Exception as e:
+                logger.warning(
+                    f"⚠️ [BatchAnalytics Sync] Batch classification failed after retry: {e}. "
+                    f"Keeping {len(buffer_to_process)} buffered items for next window."
+                )
+                return
 
-            # Handle talk timestamps
-            duration = max(0.0, speech_end - speech_start)
-            if speech_start == 0.0 and speech_end == 0.0:
-                speech_start = time.time()
-                word_count = len(raw_text.split())
-                duration = max(1.5, word_count * 0.4)
-                speech_end = speech_start + duration
+            session.analytics_buffer = session.analytics_buffer[len(buffer_to_process):]
+            session.last_analytics_flush = time.time()
 
-            spk_key = str(user_id)
-            spk_stats_before = session.stats_tracker.get_speaker(spk_key)
-            prev_total = spk_stats_before.total_speak_seconds if spk_stats_before else 0.0
+            self._apply_batch_results(session, guild_id, buffer_to_process, results, tokens, reason)
+        finally:
+            session._is_sync_flushing = False
 
-            stats = session.stats_tracker.record_utterance(
-                speaker_id=spk_key,
-                speech_start=speech_start,
-                speech_end=speech_end,
-                speaker_name=speaker_name,
-                classification=classification_data
+    def _apply_batch_results(
+        self,
+        session: SessionState,
+        guild_id: int,
+        buffer_to_process: list,
+        results: list,
+        tokens: dict,
+        reason: str
+    ):
+        results_by_line = {r.get("line_number", i + 1): r for i, r in enumerate(results)}
+
+        for idx, item in enumerate(buffer_to_process, 1):
+            res = results_by_line.get(idx, {})
+            topic = res.get("topic", "other")
+            anger = res.get("anger", "none")
+            anger_evidence = res.get("anger_evidence") or ""
+
+            # 1. Update topic stats
+            session._topic_counts[topic] = session._topic_counts.get(topic, 0) + 1
+
+            # 2. Update anger with 90s debounce
+            stats = session._stats_tracker.record_anger(
+                speaker_id=str(item["user_id"]),
+                timestamp=item["timestamp"],
+                anger=anger,
+                anger_quote=anger_evidence,
+                speaker_name=item["speaker_name"]
             )
-            talk_delta_seconds = round(stats.total_speak_seconds - prev_total, 3)
-            streak_seconds = round(stats.current_streak, 3)
-            angry_episodes = stats.angry_episodes
-
-            topic = classification_data.get("topic")
-            anger = classification_data.get("anger")
-            anger_evidence = classification_data.get("anger_evidence")
-
-            tokens = classification_data.get("_tokens", {})
-            prompt_tokens = tokens.get("prompt_tokens", 0)
-            completion_tokens = tokens.get("completion_tokens", 0)
-            total_tokens = tokens.get("total_tokens", prompt_tokens + completion_tokens)
 
             logger.info(
-                f"📈 [Analytics Update] {speaker_name} | topic={topic} | anger={anger} | "
-                f"talk_delta={talk_delta_seconds}s | total_talk={stats.total_speak_seconds:.2f}s | "
-                f"streak={streak_seconds}s | angry_episodes={angry_episodes} | "
-                f"tokens: prompt={prompt_tokens}, completion={completion_tokens}, total={total_tokens}"
+                f"📈 [Batched Analytics Line] {item['speaker_name']}: topic={topic} | anger={anger} | "
+                f"episodes={stats.angry_episodes} | quote='{anger_evidence}'"
             )
 
-            # Publish VoiceEvent(type="analytics_update")
+            # 3. Publish VoiceEvent(type="analytics_update")
             analytics_event = VoiceEvent(
                 session_id=str(guild_id),
-                correlation_id=correlation_id,
+                correlation_id=item["correlation_id"],
                 type="analytics_update",
-                speaker_id=spk_key,
-                speaker_name=speaker_name,
-                text=raw_text,
+                speaker_id=str(item["user_id"]),
+                speaker_name=item["speaker_name"],
+                text=item["text"],
                 topic=topic,
                 anger=anger,
                 anger_evidence=anger_evidence,
-                talk_delta_seconds=talk_delta_seconds,
-                streak_seconds=streak_seconds,
-                angry_episodes=angry_episodes,
+                talk_delta_seconds=item["talk_delta_seconds"],
+                streak_seconds=item["streak_seconds"],
+                angry_episodes=stats.angry_episodes,
                 payload={
                     "topic": topic,
                     "anger": anger,
                     "anger_evidence": anger_evidence,
-                    "talk_delta_seconds": talk_delta_seconds,
-                    "streak_seconds": streak_seconds,
-                    "angry_episodes": angry_episodes,
+                    "talk_delta_seconds": item["talk_delta_seconds"],
+                    "streak_seconds": item["streak_seconds"],
+                    "angry_episodes": stats.angry_episodes,
                     "total_speak_seconds": round(stats.total_speak_seconds, 3),
                     "utterance_count": stats.utterance_count,
                     "first_anger_quote": stats.first_anger_quote,
                     "tokens": tokens,
-                    "classification": {k: v for k, v in classification_data.items() if k != "_tokens"}
+                    "batch_reason": reason,
+                    "classification": {
+                        "topic": topic,
+                        "anger": anger,
+                        "anger_evidence": anger_evidence
+                    }
                 }
             )
             publisher.publish_sync_task(analytics_event)
-        except Exception as e:
-            logger.error(f"❌ [Analytics Error] Failed processing analytics for {speaker_name}: {e}", exc_info=True)
 
     async def process_utterance(
         self,
@@ -228,25 +310,53 @@ class ArbitrationEngine:
             except Exception as e:
                 logger.debug(f"Could not post to text channel: {e}")
 
-        # FAN-OUT DISPATCHER: Trigger analytics path via asyncio.create_task
-        # Must NOT wait on arbitration; arbitration must NOT wait on analytics
+        # BATCHED ANALYTICS PATH: Track talk-time & buffer for batched topic/anger reader
         t_fanout_start = time.perf_counter()
         utterance_key = f"{user_id}_{speech_start}_{raw_text.strip()}"
         if getattr(config, "ANALYTICS_ENABLED", 1) != 0 and utterance_key not in session.analyzed_utterances and not is_drained:
             session.analyzed_utterances.add(utterance_key)
-            asyncio.create_task(
-                self._run_analytics(
-                    guild_id=guild_id,
-                    user_id=user_id,
-                    speaker_name=speaker_name,
-                    raw_text=raw_text,
-                    speech_start=speech_start,
-                    speech_end=speech_end,
-                    correlation_id=correlation_id
-                )
+
+            spk_key = str(user_id)
+            duration = max(0.0, speech_end - speech_start)
+            if speech_start == 0.0 and speech_end == 0.0:
+                speech_start = time.time()
+                word_count = len(raw_text.split())
+                duration = max(1.5, word_count * 0.4)
+                speech_end = speech_start + duration
+
+            spk_stats_before = session._stats_tracker.get_speaker(spk_key)
+            prev_total = spk_stats_before.total_speak_seconds if spk_stats_before else 0.0
+
+            stats = session._stats_tracker.record_utterance(
+                speaker_id=spk_key,
+                speech_start=speech_start,
+                speech_end=speech_end,
+                speaker_name=speaker_name
             )
+            talk_delta_seconds = round(stats.total_speak_seconds - prev_total, 3)
+            streak_seconds = round(stats.current_streak, 3)
+
+            session.analytics_buffer.append({
+                "timestamp": speech_end,
+                "speaker_id": spk_key,
+                "speaker_name": speaker_name,
+                "user_id": user_id,
+                "text": raw_text,
+                "talk_delta_seconds": talk_delta_seconds,
+                "streak_seconds": streak_seconds,
+                "correlation_id": correlation_id
+            })
+
+            # Check if analytics window expired or schedule timer flush
+            if (time.time() - session.last_analytics_flush) >= config.ANALYTICS_WINDOW_SEC:
+                asyncio.create_task(self.flush_analytics(guild_id, reason="window_timer"))
+            elif session.analytics_timer_task is None or session.analytics_timer_task.done():
+                session.analytics_timer_task = asyncio.create_task(
+                    self._delayed_flush(guild_id, config.ANALYTICS_WINDOW_SEC)
+                )
+
         fanout_overhead_ms = (time.perf_counter() - t_fanout_start) * 1000
-        logger.info(f"⚡ [Fan-out Dispatcher] Analytics spawned in {fanout_overhead_ms:.3f}ms (non-blocking, arbitrator path running)")
+        logger.info(f"⚡ [Fan-out Dispatcher] Batched analytics buffered in {fanout_overhead_ms:.3f}ms (non-blocking, arbitrator path running)")
 
         # Echo Mode (Diagnostic testing only)
         if mode == "echo":
