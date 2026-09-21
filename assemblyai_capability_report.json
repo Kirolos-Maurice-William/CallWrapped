@@ -3,7 +3,7 @@
     "model_tested": "universal-3-5-pro",
     "negotiated_model": "universal-3-5-pro",
     "status": "success",
-    "connect_latency_ms": 737.7,
+    "connect_latency_ms": 875.9,
     "config": {
       "model": "universal-3-5-pro",
       "mode": "balanced",
@@ -19,7 +19,7 @@
     "model_tested": "universal-3-5-pro",
     "negotiated_model": "universal-3-5-pro",
     "status": "success",
-    "connect_latency_ms": 827.4,
+    "connect_latency_ms": 879.6,
     "config": {
       "model": "universal-3-5-pro",
       "mode": "balanced",
@@ -35,7 +35,7 @@
     "model_tested": "u3-rt-pro",
     "negotiated_model": "u3-rt-pro",
     "status": "success",
-    "connect_latency_ms": 465.9,
+    "connect_latency_ms": 420.8,
     "config": {
       "model": "u3-rt-pro",
       "mode": "balanced",
@@ -51,7 +51,7 @@
     "model_tested": "u3-rt-pro",
     "negotiated_model": "u3-rt-pro",
     "status": "success",
-    "connect_latency_ms": 1178.9,
+    "connect_latency_ms": 540.8,
     "config": {
       "model": "u3-rt-pro",
       "mode": "balanced",

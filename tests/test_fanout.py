@@ -20,7 +20,11 @@ import asyncio
 import unittest
 import logging
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -44,6 +48,8 @@ class TestFanOutDispatcher(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(config.GROQ_API_KEY, "GROQ_API_KEY is required for real acceptance test")
 
         test_guild_id = 987654321
+        orig_window = config.ANALYTICS_WINDOW_SEC
+        config.ANALYTICS_WINDOW_SEC = 0.0
         session = arbitration_engine.get_session(test_guild_id)
         session.turns.clear()
         session.stats_tracker.reset()
@@ -181,6 +187,7 @@ class TestFanOutDispatcher(unittest.IsolatedAsyncioTestCase):
             print("  Arbitrator path ran concurrently without blocking.\n")
 
         finally:
+            config.ANALYTICS_WINDOW_SEC = orig_window
             publisher.publish_sync_task = original_publish
 
     async def test_analytics_disabled_flag(self):
