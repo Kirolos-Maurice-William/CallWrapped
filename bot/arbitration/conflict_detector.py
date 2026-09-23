@@ -13,7 +13,7 @@ RULES:
 2. Direct factual contradictions on specs, dates, prices, names, version numbers ARE conflicts:
    - "RTX 5070 has 16GB VRAM" vs "No, RTX 5070 has 12GB" -> has_conflict: true
    - "Release date was 2024" vs "It came out in 2023" -> has_conflict: true
-3. Formulate an unbiased, high-precision search query that will find official ground-truth documentation.
+3. Formulate an unbiased, high-precision search query in English (using standard Latin keywords, entity names, and technical terms) that will find official ground-truth documentation.
 
 Respond STRICTLY in JSON:
 {
