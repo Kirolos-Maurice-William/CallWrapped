@@ -92,8 +92,11 @@ class KeyPool:
         others = [k for k in self.keys if k["id"] != current_key["id"]]
         return others[0] if others else None
 
-    def update_headers(self, key_entry: Dict[str, Any], headers: httpx.Headers):
+    def update_headers(self, key_entry: Dict[str, Any], headers: httpx.Headers, status_code: int = 200):
         """Updates remaining tokens and reset time from response headers."""
+        if status_code == 429:
+            key_entry["remaining_tokens"] = 0
+            return
         rem = headers.get("x-ratelimit-remaining-tokens")
         if rem is not None:
             try:
@@ -130,18 +133,6 @@ class GroqClient:
             logger.warning("[GroqClient] No valid Groq API keys available")
             return None, {}, 0
 
-        now = time.time()
-        if now < k["reset_time"]:
-            wait_for_k = k["reset_time"] - now
-            if wait_for_k > 2.0:
-                logger.warning(
-                    f"⚠️ [GroqClient] All keys in rate-limit cooldown with reset > 2.0s ({wait_for_k:.1f}s). Skipping request."
-                )
-                return None, {}, 0
-            elif wait_for_k > 0:
-                logger.info(f"⏳ [GroqClient] All keys in cooldown. Waiting {wait_for_k:.2f}s for {k['id']} reset...")
-                await asyncio.sleep(wait_for_k)
-
         payload = {
             "model": model or self.default_model,
             "messages": messages,
@@ -164,26 +155,25 @@ class GroqClient:
                     "Content-Type": "application/json"
                 }
                 resp = await client.post(self.url, headers=headers, json=payload)
-                self.pool.update_headers(k, resp.headers)
+                self.pool.update_headers(k, resp.headers, resp.status_code)
 
                 # HTTP 429: Immediately retry ONCE with OTHER key
                 if resp.status_code == 429:
                     wait_sec = parse_reset_duration(
                         resp.headers.get("retry-after") or
-                        resp.headers.get("x-ratelimit-reset-tokens") or
-                        resp.headers.get("x-ratelimit-reset-requests")
+                        resp.headers.get("x-ratelimit-reset-tokens")
                     )
                     k["remaining_tokens"] = 0
                     k["reset_time"] = time.time() + wait_sec
 
                     k2 = self.pool.get_other_key(k)
-                    if k2 and time.time() >= k2["reset_time"]:
+                    if k2:
                         headers2 = {
                             "Authorization": f"Bearer {k2['key']}",
                             "Content-Type": "application/json"
                         }
                         resp2 = await client.post(self.url, headers=headers2, json=payload)
-                        self.pool.update_headers(k2, resp2.headers)
+                        self.pool.update_headers(k2, resp2.headers, resp2.status_code)
 
                         if resp2.status_code == 200:
                             logger.info(f"🔄 [{k['id']} 429 → {k2['id']} retry ok]")
@@ -193,8 +183,7 @@ class GroqClient:
                             # Both keys exhausted
                             wait_sec2 = parse_reset_duration(
                                 resp2.headers.get("retry-after") or
-                                resp2.headers.get("x-ratelimit-reset-tokens") or
-                                resp2.headers.get("x-ratelimit-reset-requests")
+                                resp2.headers.get("x-ratelimit-reset-tokens")
                             )
                             k2["remaining_tokens"] = 0
                             k2["reset_time"] = time.time() + wait_sec2
@@ -312,7 +301,7 @@ class GroqClient:
                     "Content-Type": "application/json"
                 }
                 resp = client.post(self.url, headers=headers, json=payload)
-                self.pool.update_headers(k, resp.headers)
+                self.pool.update_headers(k, resp.headers, resp.status_code)
 
                 if resp.status_code == 429:
                     wait_sec = parse_reset_duration(
@@ -323,13 +312,13 @@ class GroqClient:
                     k["reset_time"] = time.time() + wait_sec
 
                     k2 = self.pool.get_other_key(k)
-                    if k2 and time.time() >= k2["reset_time"]:
+                    if k2:
                         headers2 = {
                             "Authorization": f"Bearer {k2['key']}",
                             "Content-Type": "application/json"
                         }
                         resp2 = client.post(self.url, headers=headers2, json=payload)
-                        self.pool.update_headers(k2, resp2.headers)
+                        self.pool.update_headers(k2, resp2.headers, resp2.status_code)
                         if resp2.status_code == 200:
                             logger.info(f"🔄 [{k['id']} 429 → {k2['id']} retry ok]")
                             resp = resp2
