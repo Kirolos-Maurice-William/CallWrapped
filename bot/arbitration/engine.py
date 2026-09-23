@@ -10,6 +10,7 @@ from bot.arbitration.conflict_detector import conflict_detector
 from bot.arbitration.verifier import arbitration_verifier
 from bot.arbitration.claim_memory import ClaimMemory, StoredClaim
 from bot.arbitration.stats import SessionStatsTracker
+from bot.arbitration.fast_gate import fast_gate
 from bot.events.models import VoiceEvent, LatencyBreakdown
 from bot.events.publisher import publisher
 from bot.config import config
@@ -427,7 +428,15 @@ class ArbitrationEngine:
         correlation_id: str
     ):
 
-        # Step A: FastGate + Groq Claim Detector
+        # Step A: FastGate deterministic filter
+        is_candidate, reason = fast_gate.is_candidate(raw_text)
+        if not is_candidate:
+            logger.info(
+                f"⚡ [FastGate Skip] Skipped arbitration for {speaker_name} ({reason}): '{raw_text}'"
+            )
+            return
+
+        # Step B: Groq Claim Detector
         t_claim_start = time.monotonic()
         is_claim, claim_data, claim_ms = await self._classify_utterance(raw_text)
         t_claim_end = time.monotonic()

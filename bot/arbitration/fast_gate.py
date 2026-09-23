@@ -32,11 +32,11 @@ class FastGate:
         # Assertions & specs in Arabic
         r"(بيجي|بيحتوي|مواصفات|نزلت|نزل|سعره|أسرع|أقوى|أحسن|أرخص|أغلى|تاريخ|سنة|تحديث)",
         # Disagreements & counters in Arabic
-        r"(لا غلط|مش صح|أنت غلطان|كلامك غلط|مش كدا|مش كده|بالعكس|أصلاً|أصلا|أكيد|مستحيل|متأكد)",
+        r"(لا غلط|مش صح|أنت غلطان|كلامك غلط|مش كدا|مش كده|بالعكس|أصلاً|أصلا|أكيد|مستحيل|متأكد|بيعارض|بتعارض|مش متفق)",
         # Assertions in English
         r"\b(is|has|features|specs|released|supports|faster|better|cheaper|expensive|costs|weighs|dated)\b",
         # Disagreements & counters in English
-        r"\b(no you're wrong|that's wrong|not true|actually|incorrect|false|nope|definitely not)\b"
+        r"\b(no you're wrong|that's wrong|not true|actually|incorrect|false|nope|definitely not|contradict\w*|disagree\w*)\b"
     ]
 
     def is_candidate(self, text: str) -> Tuple[bool, str]:
