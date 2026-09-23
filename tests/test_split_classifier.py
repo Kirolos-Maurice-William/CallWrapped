@@ -266,6 +266,10 @@ class TestSplitClassifier(unittest.IsolatedAsyncioTestCase):
         print(f"Buffer size before recap (without waiting 75s): {len(session.analytics_buffer)}")
         self.assertEqual(len(session.analytics_buffer), 3, "Buffer must hold 3 pending utterances before recap")
 
+        # Flush buffer before recap (as async !recap command does)
+        if session.analytics_buffer:
+            await arbitration_engine.flush_analytics(test_guild_id, reason="recap_render")
+
         # Call recap WITHOUT waiting 75s
         recap_text = render_recap(session)
 

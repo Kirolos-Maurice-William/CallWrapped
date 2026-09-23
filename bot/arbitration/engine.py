@@ -43,8 +43,6 @@ class SessionState:
 
     @property
     def stats_tracker(self) -> SessionStatsTracker:
-        if self.analytics_buffer and not self._is_sync_flushing:
-            arbitration_engine.flush_analytics_sync(self.guild_id, reason="stats_tracker_read")
         return self._stats_tracker
 
     @stats_tracker.setter
@@ -53,8 +51,6 @@ class SessionState:
 
     @property
     def topic_counts(self) -> Dict[str, int]:
-        if self.analytics_buffer and not self._is_sync_flushing:
-            arbitration_engine.flush_analytics_sync(self.guild_id, reason="recap_render")
         return self._topic_counts
 
     @topic_counts.setter
@@ -76,9 +72,12 @@ class SessionState:
         self.speaker_stats[speaker_name]["turns"] += 1
 
     def reset(self):
-        """Flushes pending analytics buffer and resets all session statistics."""
+        """Resets all session statistics without blocking the event loop."""
         if self.analytics_buffer:
-            arbitration_engine.flush_analytics_sync(self.guild_id, reason="session_reset")
+            dropped_count = len(self.analytics_buffer)
+            logger.warning(
+                f"⚠️ [SessionReset] Dropping {dropped_count} un-flushed analytics utterances on session reset"
+            )
         self.turns.clear()
         self.analytics_buffer.clear()
         self._topic_counts.clear()

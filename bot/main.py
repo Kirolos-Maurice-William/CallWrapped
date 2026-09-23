@@ -367,6 +367,8 @@ def render_recap(session_state: Any) -> str:
 async def recap_command(ctx: commands.Context):
     """Displays real-time session recap."""
     session = arbitration_engine.get_session(ctx.guild.id)
+    if getattr(session, "analytics_buffer", None):
+        await arbitration_engine.flush_analytics(ctx.guild.id, reason="recap_render")
     recap_text = render_recap(session)
     await ctx.send(recap_text)
 
