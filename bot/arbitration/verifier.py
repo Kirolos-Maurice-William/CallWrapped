@@ -39,13 +39,14 @@ class ArbitrationVerifier:
     ) -> str:
         """
         Builds a strict template-based spoken intervention:
-        CONTRADICTED: 'Correction: {fact}. Source: {domain}'
-        SUPPORTED: 'That claim is verified: {fact}. Source: {domain}'
-        UNVERIFIABLE: 'I could not verify that claim from a reliable source.'
+        CONTRADICTED: 'Correction: {fact}. Source: {domain}.' / 'تصحيح: {fact}. المصدر: {domain}.'
+        SUPPORTED: 'That claim is verified: {fact}. Source: {domain}.' / 'المعلومة صحيحة: {fact}. المصدر: {domain}.'
+        UNVERIFIABLE: 'Unable to verify this claim from reliable sources.' / 'تعذر التحقق من المعلومة من مصادر موثوقة.'
         """
         fact = assessment.get("correct_fact", "").strip()
         url = assessment.get("selected_source_url", "")
-        domain = urlparse(url).netloc.replace("www.", "") if url else "Official Documentation"
+        default_domain = "مصادر رسمية" if is_arabic else "Official Documentation"
+        domain = urlparse(url).netloc.replace("www.", "") if url else default_domain
 
         a_status = assessment.get("speaker_a_status")
         b_status = assessment.get("speaker_b_status")
@@ -53,12 +54,20 @@ class ArbitrationVerifier:
         has_contradiction = "CONTRADICTED" in (a_status, b_status)
         has_supported = "SUPPORTED" in (a_status, b_status)
 
-        if has_contradiction:
-            return f"Correction: {fact} Source: {domain}."
-        elif has_supported:
-            return f"That claim is verified: {fact} Source: {domain}."
+        if is_arabic:
+            if has_contradiction:
+                return f"تصحيح: {fact}. المصدر: {domain}."
+            elif has_supported:
+                return f"المعلومة صحيحة: {fact}. المصدر: {domain}."
+            else:
+                return "تعذر التحقق من المعلومة من مصادر موثوقة."
         else:
-            return "Unable to verify this claim from reliable sources."
+            if has_contradiction:
+                return f"Correction: {fact}. Source: {domain}."
+            elif has_supported:
+                return f"That claim is verified: {fact}. Source: {domain}."
+            else:
+                return "Unable to verify this claim from reliable sources."
 
     async def verify_dispute(
         self,
