@@ -435,7 +435,7 @@ def build_status_embed(guild_ctx: Any, session: Any, ping_ms: int = 0) -> discor
         name="🧠 Cloud AI Pipeline",
         value=(
             f"• **AssemblyAI {config.speech_model_display}:** ✅ Active (Native Code-Switching)\n"
-            "• **Groq LPU (Llama-3.3-70b):** ✅ Active (~200ms)\n"
+            f"• **Groq LPU ({config.GROQ_MODEL}):** ✅ Active (~200ms)\n"
             "• **Tavily Web Search:** ✅ Active (Ground Truth)\n"
             "• **Edge-TTS (ar-EG-Shakir):** ✅ Active"
         ),

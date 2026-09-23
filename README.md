@@ -212,7 +212,7 @@ Voice Arbitrator was engineered from the ground up for the **AssemblyAI Voice Ag
 - **Organizer:** [lablab.ai](https://lablab.ai) & AssemblyAI
 - **Timeline:** September 1 – September 30, 2026
 - **Speech Model:** AssemblyAI Universal-3.5 Pro Realtime STT
-- **Epistemic Engine:** Groq LPU (Llama-3.3-70b-versatile)
+- **Epistemic Engine:** Groq LPU (Qwen 3.8-27b)
 - **Search Engine:** Tavily Search API
 - **TTS Engine:** Microsoft Edge Neural Voice (`en-US-ChristopherNeural` / `ar-EG-ShakirNeural`)
 

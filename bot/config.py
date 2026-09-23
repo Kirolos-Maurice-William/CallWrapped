@@ -24,9 +24,9 @@ class BotConfig:
     ASSEMBLYAI_API_KEY: str = os.getenv("ASSEMBLYAI_API_KEY", "")
     PRIMARY_STT_PROVIDER: str = os.getenv("PRIMARY_STT_PROVIDER", "assemblyai")
     SPEECH_LANGUAGE: str = os.getenv("SPEECH_LANGUAGE", "ar")
-    raw_speech_models = os.getenv("SPEECH_MODELS") or os.getenv("ASSEMBLYAI_MODEL", "universal-3-6-pro,universal-3-5-pro,universal-2")
+    raw_speech_models = os.getenv("SPEECH_MODELS") or os.getenv("ASSEMBLYAI_MODEL", "universal-3-5-pro,universal-2")
     SPEECH_MODELS: list = [m.strip() for m in raw_speech_models.split(",") if m.strip()]
-    SPEECH_MODEL_NAME: str = os.getenv("SPEECH_MODEL_NAME", SPEECH_MODELS[0] if SPEECH_MODELS else "universal-3-6-pro")
+    SPEECH_MODEL_NAME: str = os.getenv("SPEECH_MODEL_NAME", SPEECH_MODELS[0] if SPEECH_MODELS else "universal-3-5-pro")
     ASSEMBLYAI_POLL_ATTEMPTS: int = int(os.getenv("ASSEMBLYAI_POLL_ATTEMPTS", "40"))
     ASSEMBLYAI_POLL_INTERVAL_SEC: float = float(os.getenv("ASSEMBLYAI_POLL_INTERVAL_SEC", "0.5"))
 
@@ -64,7 +64,7 @@ class BotConfig:
 
     @property
     def speech_model_display(self) -> str:
-        name = self.SPEECH_MODELS[0] if self.SPEECH_MODELS else "universal-3-6-pro"
+        name = self.SPEECH_MODELS[0] if self.SPEECH_MODELS else "universal-3-5-pro"
         parts = name.split("-")
         if len(parts) >= 3 and parts[0] == "universal":
             version = f"{parts[1]}.{parts[2]}" if len(parts) >= 3 and parts[2].isdigit() else parts[1]

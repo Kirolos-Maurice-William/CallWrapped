@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     
     # AssemblyAI
     ASSEMBLYAI_API_KEY: str = ""
-    ASSEMBLYAI_MODEL: str = (os.getenv("SPEECH_MODELS") or os.getenv("ASSEMBLYAI_MODEL") or "universal-3-6-pro").split(",")[0].strip()
+    ASSEMBLYAI_MODEL: str = (os.getenv("SPEECH_MODELS") or os.getenv("ASSEMBLYAI_MODEL") or "universal-3-5-pro").split(",")[0].strip()
     
     # LLM Settings
     GEMINI_API_KEY: str = ""
