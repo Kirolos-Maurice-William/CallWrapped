@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import logging
 from pathlib import Path
 from typing import Dict, Optional, Any
@@ -483,15 +484,37 @@ async def manual_arbitrate(ctx: commands.Context, *, query: str):
             search_query=query
         )
 
-        if not verdict or verdict.get("status") == "unverifiable":
+        status_val = str(verdict.get("status", "")).upper() if verdict else ""
+        if not verdict or status_val == "UNVERIFIABLE":
             await msg.edit(content=f"⚠️ Unable to conclusively verify: `{query}` from available sources.")
             return
 
         correct_fact = verdict.get("correct_fact", query)
         spoken_text = verdict.get("spoken_intervention", correct_fact)
-        source_url = verdict.get("best_source_url", "")
-        source_title = verdict.get("best_source_title", "Official Source")
+        source_url = verdict.get("selected_source_url") or verdict.get("best_source_url", "")
+        source_title = verdict.get("selected_source_title") or verdict.get("best_source_title", "Official Source")
         confidence = verdict.get("confidence", 95)
+
+        search_ms = int(search_ms) if search_ms else 0
+        synth_ms = int(synth_ms) if synth_ms else 0
+        stt_ms = 0  # Text chat query has no speech STT
+
+        spk_a_status = verdict.get("speaker_a_status", "")
+        spk_b_status = verdict.get("speaker_b_status", "")
+
+        winner = None
+        loser = None
+        if spk_a_status == "SUPPORTED":
+            winner = ctx.author.display_name
+        elif spk_a_status == "CONTRADICTED":
+            loser = ctx.author.display_name
+
+        if spk_b_status == "SUPPORTED" and not winner:
+            winner = "Fact Checker"
+        elif spk_b_status == "CONTRADICTED" and not loser:
+            loser = "Fact Checker"
+
+        status_str = "contradicted" if "CONTRADICTED" in (spk_a_status, spk_b_status) else ("verified" if "SUPPORTED" in (spk_a_status, spk_b_status) else "unverifiable")
 
         embed = discord.Embed(
             title="⚖️ Factual Arbitration Verdict",
@@ -509,7 +532,9 @@ async def manual_arbitrate(ctx: commands.Context, *, query: str):
         # Speak via voice if connected
         tts_ms = 0
         if guild_ctx.voice_client and guild_ctx.voice_client.is_connected():
-            tts_ms = await speaker.speak(guild_ctx.voice_client, spoken_text)
+            t_tts = time.monotonic()
+            tts_res = await speaker.speak(guild_ctx.voice_client, spoken_text)
+            tts_ms = int(tts_res) if (isinstance(tts_res, (int, float)) and tts_res > 0) else int(round((time.monotonic() - t_tts) * 1000))
 
         # Publish to dashboard
         publisher.publish_sync_task(VoiceEvent(
@@ -517,21 +542,23 @@ async def manual_arbitrate(ctx: commands.Context, *, query: str):
             speaker_name=ctx.author.display_name,
             text=spoken_text,
             latency=LatencyBreakdown(
-                stt_ms=10,
+                stt_ms=stt_ms,
                 llm_ms=synth_ms,
                 search_ms=search_ms,
                 tts_ms=tts_ms
             ),
             payload={
-                "status": "verified",
+                "status": status_str,
                 "confidence": confidence,
                 "correct_fact": correct_fact,
-                "winner": ctx.author.display_name,
-                "loser": "Disputed",
+                "winner": winner,
+                "loser": loser,
                 "speaker_a": ctx.author.display_name,
                 "claim_a": query,
                 "speaker_b": "Fact Checker",
                 "claim_b": "Verification",
+                "speaker_a_status": spk_a_status,
+                "speaker_b_status": spk_b_status,
                 "source_url": source_url,
                 "source_title": source_title,
                 "spoken_intervention": spoken_text
@@ -555,7 +582,7 @@ async def simulate_demo(ctx: commands.Context):
         type="transcript",
         speaker_name="Ahmed",
         text="Guys, the RTX 5070 definitely launches with 16GB VRAM, I am 100% sure.",
-        latency=LatencyBreakdown(stt_ms=275)
+        latency=LatencyBreakdown(stt_ms=0)
     ))
 
     # Step 2: Claim B
@@ -564,28 +591,57 @@ async def simulate_demo(ctx: commands.Context):
         type="transcript",
         speaker_name="Omar",
         text="No Ahmed, you're mistaken. The RTX 5070 comes with 12GB GDDR7, not 16GB.",
-        latency=LatencyBreakdown(stt_ms=260)
+        latency=LatencyBreakdown(stt_ms=0)
     ))
 
-    # Step 3: Factual Intervention
-    spoken_text = "Correction for the group: Nvidia's official specifications confirm the RTX 5070 features 12GB GDDR7 memory, not 16GB."
-    correct_fact = "NVIDIA GeForce RTX 5070 features 12GB GDDR7 VRAM (192-bit bus), not 16GB."
-    source_url = "https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/rtx-5070/"
-    source_title = "NVIDIA Official GeForce RTX 5070 Specifications"
+    # Step 3: Real Factual Arbitration
+    verdict, search_ms, synth_ms, sources = await arbitration_verifier.verify_dispute(
+        speaker_a="Ahmed",
+        claim_a="RTX 5070 definitely launches with 16GB VRAM",
+        speaker_b="Omar",
+        claim_b="RTX 5070 comes with 12GB GDDR7, not 16GB",
+        search_query="RTX 5070 VRAM memory specifications"
+    )
+
+    if verdict:
+        correct_fact = verdict.get("correct_fact", "NVIDIA RTX 5070 features 12GB GDDR7 memory.")
+        spoken_text = verdict.get("spoken_intervention", correct_fact)
+        source_url = verdict.get("selected_source_url") or verdict.get("best_source_url", "")
+        source_title = verdict.get("selected_source_title") or verdict.get("best_source_title", "Official Source")
+        confidence = verdict.get("confidence", 95)
+        spk_a_status = verdict.get("speaker_a_status", "CONTRADICTED")
+        spk_b_status = verdict.get("speaker_b_status", "SUPPORTED")
+    else:
+        correct_fact = "NVIDIA GeForce RTX 5070 features 12GB GDDR7 VRAM, not 16GB."
+        spoken_text = "Correction: Nvidia's official specifications confirm the RTX 5070 features 12GB GDDR7 memory, not 16GB."
+        source_url = "https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/rtx-5070/"
+        source_title = "NVIDIA Official GeForce RTX 5070 Specifications"
+        confidence = 99
+        spk_a_status = "CONTRADICTED"
+        spk_b_status = "SUPPORTED"
+
+    search_ms = int(search_ms) if search_ms else 0
+    synth_ms = int(synth_ms) if synth_ms else 0
+    stt_ms = 0  # Simulated text in chat has no speech STT
+
+    winner = "Omar" if spk_b_status == "SUPPORTED" else ("Ahmed" if spk_a_status == "SUPPORTED" else None)
+    loser = "Ahmed" if spk_a_status == "CONTRADICTED" else ("Omar" if spk_b_status == "CONTRADICTED" else None)
 
     tts_ms = 0
     if guild_ctx.voice_client and guild_ctx.voice_client.is_connected():
-        tts_ms = await speaker.speak(guild_ctx.voice_client, spoken_text)
+        t_tts = time.monotonic()
+        tts_res = await speaker.speak(guild_ctx.voice_client, spoken_text)
+        tts_ms = int(tts_res) if (isinstance(tts_res, (int, float)) and tts_res > 0) else int(round((time.monotonic() - t_tts) * 1000))
 
     embed = discord.Embed(
         title="⚖️ Verified Dispute Arbitration Verdict",
         description=(
             f"📢 **{correct_fact}**\n\n"
-            f"✅ **Accurate Speaker**: `Omar`\n"
-            f"❌ **Refuted Speaker**: `Ahmed`\n"
-            f"🎯 **Confidence**: `99%`\n"
+            f"✅ **Accurate Speaker**: `{winner or 'Omar'}`\n"
+            f"❌ **Refuted Speaker**: `{loser or 'Ahmed'}`\n"
+            f"🎯 **Confidence**: `{confidence}%`\n"
             f"🔗 **Official Source**: [{source_title}]({source_url})\n\n"
-            f"⚡ **Latency Breakdown:** STT 260ms | LLM 215ms | Search 540ms | TTS {tts_ms or 175}ms"
+            f"⚡ **Latency Breakdown:** STT {stt_ms}ms | LLM {synth_ms}ms | Search {search_ms}ms | TTS {tts_ms}ms"
         ),
         color=0x57F287
     )
@@ -594,24 +650,26 @@ async def simulate_demo(ctx: commands.Context):
 
     publisher.publish_sync_task(VoiceEvent(
         type="intervention",
-        speaker_name="Omar",
+        speaker_name=winner or "Omar",
         text=spoken_text,
         latency=LatencyBreakdown(
-            stt_ms=260,
-            llm_ms=215,
-            search_ms=540,
-            tts_ms=tts_ms or 175
+            stt_ms=stt_ms,
+            llm_ms=synth_ms,
+            search_ms=search_ms,
+            tts_ms=tts_ms
         ),
         payload={
-            "status": "contradicted",
-            "confidence": 99,
+            "status": "contradicted" if "CONTRADICTED" in (spk_a_status, spk_b_status) else "supported",
+            "confidence": confidence,
             "correct_fact": correct_fact,
-            "winner": "Omar",
-            "loser": "Ahmed",
+            "winner": winner,
+            "loser": loser,
             "speaker_a": "Ahmed",
-            "claim_a": "RTX 5070 comes with 16GB VRAM",
+            "claim_a": "RTX 5070 launches with 16GB VRAM",
             "speaker_b": "Omar",
             "claim_b": "RTX 5070 comes with 12GB GDDR7, not 16GB",
+            "speaker_a_status": spk_a_status,
+            "speaker_b_status": spk_b_status,
             "source_url": source_url,
             "source_title": source_title,
             "spoken_intervention": spoken_text
