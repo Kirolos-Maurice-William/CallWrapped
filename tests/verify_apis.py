@@ -7,10 +7,7 @@ import time
 import httpx
 from dotenv import load_dotenv
 
-if sys.stdout and hasattr(sys.stdout, 'buffer'):
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-if sys.stderr and hasattr(sys.stderr, 'buffer'):
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+import tests._setup
 
 load_dotenv()
 

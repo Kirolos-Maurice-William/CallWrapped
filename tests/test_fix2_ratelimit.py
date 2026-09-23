@@ -4,11 +4,7 @@ import asyncio
 import unittest
 from unittest.mock import patch, MagicMock
 
-if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+import tests._setup
 
 from bot.ai.groq import parse_reset_duration, GroqClient, KeyPool
 

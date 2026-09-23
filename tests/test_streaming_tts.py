@@ -15,11 +15,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from bot.config import config
 from bot.ai.tts import speaker, StreamFFmpegPCMAudio, create_streaming_source
 
-if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
+import tests._setup
 
 logging.basicConfig(
     level=logging.INFO,

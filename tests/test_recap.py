@@ -14,11 +14,7 @@ import sys
 import io
 import unittest
 
-if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+import tests._setup
 
 from bot.main import render_recap
 from bot.arbitration.engine import SessionState

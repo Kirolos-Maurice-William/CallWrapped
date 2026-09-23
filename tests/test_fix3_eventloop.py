@@ -4,11 +4,7 @@ import asyncio
 import unittest
 import logging
 
-if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+import tests._setup
 
 from bot.arbitration.engine import SessionState, arbitration_engine
 from bot.main import render_recap

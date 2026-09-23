@@ -19,11 +19,7 @@ import time
 import asyncio
 import unittest
 
-if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+import tests._setup
 
 from bot.arbitration.claim_detector import claim_detector
 from bot.config import config
