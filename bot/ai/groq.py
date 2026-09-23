@@ -12,27 +12,41 @@ logger = logging.getLogger("GroqClient")
 
 
 def parse_reset_duration(header_val: Optional[str]) -> float:
-    """Parses rate limit reset duration from headers (e.g. '6s', '250ms', '1m12s', '42')."""
+    """
+    Parses rate limit reset duration from headers (e.g. '134ms', '250ms', '27m21.6s', '2m30s', '45s', '42').
+    Checks 'ms' FIRST and returns early. Accumulates compound formats (hours, minutes, seconds).
+    """
     if not header_val:
         return 2.0
     val = str(header_val).strip()
+
+    # 1. Check 'ms' FIRST and return early (e.g. '250ms' -> 0.25, '134ms' -> 0.134)
+    m_ms = re.search(r"(\d+(?:\.\d+)?)\s*ms", val)
+    if m_ms:
+        return float(m_ms.group(1)) / 1000.0
+
+    # 2. Raw numeric value in seconds
     try:
-        return max(0.1, float(val))
+        return max(0.001, float(val))
     except ValueError:
         pass
 
+    # 3. Accumulate compound formats: 'h' hours, 'm(?!s)' minutes, 's' seconds
     total_sec = 0.0
-    m_min = re.search(r"(\d+(?:\.\d+)?)\s*m(?:in)?", val)
+
+    m_h = re.search(r"(\d+(?:\.\d+)?)\s*h", val)
+    if m_h:
+        total_sec += float(m_h.group(1)) * 3600.0
+
+    m_min = re.search(r"(\d+(?:\.\d+)?)\s*m(?!s)", val)
     if m_min:
         total_sec += float(m_min.group(1)) * 60.0
+
     m_sec = re.search(r"(\d+(?:\.\d+)?)\s*s(?:ec)?", val)
     if m_sec:
         total_sec += float(m_sec.group(1))
-    m_ms = re.search(r"(\d+(?:\.\d+)?)\s*ms", val)
-    if m_ms:
-        total_sec += float(m_ms.group(1)) / 1000.0
 
-    return max(0.1, total_sec) if total_sec > 0 else 2.0
+    return round(total_sec, 4) if total_sec > 0 else 2.0
 
 
 class KeyPool:
@@ -116,6 +130,18 @@ class GroqClient:
             logger.warning("[GroqClient] No valid Groq API keys available")
             return None, {}, 0
 
+        now = time.time()
+        if now < k["reset_time"]:
+            wait_for_k = k["reset_time"] - now
+            if wait_for_k > 2.0:
+                logger.warning(
+                    f"⚠️ [GroqClient] All keys in rate-limit cooldown with reset > 2.0s ({wait_for_k:.1f}s). Skipping request."
+                )
+                return None, {}, 0
+            elif wait_for_k > 0:
+                logger.info(f"⏳ [GroqClient] All keys in cooldown. Waiting {wait_for_k:.2f}s for {k['id']} reset...")
+                await asyncio.sleep(wait_for_k)
+
         payload = {
             "model": model or self.default_model,
             "messages": messages,
@@ -167,27 +193,48 @@ class GroqClient:
                             # Both keys exhausted
                             wait_sec2 = parse_reset_duration(
                                 resp2.headers.get("retry-after") or
-                                resp2.headers.get("x-ratelimit-reset-tokens")
+                                resp2.headers.get("x-ratelimit-reset-tokens") or
+                                resp2.headers.get("x-ratelimit-reset-requests")
                             )
                             k2["remaining_tokens"] = 0
                             k2["reset_time"] = time.time() + wait_sec2
                             sleep_wait = min(
-                                max(0.1, k["reset_time"] - time.time()),
-                                max(0.1, k2["reset_time"] - time.time())
+                                max(0.0, k["reset_time"] - time.time()),
+                                max(0.0, k2["reset_time"] - time.time())
                             )
-                            logger.warning(f"⚠️ [GroqClient] Both keys hit 429. Waiting {sleep_wait:.2f}s reset...")
+                            if sleep_wait > 2.0:
+                                logger.warning(
+                                    f"⚠️ [GroqClient] Both keys hit 429 with long resets ({sleep_wait:.1f}s > 2.0s). Skipping request."
+                                )
+                                latency_ms = int((time.perf_counter() - t0) * 1000)
+                                return None, {}, latency_ms
+                            elif sleep_wait > 0:
+                                logger.warning(f"⚠️ [GroqClient] Both keys hit 429. Waiting {sleep_wait:.2f}s reset...")
+                                await asyncio.sleep(sleep_wait)
+                                k_best = min(self.pool.keys, key=lambda x: x["reset_time"])
+                                h_best = {"Authorization": f"Bearer {k_best['key']}", "Content-Type": "application/json"}
+                                resp = await client.post(self.url, headers=h_best, json=payload)
+                                self.pool.update_headers(k_best, resp.headers)
+                                k = k_best
+                    else:
+                        # Single key or both currently unavailable
+                        sleep_wait = max(0.0, k["reset_time"] - time.time())
+                        if k2:
+                            sleep_wait = min(sleep_wait, max(0.0, k2["reset_time"] - time.time()))
+                        if sleep_wait > 2.0:
+                            logger.warning(
+                                f"⚠️ [{k['id']} 429] Rate limit reset too long ({sleep_wait:.1f}s > 2.0s). Skipping request."
+                            )
+                            latency_ms = int((time.perf_counter() - t0) * 1000)
+                            return None, {}, latency_ms
+                        elif sleep_wait > 0:
+                            logger.warning(f"⚠️ [{k['id']} 429] Rate limit hit. Waiting {sleep_wait:.2f}s...")
                             await asyncio.sleep(sleep_wait)
                             k_best = min(self.pool.keys, key=lambda x: x["reset_time"])
                             h_best = {"Authorization": f"Bearer {k_best['key']}", "Content-Type": "application/json"}
                             resp = await client.post(self.url, headers=h_best, json=payload)
                             self.pool.update_headers(k_best, resp.headers)
                             k = k_best
-                    else:
-                        # Single key or both exhausted, wait and retry once
-                        logger.warning(f"⚠️ [{k['id']} 429] Rate limit hit. Waiting {wait_sec:.2f}s...")
-                        await asyncio.sleep(wait_sec)
-                        resp = await client.post(self.url, headers=headers, json=payload)
-                        self.pool.update_headers(k, resp.headers)
 
         except Exception as e:
             latency_ms = int((time.perf_counter() - t0) * 1000)
