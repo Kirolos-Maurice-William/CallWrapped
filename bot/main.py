@@ -183,31 +183,50 @@ async def set_mode(ctx: commands.Context, mode_name: str):
     await ctx.send(f"✅ {modes_desc[mode_name]}")
 
 
-@bot.command(name="stats")
-async def show_stats(ctx: commands.Context):
-    """Displays Server Insights & Evidence Leaderboard."""
-    session = arbitration_engine.get_session(ctx.guild.id)
+def build_stats_embed(session: Any) -> discord.Embed:
+    """Builds discord.Embed for Server Insights & Evidence Leaderboard with defensive key lookups."""
+    verified_claims = getattr(session, "verified_claims_count", 0)
+    disputed_claims = getattr(session, "disputed_claims_count", 0)
+    unverifiable = getattr(session, "unverifiable_count", 0)
 
     embed = discord.Embed(
         title="📊 Server Insights & Evidence Leaderboard",
         description=(
-            f"• **Verified Claims:** `{session.verified_claims_count}`\n"
-            f"• **Disputed Claims:** `{session.disputed_claims_count}`\n"
-            f"• **Unverifiable Claims:** `{session.unverifiable_count}`"
+            f"• **Verified Claims:** `{verified_claims}`\n"
+            f"• **Disputed Claims:** `{disputed_claims}`\n"
+            f"• **Unverifiable Claims:** `{unverifiable}`"
         ),
         color=config.EMBED_COLOR_INFO
     )
 
-    if session.speaker_stats:
-        for name, data in session.speaker_stats.items():
+    speaker_stats = getattr(session, "speaker_stats", {}) or {}
+    if speaker_stats:
+        for name, data in speaker_stats.items():
+            if isinstance(data, dict):
+                turns = data.get("turns", 0)
+                verified = data.get("verified", 0)
+                refuted = data.get("refuted", data.get("disputed", 0))
+            else:
+                turns = getattr(data, "turns", 0)
+                verified = getattr(data, "verified", 0)
+                refuted = getattr(data, "refuted", getattr(data, "disputed", 0))
+
             embed.add_field(
                 name=f"👤 {name}",
-                value=f"• Total Turns: `{data['turns']}`\n• Verified Facts: `✅ {data['verified']}`\n• Refuted Claims: `❌ {data['disputed']}`",
+                value=f"• Total Turns: `{turns}`\n• Verified Facts: `✅ {verified}`\n• Refuted Claims: `❌ {refuted}`",
                 inline=True
             )
     else:
         embed.add_field(name="Participants", value="No voice activity recorded yet.", inline=False)
 
+    return embed
+
+
+@bot.command(name="stats")
+async def show_stats(ctx: commands.Context):
+    """Displays Server Insights & Evidence Leaderboard."""
+    session = arbitration_engine.get_session(ctx.guild.id)
+    embed = build_stats_embed(session)
     await ctx.send(embed=embed)
 
 
@@ -393,22 +412,21 @@ async def show_help(ctx: commands.Context):
     await ctx.send(embed=embed)
 
 
-@bot.command(name="status")
-async def show_status(ctx: commands.Context):
-    """Displays bot health, latency metrics, and API connectivity."""
-    guild_ctx = get_guild_context(ctx.guild.id)
-    session = arbitration_engine.get_session(ctx.guild.id)
-
-    in_voice = guild_ctx.voice_client and guild_ctx.voice_client.is_connected()
-    channel_name = guild_ctx.voice_client.channel.name if in_voice else "Not Connected"
+def build_status_embed(guild_ctx: Any, session: Any, ping_ms: int = 0) -> discord.Embed:
+    """Builds discord.Embed for Operational Status with defensive attribute lookups."""
+    vc = getattr(guild_ctx, "voice_client", None)
+    in_voice = bool(vc and vc.is_connected())
+    channel = getattr(vc, "channel", None) if in_voice else None
+    channel_name = getattr(channel, "name", "Not Connected") if channel else "Not Connected"
+    mode_str = getattr(guild_ctx, "mode", "referee").upper()
 
     embed = discord.Embed(
         title="⚙️ Voice Arbitrator — Operational Status",
         color=0x57F287 if in_voice else config.EMBED_COLOR_INFO
     )
     embed.add_field(name="🎙️ Voice Status", value=f"Connected to: **{channel_name}**" if in_voice else "❌ Disconnected (`!join` to start)", inline=True)
-    embed.add_field(name="🛡️ Active Mode", value=f"`{guild_ctx.mode.upper()}`", inline=True)
-    embed.add_field(name="⚡ Bot Ping", value=f"`{round(bot.latency * 1000)}ms`", inline=True)
+    embed.add_field(name="🛡️ Active Mode", value=f"`{mode_str}`", inline=True)
+    embed.add_field(name="⚡ Bot Ping", value=f"`{ping_ms}ms`", inline=True)
 
     embed.add_field(
         name="🧠 Cloud AI Pipeline",
@@ -420,9 +438,14 @@ async def show_status(ctx: commands.Context):
         ),
         inline=False
     )
+
+    turns_len = len(getattr(session, "turns", [])) if getattr(session, "turns", None) is not None else 0
+    disputed_count = getattr(session, "disputed_claims_count", 0)
+    verified_count = getattr(session, "verified_claims_count", 0)
+
     embed.add_field(
         name="📊 Session Statistics",
-        value=f"• Recorded Turns: `{len(session.turns)}`\n• Disputes Resolved: `{session.disputed_claims_count}`\n• Verified Facts: `{session.verified_claims_count}`",
+        value=f"• Recorded Turns: `{turns_len}`\n• Disputes Resolved: `{disputed_count}`\n• Verified Facts: `{verified_count}`",
         inline=True
     )
     embed.add_field(
@@ -430,6 +453,16 @@ async def show_status(ctx: commands.Context):
         value=f"[Open Dashboard]({config.BACKEND_API_URL})",
         inline=True
     )
+    return embed
+
+
+@bot.command(name="status")
+async def show_status(ctx: commands.Context):
+    """Displays bot health, latency metrics, and API connectivity."""
+    guild_ctx = get_guild_context(ctx.guild.id)
+    session = arbitration_engine.get_session(ctx.guild.id)
+    ping_ms = round(bot.latency * 1000) if hasattr(bot, "latency") else 0
+    embed = build_status_embed(guild_ctx, session, ping_ms=ping_ms)
     await ctx.send(embed=embed)
 
 
