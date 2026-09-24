@@ -40,11 +40,28 @@ publisher.publish_sync_task = _on_event_published
 # 1. Install isolated DAVE E2EE decryption adapter immediately
 install_dave_adapter()
 
+# Configure logging filter to silence spammy RTCP packet warnings from discord.ext.voice_recv
+class SilenceRTCPFilter(logging.Filter):
+    """Filters out noisy 'Received unexpected rtcp packet' log spam from discord.ext.voice_recv."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            if "unexpected rtcp packet" in record.getMessage().lower():
+                return False
+        except Exception:
+            pass
+        return True
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
+_rtcp_filter = SilenceRTCPFilter()
+logging.getLogger("discord.ext.voice_recv").addFilter(_rtcp_filter)
+for _h in logging.root.handlers:
+    _h.addFilter(_rtcp_filter)
+
 logger = logging.getLogger("VoiceArbitratorBot")
 
 # Bot Setup
