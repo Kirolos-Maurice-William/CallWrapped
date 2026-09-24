@@ -22,8 +22,19 @@ ASSEMBLYAI_CONTEXT_PROMPT = (
 )
 
 ASSEMBLYAI_KEYTERMS = [
+    # Tech & Gaming
     "ping", "ranked", "update", "Discord", "Minecraft", "FPS", "packet loss",
-    "stream", "lag", "RTX", "VRAM", "5070", "GPU", "bro", "server", "admin"
+    "stream", "lag", "RTX", "VRAM", "5070", "GPU", "bro", "server", "admin", "GTA",
+    # Egyptian & Global Football
+    "الأهلي", "الزمالك", "ميسي", "صلاح", "كأس", "دوري", "السوبر",
+    "ريال مدريد", "برشلونة", "منتخب مصر", "كولر", "جوميز",
+    # Movies & Cinema
+    "ولاد رزق", "السينما", "فيلم", "مسلسل", "تريند", "عيد الأضحى",
+    "تامر حسني", "ماجد الكدواني", "أحمد عز",
+    # Music & Rap
+    "عمرو دياب", "ويجز", "مكانك", "تراك", "ألبوم", "راب", "مروان بابلو", "حمزة نمرة",
+    # Politics & Public Affairs
+    "انتخابات", "مجلس النواب", "قانون", "الإيجار القديم", "البرلمان", "الحكومة", "الوزراء", "الدولار"
 ]
 
 
