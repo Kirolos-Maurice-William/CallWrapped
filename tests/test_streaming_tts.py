@@ -95,7 +95,9 @@ class TestStreamingTTS(unittest.IsolatedAsyncioTestCase):
                 )
 
                 # Give enough time for first chunk to trigger play()
-                await asyncio.sleep(0.12)
+                # FFmpeg spawn + first chunk ~90ms TTFB; 4 chunks finish at ~270ms
+                # 200ms captures play() start while leaving later chunks in-flight
+                await asyncio.sleep(0.20)
 
                 self.assertTrue(vc.is_playing(), "VoiceClient must start playing on first chunk")
                 self.assertIsNotNone(vc.play_timestamp, "VoiceClient.play() must have been called")
