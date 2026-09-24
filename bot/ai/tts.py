@@ -53,28 +53,25 @@ class StreamFFmpegPCMAudio(discord.AudioSource):
         self._stdin = self.process.stdin
         self._stdout = self.process.stdout
         self._closed = False
-        self._lock = threading.Lock()
 
     def write_chunk(self, chunk: bytes) -> bool:
-        """Writes an MP3 chunk into ffmpeg stdin with immediate flushing."""
-        with self._lock:
-            if self._closed or not self._stdin:
-                return False
-            try:
-                self._stdin.write(chunk)
-                self._stdin.flush()
-                return True
-            except (BrokenPipeError, OSError, ValueError):
-                return False
+        """Writes an MP3 chunk into ffmpeg stdin with immediate flushing (called in worker thread)."""
+        if self._closed or not self._stdin:
+            return False
+        try:
+            self._stdin.write(chunk)
+            self._stdin.flush()
+            return True
+        except (BrokenPipeError, OSError, ValueError):
+            return False
 
     def finish_writing(self) -> None:
         """Closes stdin so ffmpeg knows all audio chunks have been sent (EOF)."""
-        with self._lock:
-            if self._stdin and not self._stdin.closed:
-                try:
-                    self._stdin.close()
-                except Exception:
-                    pass
+        if self._stdin and not self._stdin.closed:
+            try:
+                self._stdin.close()
+            except Exception:
+                pass
 
     def read(self) -> bytes:
         """Called every 20ms by Discord AudioPlayer thread. Returns 3840 bytes PCM."""
@@ -93,27 +90,27 @@ class StreamFFmpegPCMAudio(discord.AudioSource):
 
     def cleanup(self) -> None:
         """Kills the FFmpeg process cleanly and reaps returncode (prevents zombies)."""
-        with self._lock:
-            self._closed = True
-            if self._stdin:
-                try:
-                    self._stdin.close()
-                except Exception:
-                    pass
-            if self._stdout:
-                try:
-                    self._stdout.close()
-                except Exception:
-                    pass
-            if self.process:
-                try:
-                    self.process.kill()
-                except Exception:
-                    pass
-                try:
-                    self.process.wait(timeout=0.5)
-                except Exception:
-                    pass
+        self._closed = True
+        if self.process:
+            try:
+                self.process.kill()
+            except Exception:
+                pass
+        if self._stdin:
+            try:
+                self._stdin.close()
+            except Exception:
+                pass
+        if self._stdout:
+            try:
+                self._stdout.close()
+            except Exception:
+                pass
+        if self.process:
+            try:
+                self.process.wait(timeout=0.5)
+            except Exception:
+                pass
 
     def __del__(self) -> None:
         self.cleanup()
@@ -214,19 +211,22 @@ class InterventionSpeaker:
                             break
                         if chunk.get("type") == "audio":
                             data = chunk.get("data", b"")
+                            if not data:
+                                continue
                             if not first_chunk_played:
                                 ttfb_ms = int((time.perf_counter() - t0) * 1000)
                                 if hasattr(audio_source, "write_chunk"):
-                                    audio_source.write_chunk(data)
+                                    await asyncio.to_thread(audio_source.write_chunk, data)
                                 voice_client.play(audio_source, after=after_play)
                                 first_chunk_played = True
                                 logger.info(f"🔊 [TTS Stream Started] ({ttfb_ms}ms TTFB): '{text[:50]}'")
                             else:
                                 if hasattr(audio_source, "write_chunk"):
-                                    if not audio_source.write_chunk(data):
+                                    ok = await asyncio.to_thread(audio_source.write_chunk, data)
+                                    if not ok or self.interrupted:
                                         break
                     if hasattr(audio_source, "finish_writing"):
-                        audio_source.finish_writing()
+                        await asyncio.to_thread(audio_source.finish_writing)
 
                 # Timeout wrapper around the whole synthesis
                 tts_timeout = getattr(config, "TTS_TIMEOUT_SEC", 10.0)
@@ -235,11 +235,11 @@ class InterventionSpeaker:
                 except asyncio.TimeoutError:
                     logger.warning(f"⚠️ [TTS Timeout] Stream synthesis exceeded {tts_timeout}s for '{text[:40]}...'")
                     if hasattr(audio_source, "finish_writing"):
-                        audio_source.finish_writing()
+                        await asyncio.to_thread(audio_source.finish_writing)
                 except Exception as e:
                     logger.warning(f"⚠️ [TTS Stream Error] Synthesis error: {e}")
                     if hasattr(audio_source, "finish_writing"):
-                        audio_source.finish_writing()
+                        await asyncio.to_thread(audio_source.finish_writing)
 
                 if not first_chunk_played and not self.interrupted:
                     if hasattr(audio_source, "cleanup"):
