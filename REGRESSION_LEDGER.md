@@ -29,4 +29,5 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-24 | `36baa6f` | Silence unexpected RTCP packet spam from `discord.ext.voice_recv` via `SilenceRTCPFilter` (BUG 4) | `tests/test_bug4_rtcp_filter.py` |
 | 2026-09-24 | `cc681e4` | Add real Discord voice-channel live smoke test for streaming and barge-in | `tests/smoke_real_voice.py` |
 | 2026-09-24 | `dccac0e` | Implement conflict authenticity gate and private entity refusal with Egyptian few-shots (Phase B) | `tests/test_phase_b_referee_gates.py` |
+| 2026-09-24 | `83410c9` | Update spoken intervention templates to hedged social form in Arabic & English (Phase D) | `tests/test_fix7_arabic_verdicts.py`, `tests/test_bug3_arabic_fact.py` |
 
