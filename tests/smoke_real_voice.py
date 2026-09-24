@@ -134,23 +134,32 @@ async def run_smoke_test():
             receiver = AudioReceiver(loop=asyncio.get_running_loop(), on_utterance=on_utterance, voice_client=vc_client)
             vc_client.listen(receiver)
 
-            # 3. Play realistic verdict
-            verdict_text = "تصحيح: كارت RTX 5070 بيجي بـ 12 جيجا بايت VRAM مش 16. المصدر: nvidia.com."
+            # 3. Play realistic hedged verdict
+            verdict_text = "تصحيح سريع: المصدر اللي لقيته بيقول كارت RTX 5070 بيجي بـ 12 جيجا بايت VRAM مش 16. ممكن يكون في سياق فاتني — المصدر ظاهر في الداشبورد."
             logger.info(f"📢 Starting spoken verdict intervention: '{verdict_text}'")
 
             t_speak_start = time.perf_counter()
             speak_task = asyncio.create_task(speaker.speak(vc_client, verdict_text))
 
-            # 4. Wait for playback to begin, then test barge-in
-            # Give playback 2.5 seconds to stream chunks through FFmpeg stdin
-            logger.info("Streaming audio through non-blocking pipeline... (monitoring heartbeat)")
-            await asyncio.sleep(2.5)
+            # 4. Wait for audio playback to actually start on Discord
+            logger.info("Waiting for TTS audio playback to start on Discord...")
+            wait_start = time.perf_counter()
+            while not vc_client.is_playing() and not speak_task.done():
+                await asyncio.sleep(0.05)
+                if (time.perf_counter() - wait_start) > 10.0:
+                    break
 
-            # Check if user spoke, or trigger programmatic barge-in test if channel is quiet
-            if not barge_in_fired.is_set():
-                logger.info("⚡ [Simulating Barge-in Mid-Verdict] Calling speaker.stop(vc_client, user='moustafa2003')...")
-                speaker.stop(vc_client, user="moustafa2003")
-                barge_in_fired.set()
+            if vc_client.is_playing():
+                logger.info("🔊 Audio playback is active! Streaming chunks through non-blocking pipeline for 1.5s...")
+                await asyncio.sleep(1.5)
+
+                if not barge_in_fired.is_set():
+                    logger.info("⚡ [Triggering Barge-in Mid-Verdict] Calling speaker.stop(vc_client, user='moustafa2003')...")
+                    stopped = speaker.stop(vc_client, user="moustafa2003")
+                    barge_in_fired.set()
+                    logger.info(f"Barge-in stop result: {stopped}")
+            else:
+                logger.warning("Playback never entered is_playing state!")
 
             # Wait for speak task to conclude
             tts_latency = await speak_task
@@ -159,7 +168,29 @@ async def run_smoke_test():
             logger.info(f"Spoken verdict completed in {t_total:.1f}ms (reported latency: {tts_latency}ms)")
             logger.info(f"Interrupted state: {speaker.interrupted} | Last barge-in user: {speaker.last_barge_in_user}")
 
-            # 5. Assertions & Verification
+            # 5. Live Private-Entity Refusal Gate Test
+            from bot.arbitration.conflict_detector import conflict_detector
+            logger.info("🔒 [Testing Private-Entity Refusal Gate] 'محمد قال الماتش الساعة 8' vs 'لا هو قال 9'...")
+            has_conf, conf_data, conf_latency = await conflict_detector.detect_conflict(
+                speaker_a="Ali",
+                claim_a="محمد قال الماتش الساعة 8",
+                speaker_b="Hassan",
+                claim_b="لا هو قال 9"
+            )
+            private_refusal_ok = (
+                has_conf is False
+                and conf_data is not None
+                and conf_data.get("entity_type") == "PRIVATE"
+                and conf_data.get("is_refused_private") is True
+                and conf_data.get("dashboard_label") == "Private claim — no lookup performed"
+            )
+            logger.info(
+                f"🔒 Private Refusal Result: has_conflict={has_conf}, "
+                f"entity_type={conf_data.get('entity_type') if conf_data else None}, "
+                f"label='{conf_data.get('dashboard_label') if conf_data else None}'"
+            )
+
+            # 6. Assertions & Verification
             print("\n" + "=" * 70)
             print("=== REAL VOICE-CHANNEL SMOKE TEST RESULTS ===")
             print("=" * 70)
@@ -168,6 +199,8 @@ async def run_smoke_test():
             print(f"Spoken Verdict:            '{verdict_text}'")
             print(f"TTS Stream Duration:       {t_total:.1f}ms")
             print(f"Barge-in Fired:            {barge_in_fired.is_set()} (stopped playback successfully)")
+            print(f"Private Entity Refusal:    {private_refusal_ok} (refused without web lookup)")
+            print(f"Private Dashboard Label:   '{conf_data.get('dashboard_label') if conf_data else None}'")
             print(f"Heartbeat Blocked Count:   {len(heartbeat_blocked_warnings)}")
             print("=" * 70 + "\n")
 
@@ -179,10 +212,17 @@ async def run_smoke_test():
             if speaker.interrupted:
                 print("✅ [VERIFIED] Barge-in fired mid-verdict and terminated playback cleanly!")
 
+            if private_refusal_ok:
+                print("✅ [VERIFIED] Private-entity claim safely refused without search!")
+
             receiver.cleanup()
             await vc_client.disconnect()
             logger.info("Disconnected cleanly from voice channel.")
-            test_passed = (len(heartbeat_blocked_warnings) == 0 and speaker.interrupted)
+            test_passed = (
+                len(heartbeat_blocked_warnings) == 0
+                and speaker.interrupted
+                and private_refusal_ok
+            )
 
         except Exception as e:
             logger.error(f"Error during smoke test: {e}", exc_info=True)

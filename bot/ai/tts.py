@@ -43,6 +43,7 @@ class StreamFFmpegPCMAudio(discord.AudioSource):
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
+                bufsize=0,
                 creationflags=creationflags
             )
         except FileNotFoundError:
@@ -55,12 +56,11 @@ class StreamFFmpegPCMAudio(discord.AudioSource):
         self._closed = False
 
     def write_chunk(self, chunk: bytes) -> bool:
-        """Writes an MP3 chunk into ffmpeg stdin with immediate flushing (called in worker thread)."""
+        """Writes an MP3 chunk into ffmpeg stdin without user-space buffer (called in worker thread)."""
         if self._closed or not self._stdin:
             return False
         try:
             self._stdin.write(chunk)
-            self._stdin.flush()
             return True
         except (BrokenPipeError, OSError, ValueError):
             return False
@@ -96,19 +96,26 @@ class StreamFFmpegPCMAudio(discord.AudioSource):
                 self.process.kill()
             except Exception:
                 pass
+            try:
+                self.process.wait(timeout=0.2)
+            except Exception:
+                pass
+
         if self._stdin:
             try:
                 self._stdin.close()
             except Exception:
                 pass
+
         if self._stdout:
             try:
                 self._stdout.close()
             except Exception:
                 pass
-        if self.process:
+
+        if self._stdout:
             try:
-                self.process.wait(timeout=0.5)
+                self._stdout.close()
             except Exception:
                 pass
 
