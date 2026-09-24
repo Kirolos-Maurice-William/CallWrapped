@@ -459,6 +459,39 @@ def build_status_embed(guild_ctx: Any, session: Any, ping_ms: int = 0) -> discor
     return embed
 
 
+def build_dashboard_embed() -> discord.Embed:
+    """Builds discord.Embed with the live web dashboard URL read from config."""
+    url = getattr(config, "DASHBOARD_URL", None) or getattr(config, "BACKEND_API_URL", "http://127.0.0.1:8000")
+    embed = discord.Embed(
+        title="🌐 Live Judge & Analytics Dashboard",
+        description=(
+            "Access real-time voice call analytics, live epistemic fact-checks, "
+            "and evidence telemetry on the web interface:\n\n"
+            f"🔗 **[Open Web Dashboard]({url})**\n\n"
+            f"📍 **Direct URL:** `{url}`"
+        ),
+        color=config.EMBED_COLOR_INFO
+    )
+    embed.add_field(
+        name="⚡ Features",
+        value=(
+            "• Live STT & Latency telemetry\n"
+            "• Epistemic conflict & arbitration logs\n"
+            "• Speaker participation & frustration trackers"
+        ),
+        inline=False
+    )
+    embed.set_footer(text="AssemblyAI Hackathon • Real-Time Voice Arbitrator")
+    return embed
+
+
+@bot.command(name="dashboard")
+async def show_dashboard(ctx: commands.Context):
+    """Sends the link and embed for the live web dashboard."""
+    embed = build_dashboard_embed()
+    await ctx.send(embed=embed)
+
+
 @bot.command(name="status")
 async def show_status(ctx: commands.Context):
     """Displays bot health, latency metrics, and API connectivity."""
