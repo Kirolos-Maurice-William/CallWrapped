@@ -226,14 +226,18 @@ class ArbitrationEngine:
             if getattr(publisher.publish_sync_task, "__name__", "") != "_on_event_published":
                 session._topic_counts[topic] = session._topic_counts.get(topic, 0) + 1
 
-            # 2. Update anger with 90s debounce
-            stats = session._stats_tracker.record_anger(
-                speaker_id=str(item["user_id"]),
-                timestamp=item["timestamp"],
-                anger=anger,
-                anger_quote=anger_evidence,
-                speaker_name=item["speaker_name"]
-            )
+            # 2. Update anger with 90s debounce (record_anger ONLY when anger is mild or high)
+            spk_key = str(item["user_id"])
+            if anger and str(anger).lower() in ("mild", "high"):
+                stats = session._stats_tracker.record_anger(
+                    speaker_id=spk_key,
+                    timestamp=item["timestamp"],
+                    anger=anger,
+                    anger_quote=anger_evidence,
+                    speaker_name=item["speaker_name"]
+                )
+            else:
+                stats = session._stats_tracker.get_or_create_speaker(spk_key, item["speaker_name"])
 
             logger.info(
                 f"📈 [Batched Analytics Line] {item['speaker_name']}: topic={topic} | anger={anger} | "
