@@ -517,6 +517,37 @@ class ArbitrationEngine:
         )
         t_conflict_end = time.monotonic()
 
+        if conflict_data and conflict_data.get("entity_type") == "PRIVATE":
+            logger.info(
+                f"🚫 [Private Entity Refusal] Skipping lookup for private entity "
+                f"'{conflict_data.get('entity_name')}': Private claim — no lookup performed"
+            )
+            private_event = VoiceEvent(
+                session_id=str(guild_id),
+                correlation_id=correlation_id,
+                type="intervention",
+                speaker_id=str(user_id),
+                speaker_name=speaker_name,
+                text=raw_text,
+                payload={
+                    "status": "REFUSED_PRIVATE",
+                    "label": "Private claim — no lookup performed",
+                    "correct_fact": "Private claim — no lookup performed",
+                    "entity_type": "PRIVATE",
+                    "entity_name": conflict_data.get("entity_name"),
+                    "speaker_a": prior_claim.speaker_name,
+                    "claim_a": prior_claim.claim_text,
+                    "speaker_b": speaker_name,
+                    "claim_b": claim_stmt,
+                    "why_i_spoke": [
+                        "Private entity detected (bare first name / call participant)",
+                        "Web lookup refused: Private claim — no lookup performed"
+                    ]
+                }
+            )
+            publisher.publish_sync_task(private_event)
+            return
+
         if not is_conflict or not conflict_data:
             return
 
