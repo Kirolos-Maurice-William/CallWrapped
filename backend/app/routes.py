@@ -45,6 +45,9 @@ LIVE_STATE: Dict[str, Any] = {
         "Disputed Claims": 0,
         "Speakers": {}
     },
+    "active_offer": None,
+    "fact_check_mode": "OFF",
+    "fact_check_mode_badge": "Fact Check Mode: OFF",
     "assemblyai_model": settings.ASSEMBLYAI_MODEL,
     "discord_invite_url": settings.discord_invite_url,
     "analytics": ANALYTICS_STATE
@@ -56,7 +59,7 @@ class VoiceEventPayload(BaseModel):
     session_id: str = "hackathon_live_session"
     correlation_id: Optional[str] = None
     timestamp: float = Field(default_factory=time.time)
-    type: str  # "transcript" | "claim" | "dispute" | "verification" | "intervention" | "analytics_update"
+    type: str  # "transcript" | "claim" | "dispute" | "verification" | "intervention" | "analytics_update" | "dispute_check_offered" | "dispute_check_completed" | "dispute_check_expired" | "fact_check_mode_update"
     speaker_id: Optional[str] = None
     speaker_name: str = "Unknown"
     text: str = ""
@@ -131,8 +134,8 @@ async def ingest_voice_event(event: VoiceEventPayload):
     elif event.type == "claim":
         logger.info(f"💡 [Claim] {event.speaker_name}: {event.text} (correlation: {event.correlation_id})")
 
-    # 3. Intervention (Factual Dispute Resolved)
-    elif event.type == "intervention":
+    # 3. Intervention or Dispute Check Completed (Factual Dispute Resolved)
+    elif event.type in ("intervention", "dispute_check_completed"):
         payload = event.payload
         spk_a = payload.get("speaker_a")
         spk_b = payload.get("speaker_b")
@@ -172,6 +175,7 @@ async def ingest_voice_event(event: VoiceEventPayload):
         }
         LIVE_STATE["active_dispute"] = dispute_info
         LIVE_STATE["disputes_history"].append(dispute_info)
+        LIVE_STATE["active_offer"] = None
         LIVE_STATE["leaderboard"]["Disputed Claims"] += 1
         LIVE_STATE["leaderboard"]["Verified Claims"] += 1
 
@@ -191,6 +195,38 @@ async def ingest_voice_event(event: VoiceEventPayload):
                 speakers[spk_b]["verified"] += 1
             elif spk_b_status == "CONTRADICTED":
                 speakers[spk_b]["refuted"] += 1
+
+    # 4. Dispute Check Offered
+    elif event.type == "dispute_check_offered":
+        payload = event.payload
+        LIVE_STATE["active_offer"] = {
+            "event_id": event.event_id,
+            "offer_id": payload.get("offer_id"),
+            "speaker_a": payload.get("speaker_a"),
+            "claim_a": payload.get("claim_a"),
+            "speaker_b": payload.get("speaker_b"),
+            "claim_b": payload.get("claim_b"),
+            "entity": payload.get("entity"),
+            "expires_in_seconds": payload.get("expires_in_seconds", 30.0),
+            "expires_at": payload.get("expires_at"),
+            "timestamp": event.timestamp,
+            "text": event.text
+        }
+        LIVE_STATE["last_updated"] = event.timestamp
+        logger.info(f"📣 [LiveState] Dispute offer registered: {payload.get('offer_id')}")
+
+    # 5. Dispute Check Expired
+    elif event.type == "dispute_check_expired":
+        LIVE_STATE["active_offer"] = None
+        LIVE_STATE["last_updated"] = event.timestamp
+        logger.info(f"⌛ [LiveState] Dispute offer expired: {event.payload.get('offer_id')}")
+
+    # 6. Fact Check Mode Update
+    elif event.type == "fact_check_mode_update":
+        LIVE_STATE["fact_check_mode"] = event.payload.get("mode", "ON")
+        LIVE_STATE["fact_check_mode_badge"] = event.payload.get("badge", "Fact Check Mode: ON")
+        LIVE_STATE["last_updated"] = event.timestamp
+        logger.info(f"🛡️ [LiveState] Fact Check Mode updated: {LIVE_STATE['fact_check_mode']}")
 
     # 4. Analytics Aggregation (analytics_update or any event carrying analytics data)
     topic = event.topic or event.payload.get("topic")
@@ -262,6 +298,9 @@ async def reset_live_state():
     }
     LIVE_STATE["turns"].clear()
     LIVE_STATE["active_dispute"] = None
+    LIVE_STATE["active_offer"] = None
+    LIVE_STATE["fact_check_mode"] = "OFF"
+    LIVE_STATE["fact_check_mode_badge"] = "Fact Check Mode: OFF"
     LIVE_STATE["disputes_history"].clear()
     LIVE_STATE["leaderboard"] = {
         "Verified Claims": 0,

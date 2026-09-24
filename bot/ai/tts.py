@@ -142,6 +142,8 @@ class InterventionSpeaker:
         self.last_barge_in_user: Optional[str] = None
         self.current_audio_source: Optional[Any] = None
         self.last_audio_source: Optional[Any] = None
+        self.last_ttfb_ms: int = 0
+        self.last_audio_start_time: float = 0.0
 
     def stop(self, voice_client: Optional[discord.VoiceClient], user: Optional[Any] = None) -> bool:
         """
@@ -222,6 +224,8 @@ class InterventionSpeaker:
                                 continue
                             if not first_chunk_played:
                                 ttfb_ms = int((time.perf_counter() - t0) * 1000)
+                                self.last_ttfb_ms = ttfb_ms
+                                self.last_audio_start_time = time.time()
                                 if hasattr(audio_source, "write_chunk"):
                                     await asyncio.to_thread(audio_source.write_chunk, data)
                                 voice_client.play(audio_source, after=after_play)

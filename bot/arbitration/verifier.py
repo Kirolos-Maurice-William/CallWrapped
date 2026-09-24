@@ -78,24 +78,27 @@ class ArbitrationVerifier:
             else:
                 return "Unable to verify this claim from reliable sources."
 
-    async def verify_dispute(
+    async def search_evidence(
+        self,
+        search_query: str,
+        target_domains: Optional[List[str]] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Queries Tavily using Tiered Source Policy. Returns (sources, search_ms)."""
+        return await tavily_client.search(search_query, target_domains=target_domains)
+
+    async def synthesize_verdict(
         self,
         speaker_a: str,
         claim_a: str,
         speaker_b: str,
         claim_b: str,
-        search_query: str,
-        target_domains: Optional[List[str]] = None
+        sources: List[Dict[str, Any]],
+        search_ms: int = 0
     ) -> Tuple[Optional[Dict[str, Any]], int, int, List[Dict[str, Any]]]:
-        """
-        Returns (assessment_dict, search_ms, llm_ms, sources).
-        """
-        # Step 1: Search using Tiered Source Policy
-        sources, search_ms = await tavily_client.search(search_query, target_domains=target_domains)
+        """Evaluates retrieved web evidence snippets and synthesizes a structured verdict."""
         if not sources:
             return None, search_ms, 0, []
 
-        # Format Evidence Snippets
         evidence_snippets = "\n".join([
             f"[Source {i+1} - Tier {s.get('source_tier', 3)}] {s['title']} ({s['domain']}):\n{s['snippet']}\nURL: {s['url']}"
             for i, s in enumerate(sources[:4])
@@ -141,6 +144,31 @@ class ArbitrationVerifier:
             return assessment, search_ms, llm_ms, sources
 
         return None, search_ms, llm_ms, sources
+
+    async def verify_dispute(
+        self,
+        speaker_a: str,
+        claim_a: str,
+        speaker_b: str,
+        claim_b: str,
+        search_query: str,
+        target_domains: Optional[List[str]] = None
+    ) -> Tuple[Optional[Dict[str, Any]], int, int, List[Dict[str, Any]]]:
+        """
+        Backward-compatible wrapper: searches evidence and synthesizes verdict.
+        Returns (assessment_dict, search_ms, llm_ms, sources).
+        """
+        sources, search_ms = await self.search_evidence(search_query, target_domains=target_domains)
+        if not sources:
+            return None, search_ms, 0, []
+        return await self.synthesize_verdict(
+            speaker_a=speaker_a,
+            claim_a=claim_a,
+            speaker_b=speaker_b,
+            claim_b=claim_b,
+            sources=sources,
+            search_ms=search_ms
+        )
 
 
 arbitration_verifier = ArbitrationVerifier()

@@ -121,6 +121,15 @@ async def run_smoke_test():
 
             logger.info(f"✅ Connected to voice channel {target_vc.name} (endpoint: {vc_client.endpoint})")
 
+            target_text_channel = None
+            for tc in target_vc.guild.text_channels:
+                perms = tc.permissions_for(target_vc.guild.me)
+                if perms.send_messages:
+                    target_text_channel = tc
+                    break
+            if target_text_channel:
+                logger.info(f"Target Text Channel for Offer: #{target_text_channel.name}")
+
             # 2. Setup audio receiver for barge-in
             barge_in_fired = asyncio.Event()
 
@@ -134,23 +143,69 @@ async def run_smoke_test():
             receiver = AudioReceiver(loop=asyncio.get_running_loop(), on_utterance=on_utterance, voice_client=vc_client)
             vc_client.listen(receiver)
 
-            # 3. Play realistic hedged verdict
-            verdict_text = "تصحيح سريع: المصدر اللي لقيته بيقول كارت RTX 5070 بيجي بـ 12 جيجا بايت VRAM مش 16. ممكن يكون في سياق فاتني — المصدر ظاهر في الداشبورد."
-            logger.info(f"📢 Starting spoken verdict intervention: '{verdict_text}'")
+            # 3. Two-Stage Referee: Stage Conflict & Verify Offer (Zero Unsolicited Speech)
+            from bot.arbitration.engine import arbitration_engine
+            session = arbitration_engine.get_session(target_vc.guild.id)
+            session.reset()
 
-            t_speak_start = time.perf_counter()
-            speak_task = asyncio.create_task(speaker.speak(vc_client, verdict_text))
+            # Pre-seed prior claim in memory
+            session.claim_memory.add_claim(
+                claim_id="prior_smoke_5070",
+                speaker_name="Omar",
+                speaker_id="101",
+                raw_text="كارت 5070 نازل بـ 16 جيجا",
+                claim_text="كارت 5070 نازل بـ 16 جيجا",
+                entity="RTX 5070",
+                topic="tech",
+                metric="16 جيجا"
+            )
 
-            # 4. Wait for audio playback to actually start on Discord
-            logger.info("Waiting for TTS audio playback to start on Discord...")
+            logger.info("⚔️ [Step 1: Conflicting Utterance] Sending 'كارت الـ 5070 نازل بـ 12 جيجا' from Ziad...")
+            await arbitration_engine.process_utterance(
+                guild_id=target_vc.guild.id,
+                user_id=102,
+                speaker_name="Ziad",
+                raw_text="كارت الـ 5070 نازل بـ 12 جيجا",
+                stt_ms=110,
+                voice_client=vc_client,
+                text_channel=target_text_channel,
+                mode="referee"
+            )
+
+            # Assert offer created and NO speech has occurred yet
+            offer_created = session.pending_offer is not None
+            is_silent_before_confirm = not vc_client.is_playing()
+            logger.info(f"🤖 [Dispute Offer Created]: {offer_created} (offer_id={session.pending_offer.offer_id if session.pending_offer else None})")
+            logger.info(f"🤫 [Zero Unsolicited Speech Verified]: is_silent={is_silent_before_confirm}")
+
+            # 4. Confirmation: Voice keyword 'شوفها' triggers verification & TTS
+            logger.info("🎤 [Step 2: Voice Confirmation] Speaker confirms with 'شوفها كده يا حكم'...")
+            t_confirm_speech = time.time()
+            t_confirm_start_mono = time.monotonic()
+            await arbitration_engine.process_utterance(
+                guild_id=target_vc.guild.id,
+                user_id=103,
+                speaker_name="moustafa2003",
+                raw_text="شوفها كده يا حكم",
+                stt_ms=90,
+                voice_client=vc_client,
+                text_channel=target_text_channel,
+                mode="referee",
+                speech_start=t_confirm_speech - 1.0,
+                speech_end=t_confirm_speech
+            )
+
+            # 5. Wait for audio playback of hedged verdict to start
+            logger.info("Waiting for TTS audio playback of hedged verdict to start on Discord...")
             wait_start = time.perf_counter()
-            while not vc_client.is_playing() and not speak_task.done():
+            while not vc_client.is_playing():
                 await asyncio.sleep(0.05)
-                if (time.perf_counter() - wait_start) > 10.0:
+                if (time.perf_counter() - wait_start) > 12.0:
                     break
 
+            t_speak_start = time.perf_counter()
             if vc_client.is_playing():
-                logger.info("🔊 Audio playback is active! Streaming chunks through non-blocking pipeline for 1.5s...")
+                logger.info("🔊 Hedged verdict is playing live! Streaming chunks through non-blocking pipeline for 1.5s...")
                 await asyncio.sleep(1.5)
 
                 if not barge_in_fired.is_set():
@@ -161,11 +216,15 @@ async def run_smoke_test():
             else:
                 logger.warning("Playback never entered is_playing state!")
 
-            # Wait for speak task to conclude
-            tts_latency = await speak_task
-            t_total = (time.perf_counter() - t_speak_start) * 1000.0
+            # Wait for arbitration cycle to conclude
+            wait_arb_start = time.monotonic()
+            while session.is_arbitrating and (time.monotonic() - wait_arb_start < 5.0):
+                await asyncio.sleep(0.1)
 
-            logger.info(f"Spoken verdict completed in {t_total:.1f}ms (reported latency: {tts_latency}ms)")
+            t_total = (time.perf_counter() - t_speak_start) * 1000.0 if t_speak_start else 0.0
+            verdict_text = "Hedged Spoken Verdict"
+
+            logger.info(f"Spoken verdict completed in {t_total:.1f}ms")
             logger.info(f"Interrupted state: {speaker.interrupted} | Last barge-in user: {speaker.last_barge_in_user}")
 
             # 5. Live Private-Entity Refusal Gate Test

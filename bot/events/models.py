@@ -35,7 +35,7 @@ class VoiceEvent(BaseModel):
     session_id: str = "hackathon_live_session"
     correlation_id: Optional[str] = None
     timestamp: float = Field(default_factory=time.time)
-    type: str  # "transcript" | "claim" | "dispute" | "verification" | "intervention"
+    type: str  # "transcript" | "claim" | "dispute" | "verification" | "intervention" | "dispute_check_offered" | "dispute_check_completed" | "dispute_check_expired" | "fact_check_mode_update"
     speaker_id: Optional[str] = None
     speaker_name: str
     text: str

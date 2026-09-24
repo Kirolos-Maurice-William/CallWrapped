@@ -148,7 +148,9 @@ def build_join_embed(channel_name: str, mode: str) -> discord.Embed:
         description=(
             f"Connected to **{channel_name}**!\n\n"
             f"🛡️ **Current Mode:** `{mode.upper()}`\n"
-            "• `!mode referee`: **(Default)** Silent observer. Only speaks on verified factual conflicts.\n"
+            "• `!start`: Activate session (Fact Check Mode: ON, offers only).\n"
+            "• `!check`: Confirm pending dispute fact check.\n"
+            "• `!mode referee`: **(Default)** Silent observer. Only speaks when confirmed.\n"
             "• `!mode echo`: Test mode (repeats verbatim speech for mic check).\n"
             "• `!stats`: Server Evidence Leaderboard & Fact-checking insights.\n"
             "• `!dashboard`: Open Live Judge-Facing Web Dashboard.\n"
@@ -564,6 +566,79 @@ async def show_privacy(ctx: commands.Context):
     """Displays privacy policy, data retention details, and emotion inference disclaimer."""
     embed = build_privacy_embed()
     await ctx.send(embed=embed)
+
+
+def build_fact_check_mode_embed(is_on: bool = True) -> discord.Embed:
+    """Builds discord.Embed announcing Fact Check Mode status and consent notice."""
+    notice = build_privacy_notice_text()
+    embed = discord.Embed(
+        title="🎙️ Fact Check Mode: ON",
+        description=(
+            "✅ **Fact Check Mode: ON** (offers only — bot never speaks uninvited)\n\n"
+            "🔒 **إشعار الخصوصية والشفافية:**\n"
+            f"{notice}\n\n"
+            "💡 عند رصد أي اختلاف في المعلومات بين المتحدثين، سيقترح البوت التحقق كتابياً. "
+            "لتأكيد التحقق وسماع النتيجة: قل «شوفها» أو اكتب `!check`."
+        ),
+        color=config.EMBED_COLOR_INFO
+    )
+    embed.add_field(
+        name="🛡️ Operating Policy",
+        value="• Two-Stage Referee: Bot offers first, never speaks unsolicited.\n• Confirmation: Say «شوفها» in voice or type `!check` in chat.",
+        inline=False
+    )
+    embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
+    return embed
+
+
+@bot.command(name="start")
+async def start_session(ctx: commands.Context):
+    """
+    Session start command:
+    a) Posts Arabic consent/notice to text channel.
+    b) Announces: "Fact Check Mode: ON (offers only — bot never speaks uninvited)".
+    c) Emits event so dashboard shows "Fact Check Mode: ON" badge.
+    """
+    session = arbitration_engine.get_session(ctx.guild.id)
+    session.fact_check_mode = True
+
+    embed = build_fact_check_mode_embed(is_on=True)
+    await ctx.send(embed=embed)
+
+    # Publish VoiceEvent
+    mode_event = VoiceEvent(
+        session_id=str(ctx.guild.id),
+        type="fact_check_mode_update",
+        speaker_name=ctx.author.display_name,
+        text="Fact Check Mode: ON (offers only — bot never speaks uninvited)",
+        payload={
+            "mode": "ON",
+            "badge": "Fact Check Mode: ON",
+            "policy": "offers_only",
+            "never_speaks_unsolicited": True
+        }
+    )
+    publisher.publish_sync_task(mode_event)
+
+
+@bot.command(name="check")
+async def check_dispute(ctx: commands.Context):
+    """Confirm a pending dispute check offer via text chat."""
+    guild_ctx = get_guild_context(ctx.guild.id)
+    session = arbitration_engine.get_session(ctx.guild.id)
+
+    if not session.pending_offer or session.pending_offer.is_resolved:
+        await ctx.send("ℹ️ لا يوجد طلب تحقق معلق حالياً.")
+        return
+
+    await ctx.send("🔍 جاري التحقق من المعلومة عبر المصادر الموثوقة...")
+    await arbitration_engine.confirm_dispute_offer(
+        guild_id=ctx.guild.id,
+        confirmation_end_time=time.time(),
+        confirmed_by=ctx.author.display_name,
+        voice_client=guild_ctx.voice_client,
+        text_channel=ctx.channel
+    )
 
 
 @bot.command(name="status")

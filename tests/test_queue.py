@@ -5,6 +5,7 @@ is queued, preserved, and processed after arbitration for A completes.
 Also validates queue overflow policy (drops oldest, never drops silently).
 """
 
+import time
 import asyncio
 import logging
 import unittest
@@ -44,7 +45,10 @@ class TestArbitrationQueue(unittest.IsolatedAsyncioTestCase):
         async def mock_detect_conflict(speaker_a, claim_a, speaker_b, claim_b):
             return True, {"has_conflict": True, "search_query": "test query"}, 50
 
-        async def mock_verify_dispute(*args, **kwargs):
+        async def mock_search_evidence(*args, **kwargs):
+            return [{"title": "Test", "url": "http://test", "domain": "test", "snippet": "test"}], 50
+
+        async def mock_synthesize_verdict(*args, **kwargs):
             arbitration_a_started.set()
             # Wait until test signals arbitration A can finish
             await arbitration_a_finish.wait()
@@ -57,7 +61,8 @@ class TestArbitrationQueue(unittest.IsolatedAsyncioTestCase):
 
         with patch("bot.arbitration.engine.claim_detector.check_claim", side_effect=mock_check_claim), \
              patch("bot.arbitration.engine.conflict_detector.detect_conflict", side_effect=mock_detect_conflict), \
-             patch("bot.arbitration.engine.arbitration_verifier.verify_dispute", side_effect=mock_verify_dispute), \
+             patch("bot.arbitration.engine.arbitration_verifier.search_evidence", side_effect=mock_search_evidence), \
+             patch("bot.arbitration.engine.arbitration_verifier.synthesize_verdict", side_effect=mock_synthesize_verdict), \
              patch("bot.arbitration.engine.speaker.speak", new_callable=AsyncMock) as mock_speak, \
              patch("bot.arbitration.engine.publisher.publish_sync_task", MagicMock()):
 
@@ -75,17 +80,26 @@ class TestArbitrationQueue(unittest.IsolatedAsyncioTestCase):
                 metric="test"
             )
 
-            # Step 2: Launch Utterance A in background
-            task_a = asyncio.create_task(
-                arbitration_engine.process_utterance(
+            # Step 2: Utterance A runs and creates a dispute offer
+            await arbitration_engine.process_utterance(
+                guild_id=guild_id,
+                user_id=201,
+                speaker_name="Speaker_A",
+                raw_text="Utterance A contradicting prior",
+                stt_ms=150,
+                voice_client=None,
+                text_channel=None,
+                mode="referee"
+            )
+
+            self.assertIsNotNone(session.pending_offer, "Utterance A must generate an active dispute offer")
+
+            # Confirm offer to initiate active arbitration in background
+            task_confirm = asyncio.create_task(
+                arbitration_engine.confirm_dispute_offer(
                     guild_id=guild_id,
-                    user_id=201,
-                    speaker_name="Speaker_A",
-                    raw_text="Utterance A contradicting prior",
-                    stt_ms=150,
-                    voice_client=None,
-                    text_channel=None,
-                    mode="referee"
+                    confirmation_end_time=time.time(),
+                    confirmed_by="Speaker_A"
                 )
             )
 
@@ -111,7 +125,7 @@ class TestArbitrationQueue(unittest.IsolatedAsyncioTestCase):
 
             # Step 4: Release arbitration A
             arbitration_a_finish.set()
-            await task_a
+            await task_confirm
 
             # Allow drained tasks to complete
             await asyncio.sleep(0.1)

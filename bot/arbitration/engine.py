@@ -1,3 +1,4 @@
+import re
 import time
 import uuid
 import logging
@@ -17,6 +18,88 @@ from bot.config import config
 import asyncio
 
 logger = logging.getLogger("ArbitrationEngine")
+
+
+class PendingOffer:
+    """Represents an active, unconfirmed dispute verification offer awaiting user consent."""
+
+    def __init__(
+        self,
+        offer_id: str,
+        guild_id: int,
+        speaker_a: str,
+        claim_a: str,
+        speaker_b: str,
+        claim_b: str,
+        entity: Optional[str],
+        search_query: str,
+        target_domains: List[str],
+        prefetch_task: asyncio.Task,
+        created_at: float,
+        expires_at: float,
+        correlation_id: str = "",
+        voice_client: Optional[discord.VoiceClient] = None,
+        text_channel: Optional[discord.TextChannel] = None,
+        user_id: Optional[int] = None,
+        stt_ms: int = 0
+    ):
+        self.offer_id = offer_id
+        self.guild_id = guild_id
+        self.speaker_a = speaker_a
+        self.claim_a = claim_a
+        self.speaker_b = speaker_b
+        self.claim_b = claim_b
+        self.entity = entity
+        self.search_query = search_query
+        self.target_domains = target_domains
+        self.prefetch_task = prefetch_task
+        self.created_at = created_at
+        self.expires_at = expires_at
+        self.correlation_id = correlation_id
+        self.voice_client = voice_client
+        self.text_channel = text_channel
+        self.user_id = user_id
+        self.stt_ms = stt_ms
+        self.is_resolved: bool = False
+        self.expiry_task: Optional[asyncio.Task] = None
+
+    def cancel(self):
+        self.is_resolved = True
+        if self.expiry_task and not self.expiry_task.done():
+            self.expiry_task.cancel()
+        if self.prefetch_task and not self.prefetch_task.done():
+            self.prefetch_task.cancel()
+
+
+def is_confirmation_utterance(text: str) -> bool:
+    """
+    Checks if an utterance matches two-stage referee confirmation keywords.
+    Keywords: ["شوفها", "شوف", "اكد", "اتأكد", "تحقق", "check it", "check"]
+    Strictly local string/regex normalization — ZERO LLM calls.
+    """
+    if not text:
+        return False
+    cleaned = text.lower()
+    # Normalize Alefs: أ, إ, آ, ٱ -> ا
+    cleaned = re.sub(r"[أإآٱ]", "ا", cleaned)
+    # Normalize Ta Marbuta: ة -> ه
+    cleaned = re.sub(r"ة", "ه", cleaned)
+    # Strip Tashkeel & Tatweel
+    cleaned = re.sub(r"[\u064B-\u0652\u0640]", "", cleaned)
+    # Replace punctuation and non-word characters with spaces
+    cleaned = re.sub(r"[^\w\s]", " ", cleaned)
+
+    tokens = set(cleaned.split())
+    arabic_keywords = {"شوفها", "شوف", "اكد", "اتاكد", "تحقق"}
+    if any(kw in tokens for kw in arabic_keywords):
+        return True
+
+    if "check it" in cleaned:
+        return True
+    if "check" in tokens:
+        return True
+
+    return False
 
 
 class SessionState:
@@ -41,6 +124,9 @@ class SessionState:
         self._flush_lock = asyncio.Lock()
         self._is_sync_flushing: bool = False
         self.analytics_timer_task: Optional[asyncio.Task] = None
+        self.pending_offer: Optional[PendingOffer] = None
+        self.last_offer_time: float = 0.0
+        self.fact_check_mode: bool = False
 
     @property
     def stats_tracker(self) -> SessionStatsTracker:
@@ -100,6 +186,14 @@ class SessionState:
             self.claim_memory.clear()
         if self.analytics_timer_task and not self.analytics_timer_task.done():
             self.analytics_timer_task.cancel()
+        if self.pending_offer and not self.pending_offer.is_resolved:
+            logger.warning(
+                f"⚠️ [SessionReset] Dropping pending dispute check offer {self.pending_offer.offer_id} on session reset"
+            )
+            self.pending_offer.cancel()
+        self.pending_offer = None
+        self.last_offer_time = 0.0
+        self.fact_check_mode = False
 
 
 class ArbitrationEngine:
@@ -321,6 +415,23 @@ class ArbitrationEngine:
                 await text_channel.send(f"🗣️ **{speaker_name}**: {raw_text}")
             except Exception as e:
                 logger.debug(f"Could not post to text channel: {e}")
+
+        # Check for confirmation utterance if an offer is currently pending
+        if session.pending_offer and not session.pending_offer.is_resolved:
+            if is_confirmation_utterance(raw_text):
+                logger.info(
+                    f"🎯 [Voice Confirmation] Detected confirmation keyword from {speaker_name}: '{raw_text}'. "
+                    f"Confirming offer {session.pending_offer.offer_id}."
+                )
+                asyncio.create_task(
+                    self.confirm_dispute_offer(
+                        guild_id=guild_id,
+                        confirmation_end_time=speech_end if speech_end > 0 else time.time(),
+                        confirmed_by=speaker_name,
+                        voice_client=voice_client,
+                        text_channel=text_channel
+                    )
+                )
 
         # BATCHED ANALYTICS PATH: Track talk-time & buffer for batched topic/anger reader
         t_fanout_start = time.perf_counter()
@@ -556,20 +667,193 @@ class ArbitrationEngine:
         if not search_query:
             return
 
-        # Lock session while arbitrating
+        # Step E: Two-Stage Referee Flow: Detect and OFFER (Zero Unsolicited Speech)
+        now = time.time()
+        cooldown_sec = getattr(config, "DISPUTE_OFFER_COOLDOWN_SEC", 180.0)
+        if (now - session.last_offer_time) < cooldown_sec:
+            remaining = int(cooldown_sec - (now - session.last_offer_time))
+            logger.info(f"DISPUTE_SUPPRESSED: cooldown active (remaining: {remaining}s)")
+            return
+
+        # If a new offer triggers while an older one is pending (unconfirmed), replace older one with warning
+        if session.pending_offer and not session.pending_offer.is_resolved:
+            logger.warning(
+                f"⚠️ Replacing older unconfirmed pending offer ({session.pending_offer.offer_id}) with new dispute offer"
+            )
+            session.pending_offer.cancel()
+
+        session.last_offer_time = now
+
+        # Pre-fetch: fire Tavily search in background immediately (do NOT wait before offering)
+        prefetch_task = asyncio.create_task(
+            arbitration_verifier.search_evidence(search_query, target_domains=target_domains)
+        )
+
+        offer_id = f"off_{uuid.uuid4().hex[:8]}"
+        offer = PendingOffer(
+            offer_id=offer_id,
+            guild_id=guild_id,
+            speaker_a=prior_claim.speaker_name,
+            claim_a=prior_claim.claim_text,
+            speaker_b=speaker_name,
+            claim_b=claim_stmt,
+            entity=entity,
+            search_query=search_query,
+            target_domains=target_domains,
+            prefetch_task=prefetch_task,
+            created_at=now,
+            expires_at=now + 30.0,
+            correlation_id=correlation_id,
+            voice_client=voice_client,
+            text_channel=text_channel,
+            user_id=user_id,
+            stt_ms=stt_ms
+        )
+        session.pending_offer = offer
+
+        # Post Arabic offer message to Discord text channel
+        offer_text = "🤖 شفت اتنين بيقولوا نفس المعلومة بشكل مختلف — أتحقق؟ قول «شوفها» أو اكتب !check"
+        if text_channel:
+            try:
+                await text_channel.send(offer_text)
+            except Exception as e:
+                logger.debug(f"Could not post dispute offer to text channel: {e}")
+
+        # Publish VoiceEvent(type="dispute_check_offered")
+        offer_event = VoiceEvent(
+            session_id=str(guild_id),
+            correlation_id=correlation_id,
+            type="dispute_check_offered",
+            speaker_id=str(user_id),
+            speaker_name=speaker_name,
+            text=offer_text,
+            timings={
+                "stt_final_at": round(t_start, 3),
+                "claim_done_at": round(t_claim_end, 3),
+                "conflict_done_at": round(t_conflict_end, 3),
+                "offered_at": round(now, 3)
+            },
+            latency=LatencyBreakdown(
+                stt_ms=stt_ms,
+                llm_ms=claim_ms + conflict_ms
+            ),
+            payload={
+                "offer_id": offer_id,
+                "speaker_a": prior_claim.speaker_name,
+                "claim_a": prior_claim.claim_text,
+                "speaker_b": speaker_name,
+                "claim_b": claim_stmt,
+                "entity": entity,
+                "search_query": search_query,
+                "expires_in_seconds": 30.0,
+                "expires_at": round(now + 30.0, 3)
+            }
+        )
+        publisher.publish_sync_task(offer_event)
+        logger.info(
+            f"📣 [Dispute Offer Created] ({offer_id}) Posted offer for '{entity or 'topic'}'. "
+            f"Search prefetch started in background. Awaiting confirmation (30s timeout)."
+        )
+
+        expiry_sec = getattr(config, "DISPUTE_OFFER_EXPIRY_SEC", 30.0)
+        offer.expiry_task = asyncio.create_task(
+            self._offer_expiry_timer(guild_id=guild_id, offer_id=offer_id, timeout_seconds=expiry_sec)
+        )
+
+    async def _offer_expiry_timer(self, guild_id: int, offer_id: str, timeout_seconds: float = 30.0):
+        try:
+            await asyncio.sleep(timeout_seconds)
+            await self._expire_pending_offer(guild_id, offer_id)
+        except asyncio.CancelledError:
+            pass
+
+    async def _expire_pending_offer(self, guild_id: int, offer_id: str):
+        session = self.get_session(guild_id)
+        offer = session.pending_offer
+        if not offer or offer.offer_id != offer_id or offer.is_resolved:
+            return
+
+        offer.cancel()
+        session.pending_offer = None
+
+        logger.info(f"ABSTAIN: offered_not_confirmed (offer_id: {offer_id})")
+
+        expired_event = VoiceEvent(
+            session_id=str(guild_id),
+            correlation_id=offer.correlation_id,
+            type="dispute_check_expired",
+            speaker_name="Referee",
+            text="Dispute check offer expired without confirmation",
+            payload={
+                "offer_id": offer_id,
+                "speaker_a": offer.speaker_a,
+                "claim_a": offer.claim_a,
+                "speaker_b": offer.speaker_b,
+                "claim_b": offer.claim_b,
+                "entity": offer.entity,
+                "reason": "offered_not_confirmed"
+            }
+        )
+        publisher.publish_sync_task(expired_event)
+
+    async def confirm_dispute_offer(
+        self,
+        guild_id: int,
+        confirmation_end_time: float,
+        confirmed_by: str,
+        voice_client: Optional[discord.VoiceClient] = None,
+        text_channel: Optional[discord.TextChannel] = None
+    ):
+        """
+        Executes confirmation of a pending dispute offer:
+        1. Awaits pre-fetched search (cap wait at 5s)
+        2. Synthesizes verdict via Groq verifier + template
+        3. Speaks hedged verdict via TTS (ONLY path that speaks)
+        4. Logs headline metric: T_perceived = t_first_audio - t_confirm_end
+        5. Publishes dispute_check_completed VoiceEvent and sends Discord embed
+        """
+        session = self.get_session(guild_id)
+        offer = session.pending_offer
+        if not offer or offer.is_resolved:
+            logger.debug(f"[DisputeConfirm] No active pending offer for guild {guild_id}")
+            return
+
+        offer.is_resolved = True
+        if offer.expiry_task and not offer.expiry_task.done():
+            offer.expiry_task.cancel()
+
+        vc = voice_client or offer.voice_client
+        tc = text_channel or offer.text_channel
+
+        t_confirm_start = time.monotonic()
         session.is_arbitrating = True
         try:
-            # Step E: Ground Truth Verification via Tavily with Source Policy
-            t_search_start = time.monotonic()
-            assessment, search_ms, synth_ms, sources = await arbitration_verifier.verify_dispute(
-                speaker_a=prior_claim.speaker_name,
-                claim_a=prior_claim.claim_text,
-                speaker_b=speaker_name,
-                claim_b=claim_stmt,
-                search_query=search_query,
-                target_domains=target_domains
+            # Step A: Await pre-fetched search (cap at 5s)
+            sources = []
+            search_ms = 0
+            try:
+                sources, search_ms = await asyncio.wait_for(offer.prefetch_task, timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning(f"⚠️ [DisputeConfirm] Pre-fetched search timed out after 5s for offer {offer.offer_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ [DisputeConfirm] Pre-fetched search failed: {e}")
+
+            if not sources:
+                logger.warning(f"⚠️ [DisputeConfirm] No search sources found for query: '{offer.search_query}'")
+                session.unverifiable_count += 1
+                return
+
+            # Step B: Synthesize via Groq verifier
+            t_synth_start = time.monotonic()
+            assessment, search_ms, synth_ms, sources = await arbitration_verifier.synthesize_verdict(
+                speaker_a=offer.speaker_a,
+                claim_a=offer.claim_a,
+                speaker_b=offer.speaker_b,
+                claim_b=offer.claim_b,
+                sources=sources,
+                search_ms=search_ms
             )
-            t_search_end = time.monotonic()
+            t_synth_end = time.monotonic()
 
             if not assessment or assessment.get("status") == "UNVERIFIABLE":
                 session.unverifiable_count += 1
@@ -584,98 +868,117 @@ class ArbitrationEngine:
             spk_a_status = assessment.get("speaker_a_status", "UNKNOWN")
             spk_b_status = assessment.get("speaker_b_status", "UNKNOWN")
 
-            # Update speaker accuracy stats
-            if prior_claim.speaker_name in session.speaker_stats:
+            # Update speaker stats
+            if offer.speaker_a in session.speaker_stats:
                 if spk_a_status == "SUPPORTED":
-                    session.speaker_stats[prior_claim.speaker_name]["verified"] += 1
+                    session.speaker_stats[offer.speaker_a]["verified"] += 1
                 elif spk_a_status == "CONTRADICTED":
-                    session.speaker_stats[prior_claim.speaker_name]["refuted"] += 1
+                    session.speaker_stats[offer.speaker_a]["refuted"] += 1
 
-            if speaker_name in session.speaker_stats:
+            if offer.speaker_b in session.speaker_stats:
                 if spk_b_status == "SUPPORTED":
-                    session.speaker_stats[speaker_name]["verified"] += 1
+                    session.speaker_stats[offer.speaker_b]["verified"] += 1
                 elif spk_b_status == "CONTRADICTED":
-                    session.speaker_stats[speaker_name]["refuted"] += 1
+                    session.speaker_stats[offer.speaker_b]["refuted"] += 1
 
             session.disputed_claims_count += 1
             session.verified_claims_count += 1
 
-            # Step F: Voice Intervention (Template-based via Edge-TTS)
+            # Step C: Speak verdict via TTS (the ONLY path that speaks)
             t_tts_start = time.monotonic()
-            tts_ms = await speaker.speak(voice_client, spoken_text)
+            tts_ms = await speaker.speak(vc, spoken_text)
             t_tts_end = time.monotonic()
 
-            total_elapsed_ms = int((time.monotonic() - t_start) * 1000)
+            # Step D: Headline metric: T_perceived = t_first_audio - t_confirm_end
+            ttfb_sec = (getattr(speaker, "last_ttfb_ms", 0) or 0) / 1000.0
+            if confirmation_end_time > 1e8:
+                t_first_audio = getattr(speaker, "last_audio_start_time", 0.0) or (time.time() - (t_tts_end - t_tts_start) + ttfb_sec)
+                t_perceived_sec = max(0.0, t_first_audio - confirmation_end_time)
+            else:
+                t_first_audio = t_tts_start + ttfb_sec
+                t_perceived_sec = max(0.0, t_first_audio - confirmation_end_time)
+            t_perceived_ms = int(t_perceived_sec * 1000)
 
-            # Step G: Post Rich Discord Embed to Text Channel
-            if text_channel:
-                embed = discord.Embed(
-                    title="⚖️ Verified Factual Arbitration",
-                    description=(
-                        f"📢 **{correct_fact}**\n\n"
-                        f"• **{prior_claim.speaker_name}:** `{spk_a_status}`\n"
-                        f"• **{speaker_name}:** `{spk_b_status}`\n\n"
-                        f"🎯 **Evidence Strength:** `{evidence_strength}` ({confidence}%)\n"
-                        f"🔗 **Source:** [{source_title}]({source_url})\n\n"
-                        f"⚡ *Latency: STT {stt_ms}ms | LPU {claim_ms + conflict_ms + synth_ms}ms | Web {search_ms}ms | TTS {tts_ms}ms (Total: {total_elapsed_ms}ms)*"
-                    ),
-                    color=config.EMBED_COLOR_VERDICT
-                )
-                embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
-                await text_channel.send(embed=embed)
+            logger.info(
+                f"⏱️ [Headline Metric] T_perceived = {t_perceived_ms}ms "
+                f"(target: <2500ms, prefetch search_ms={search_ms}ms, synth_ms={synth_ms}ms, TTFB={int(ttfb_sec*1000)}ms)"
+            )
 
-            # Step H: Broadcast Unified Intervention Event with Explainability
-            intervention_event = VoiceEvent(
-                correlation_id=correlation_id,
-                type="intervention",
-                speaker_id=str(user_id),
-                speaker_name=speaker_name,
+            # Step E: Post Discord Embed
+            if tc:
+                try:
+                    embed = discord.Embed(
+                        title="⚖️ Verified Factual Arbitration",
+                        description=(
+                            f"📢 **{correct_fact}**\n\n"
+                            f"• **{offer.speaker_a}:** `{spk_a_status}`\n"
+                            f"• **{offer.speaker_b}:** `{spk_b_status}`\n\n"
+                            f"🎯 **Evidence Strength:** `{evidence_strength}` ({confidence}%)\n"
+                            f"🔗 **Source:** [{source_title}]({source_url})\n\n"
+                            f"⚡ *Latency: Pre-fetch {search_ms}ms | LPU {synth_ms}ms | TTS {tts_ms}ms | T_perceived {t_perceived_ms}ms*"
+                        ),
+                        color=config.EMBED_COLOR_VERDICT
+                    )
+                    embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
+                    await tc.send(embed=embed)
+                except Exception as e:
+                    logger.debug(f"Could not send embed to text channel: {e}")
+
+            # Step F: Publish VoiceEvent(type="dispute_check_completed")
+            completed_event = VoiceEvent(
+                session_id=str(guild_id),
+                correlation_id=offer.correlation_id,
+                type="dispute_check_completed",
+                speaker_id=str(offer.user_id or 0),
+                speaker_name=confirmed_by,
                 text=spoken_text,
                 timings={
-                    "stt_final_at": round(t_start, 3),
-                    "claim_done_at": round(t_claim_end, 3),
-                    "conflict_done_at": round(t_conflict_end, 3),
-                    "search_done_at": round(t_search_end, 3),
+                    "search_done_at": round(t_synth_start, 3),
+                    "synth_done_at": round(t_synth_end, 3),
                     "tts_done_at": round(t_tts_end, 3)
                 },
                 latency=LatencyBreakdown(
-                    stt_ms=stt_ms,
-                    llm_ms=claim_ms + conflict_ms + synth_ms,
+                    stt_ms=offer.stt_ms,
+                    llm_ms=synth_ms,
                     search_ms=search_ms,
                     tts_ms=tts_ms,
-                    total_ms=total_elapsed_ms
+                    total_ms=int((t_tts_end - t_confirm_start) * 1000)
                 ),
                 payload={
-                    "status": "CONTRADICTED" if "CONTRADICTED" in (spk_a_status, spk_b_status) else "SUPPORTED",
+                    "offer_id": offer.offer_id,
+                    "confirmed_by": confirmed_by,
+                    "t_perceived_ms": t_perceived_ms,
+                    "status": assessment.get("status", "CONTRADICTED"),
                     "confidence": confidence,
                     "evidence_strength": evidence_strength,
                     "correct_fact": correct_fact,
-                    "speaker_a": prior_claim.speaker_name,
-                    "claim_a": prior_claim.claim_text,
+                    "speaker_a": offer.speaker_a,
+                    "claim_a": offer.claim_a,
                     "speaker_a_status": spk_a_status,
-                    "speaker_b": speaker_name,
-                    "claim_b": claim_stmt,
+                    "speaker_b": offer.speaker_b,
+                    "claim_b": offer.claim_b,
                     "speaker_b_status": spk_b_status,
-                    "winner": prior_claim.speaker_name if spk_a_status == "SUPPORTED" else (speaker_name if spk_b_status == "SUPPORTED" else None),
-                    "loser": prior_claim.speaker_name if spk_a_status == "CONTRADICTED" else (speaker_name if spk_b_status == "CONTRADICTED" else None),
+                    "winner": offer.speaker_a if spk_a_status == "SUPPORTED" else (offer.speaker_b if spk_b_status == "SUPPORTED" else None),
+                    "loser": offer.speaker_a if spk_a_status == "CONTRADICTED" else (offer.speaker_b if spk_b_status == "CONTRADICTED" else None),
                     "source_url": source_url,
                     "source_title": source_title,
                     "spoken_intervention": spoken_text,
                     "why_i_spoke": [
-                        "Factual claim detected via FastGate + Groq",
-                        f"Direct contradiction identified on '{entity or 'topic'}'",
-                        f"Tier-1 authoritative source located ({source_title})",
-                        f"Evidence confidence high ({confidence}%)",
-                        "Spoken intervention delivered via neural voice"
+                        "Factual dispute detected and offer issued",
+                        f"Explicit confirmation received from '{confirmed_by}'",
+                        f"Pre-fetched evidence verified ({search_ms}ms search, {synth_ms}ms Groq)",
+                        f"Authoritative source located: {source_title}",
+                        f"Spoken hedged verdict delivered (T_perceived: {t_perceived_ms}ms)"
                     ]
                 }
             )
-            publisher.publish_sync_task(intervention_event)
+            publisher.publish_sync_task(completed_event)
 
         except Exception as err:
-            logger.error(f"Arbitration cycle failed: {err}", exc_info=True)
+            logger.error(f"Dispute confirmation cycle failed: {err}", exc_info=True)
         finally:
             session.is_arbitrating = False
+            session.pending_offer = None
             await self._drain_queue(guild_id, session)
 
     async def _drain_queue(self, guild_id: int, session: SessionState):
