@@ -1,6 +1,33 @@
+import re
 import time
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
+
+# Prefixes to strip for entity normalization
+_STRIP_PREFIXES_AR = ["كارت", "لعبة", "فيلم", "مسلسل", "أغنية", "ألبوم"]
+_STRIP_ARTICLES = ["ال", "the", "a", "an"]
+
+
+def canonicalize_entity(raw: Optional[str]) -> str:
+    """
+    Normalize an entity for comparison: lowercase, strip Arabic/English articles
+    and common noun prefixes (كارت، لعبة، فيلم...).
+    """
+    if not raw:
+        return ""
+    s = raw.lower().strip()
+    # Strip Arabic article ال at the start of each word
+    s = re.sub(r'\bال', '', s)
+    # Strip English articles
+    for art in ["the ", "a ", "an "]:
+        if s.startswith(art):
+            s = s[len(art):]
+    # Strip common Arabic noun prefixes
+    for prefix in _STRIP_PREFIXES_AR:
+        if s.startswith(prefix):
+            s = s[len(prefix):]
+            break
+    return s.strip()
 
 
 @dataclass
@@ -25,6 +52,10 @@ class ClaimMemory:
     def __init__(self, capacity: int = 30):
         self.capacity = capacity
         self.claims: List[StoredClaim] = []
+
+    def clear(self):
+        """Clears all stored claims."""
+        self.claims.clear()
 
     def add_claim(
         self,
@@ -65,9 +96,10 @@ class ClaimMemory:
         """
         Finds the most recent prior claim from a DIFFERENT speaker that shares
         the same entity, topic, metric, or key subjects.
+        Entity comparison uses canonicalize_entity() for normalized matching.
         """
         now = time.time()
-        new_entity_lower = (entity or "").lower().strip()
+        new_entity_canon = canonicalize_entity(entity)
         new_metric_lower = (metric or "").lower().strip()
         new_words = set(raw_text.lower().split())
 
@@ -80,12 +112,12 @@ class ClaimMemory:
             if (now - prior.timestamp) > max_age_seconds:
                 continue
 
-            prior_entity_lower = (prior.entity or "").lower().strip()
+            prior_entity_canon = canonicalize_entity(prior.entity)
             prior_metric_lower = (prior.metric or "").lower().strip()
 
-            # Direct entity match (e.g. both talking about "RTX 5070" or "Minecraft")
-            if new_entity_lower and prior_entity_lower:
-                if new_entity_lower in prior_entity_lower or prior_entity_lower in new_entity_lower:
+            # Direct entity match (canonicalized, e.g. "الكارت RTX 5070" matches "rtx 5070")
+            if new_entity_canon and prior_entity_canon:
+                if new_entity_canon in prior_entity_canon or prior_entity_canon in new_entity_canon:
                     return prior
 
             # Metric + Topic match (e.g. both talking about "VRAM" in "hardware")
@@ -102,3 +134,4 @@ class ClaimMemory:
                 return prior
 
         return None
+
