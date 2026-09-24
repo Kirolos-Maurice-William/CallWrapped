@@ -12,14 +12,15 @@ Evaluate two conversational statements against the retrieved ground-truth web se
 Do NOT guess or hallucinate facts not supported by the evidence.
 
 RULES:
-1. 'speaker_a_status' and 'speaker_b_status': Must each be 'SUPPORTED', 'CONTRADICTED', or 'UNVERIFIABLE'.
-2. 'evidence_strength': 'HIGH' (official manufacturer/gov/peer-reviewed docs), 'MEDIUM' (reputable tech media/encyclopedia), or 'LOW' (indirect/sparse).
-3. 'correct_fact': Exactly 1 objective factual sentence, strictly 6 to 12 words in colloquial phrasing.
+1. FAST-PATH GROUNDING: If Tavily's 'include_answer' field is present and consistent with the retrieved snippets, GROUND your verdict in it (validate-and-format into the required JSON schema rather than re-reasoning from scratch). If include_answer is absent or conflicts with snippets, fall back to normal evidence reading.
+2. 'speaker_a_status' and 'speaker_b_status': Must each be 'SUPPORTED', 'CONTRADICTED', or 'UNVERIFIABLE'.
+3. 'evidence_strength': 'HIGH' (official manufacturer/gov/peer-reviewed docs), 'MEDIUM' (reputable tech media/encyclopedia), or 'LOW' (indirect/sparse).
+4. 'correct_fact': Exactly 1 objective factual sentence, strictly 6 to 12 words in colloquial phrasing.
    - MANDATORY CONCISENESS & SHORTHAND: State ONLY the verified fact itself. Do NOT include comparison clauses, side-by-side specs, or extra commentary (e.g. state 'كارت RTX 5070 بيجي بـ 12 جيجا بايت VRAM' instead of comparing it with other models). Always use common shorthand/product names (e.g. 'RTX 5070' NOT 'NVIDIA GeForce RTX 5070').
    - LANGUAGE RULE (MANDATORY): 'correct_fact' MUST be written in the SAME LANGUAGE as the speakers' utterances. If the speakers' utterances are in Arabic, 'correct_fact' MUST be written in natural, fluent Arabic (translate from English evidence snippets as necessary; keep model names, numbers, and technical terms in Latin/digits as-is). Never output an English correct_fact for Arabic claims.
-4. 'comparison_details': Put any comparison details, secondary model specs, or additional context here for the dashboard embed (e.g. 'RTX 5070 Ti features 16GB VRAM'). If no comparison, leave empty string.
-5. 'selected_source_url': The most authoritative source URL from the provided evidence list.
-6. 'selected_source_title': Title of that source.
+5. 'comparison_details': Put any comparison details, secondary model specs, or additional context here for the dashboard embed (e.g. 'RTX 5070 Ti features 16GB VRAM'). If no comparison, leave empty string.
+6. 'selected_source_url': The most authoritative source URL from the provided evidence list.
+7. 'selected_source_title': Title of that source.
 
 Respond STRICTLY in JSON:
 {
@@ -128,15 +129,39 @@ class ArbitrationVerifier:
             if has_arabic else ""
         )
 
+        # Check for Tavily include_answer in retrieved search evidence
+        include_answer = ""
+        for s in sources:
+            if s.get("answer"):
+                include_answer = str(s["answer"]).strip()
+                break
+            elif s.get("include_answer"):
+                include_answer = str(s["include_answer"]).strip()
+                break
+
+        answer_section = f"Tavily include_answer (Fast-Path):\n{include_answer}\n\n" if include_answer else ""
+
         user_prompt = (
             f"Conversation Context:\n"
             f"- {speaker_a} claimed: \"{claim_a}\"\n"
             f"- {speaker_b} claimed: \"{claim_b}\"{lang_note}\n\n"
+            f"{answer_section}"
             f"Authoritative Web Evidence (Sorted by Trust Tier):\n{evidence_snippets}"
         )
 
-        # Step 2: Groq LPU evaluates evidence
-        assessment, llm_ms = await groq_client.complete_json(VERIFICATION_SYNTHESIS_PROMPT, user_prompt)
+        # Step 2: Groq LPU evaluates evidence with tightened token budget (~120 tokens)
+        messages = [
+            {"role": "system", "content": VERIFICATION_SYNTHESIS_PROMPT},
+            {"role": "user", "content": user_prompt}
+        ]
+        assessment, tokens, llm_ms = await groq_client.complete_chat(
+            messages=messages,
+            response_format={"type": "json_object"},
+            max_tokens=140,
+            temperature=0.0
+        )
+        if not assessment:
+            assessment, llm_ms = await groq_client.complete_json(VERIFICATION_SYNTHESIS_PROMPT, user_prompt)
         if assessment:
             assessment["sources"] = sources
             if not assessment.get("selected_source_url") and sources:
