@@ -285,7 +285,7 @@ class TestSplitClassifier(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Tamer", recap_text, "Recap must mention speaker Tamer")
         self.assertIn("Mostafa", recap_text, "Recap must mention speaker Mostafa")
         self.assertIn("ملخص المكالمة", recap_text, "Recap title must be present")
-        self.assertNotIn("No data yet in this call.", recap_text, "Recap must not report empty session")
+        self.assertNotIn("مفيش بيانات في المكالمة دي لسه.", recap_text, "Recap must not report empty session")
         print("[PROOF VERIFIED] Recap flush correctly flushed pending buffer and rendered complete stats.\n")
 
 

@@ -25,7 +25,7 @@ class TestSessionRecapRenderer(unittest.TestCase):
     def test_empty_session_returns_no_data(self):
         empty_session = SessionState(guild_id=111)
         output = render_recap(empty_session)
-        self.assertEqual(output, "No data yet in this call.")
+        self.assertEqual(output, "مفيش بيانات في المكالمة دي لسه.")
         print("\n[Test 1: Empty Session]")
         print(f"Output: {output}")
 
@@ -107,8 +107,8 @@ class TestSessionRecapRenderer(unittest.TestCase):
         self.assertIn("👑 **Alice** (1:23)", recap_text)
 
         # 3. Anger leaderboard
-        self.assertIn("😡 **ليدربورد العصبية:**", recap_text)
-        self.assertIn("• **Alice**: 1 episode | Receipts: \"زهقت خلاص من السيرفر ده\"", recap_text)
+        self.assertIn("😡 **نوبات إحباط:**", recap_text)
+        self.assertIn("• **Alice**: 1 moment | Receipts: \"زهقت خلاص من السيرفر ده\"", recap_text)
 
         # 4. Top-3 topics with %
         self.assertIn("🏷️ **أكتر مواضيع اتكلمتوا فيها:**", recap_text)
@@ -133,8 +133,8 @@ class TestSessionRecapRenderer(unittest.TestCase):
         print(recap_text)
         print("=" * 60 + "\n")
 
-        self.assertIn("😡 Nobody got angry this call... suspicious.", recap_text)
-        self.assertNotIn("ليدربورد العصبية", recap_text)
+        self.assertIn("😡 محدش عصب في المكالمة دي... كده مش طبيعي 😂", recap_text)
+        self.assertNotIn("نوبات إحباط", recap_text)
 
 
 if __name__ == "__main__":

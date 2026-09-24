@@ -141,7 +141,7 @@ class TestEventLoopFreezeAndRecap(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Tamer", recap_text)
         self.assertIn("Mostafa", recap_text)
         self.assertIn("ملخص المكالمة", recap_text)
-        self.assertNotIn("No data yet in this call.", recap_text)
+        self.assertNotIn("مفيش بيانات في المكالمة دي لسه.", recap_text)
 
     def test_c_session_reset_logs_warning_when_buffer_not_empty(self):
         """

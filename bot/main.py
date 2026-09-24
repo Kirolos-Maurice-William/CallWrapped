@@ -251,7 +251,7 @@ def render_recap(session_state: Any) -> str:
     Never fabricates or default-fills numbers.
     """
     if not session_state:
-        return "No data yet in this call."
+        return "مفيش بيانات في المكالمة دي لسه."
 
     # 1. Extract speakers from session_state
     speakers = []
@@ -273,7 +273,7 @@ def render_recap(session_state: Any) -> str:
 
     # Empty session check: render ONLY from real session data
     if not speakers or (total_talk_sec == 0.0 and total_utterances == 0):
-        return "No data yet in this call."
+        return "مفيش بيانات في المكالمة دي لسه."
 
     # 2. Extract topics from session_state
     topic_counts: Dict[str, int] = {}
@@ -340,15 +340,15 @@ def render_recap(session_state: Any) -> str:
     # If zero angry episodes for everyone, replace with: "😡 Nobody got angry this call... suspicious."
     angry_speakers = [s for s in sorted_speakers if s.angry_episodes > 0]
     if angry_speakers:
-        lines.append("\n😡 **ليدربورد العصبية:**")
+        lines.append("\n😡 **نوبات إحباط:**")
         angry_speakers.sort(key=lambda s: s.angry_episodes, reverse=True)
         for s in angry_speakers:
             name = s.speaker_name or s.speaker_id
             quote_str = f' | Receipts: "{s.first_anger_quote}"' if s.first_anger_quote else ""
-            ep_word = "episode" if s.angry_episodes == 1 else "episodes"
+            ep_word = "moment" if s.angry_episodes == 1 else "moments"
             lines.append(f"• **{name}**: {s.angry_episodes} {ep_word}{quote_str}")
     else:
-        lines.append("\n😡 Nobody got angry this call... suspicious.")
+        lines.append("\n😡 محدش عصب في المكالمة دي... كده مش طبيعي 😂")
 
     # Section D: Top-3 topics with %
     lines.append("\n🏷️ **أكتر مواضيع اتكلمتوا فيها:**")
