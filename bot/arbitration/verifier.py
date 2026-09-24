@@ -14,10 +14,12 @@ Do NOT guess or hallucinate facts not supported by the evidence.
 RULES:
 1. 'speaker_a_status' and 'speaker_b_status': Must each be 'SUPPORTED', 'CONTRADICTED', or 'UNVERIFIABLE'.
 2. 'evidence_strength': 'HIGH' (official manufacturer/gov/peer-reviewed docs), 'MEDIUM' (reputable tech media/encyclopedia), or 'LOW' (indirect/sparse).
-3. 'correct_fact': Exactly 1 objective, concise factual sentence drawn directly from the evidence snippets.
-   LANGUAGE RULE (MANDATORY): 'correct_fact' MUST be written in the SAME LANGUAGE as the speakers' utterances. If the speakers' utterances are in Arabic, 'correct_fact' MUST be written in natural, fluent Arabic (translate from English evidence snippets as necessary; keep brand/product names, technical terms, and model numbers in Latin/digits as-is). Never output an English correct_fact for Arabic claims.
-4. 'selected_source_url': The most authoritative source URL from the provided evidence list.
-5. 'selected_source_title': Title of that source.
+3. 'correct_fact': Exactly 1 objective factual sentence, strictly 6 to 12 words in colloquial phrasing.
+   - MANDATORY CONCISENESS & SHORTHAND: State ONLY the verified fact itself. Do NOT include comparison clauses, side-by-side specs, or extra commentary (e.g. state 'كارت RTX 5070 بيجي بـ 12 جيجا بايت VRAM' instead of comparing it with other models). Always use common shorthand/product names (e.g. 'RTX 5070' NOT 'NVIDIA GeForce RTX 5070').
+   - LANGUAGE RULE (MANDATORY): 'correct_fact' MUST be written in the SAME LANGUAGE as the speakers' utterances. If the speakers' utterances are in Arabic, 'correct_fact' MUST be written in natural, fluent Arabic (translate from English evidence snippets as necessary; keep model names, numbers, and technical terms in Latin/digits as-is). Never output an English correct_fact for Arabic claims.
+4. 'comparison_details': Put any comparison details, secondary model specs, or additional context here for the dashboard embed (e.g. 'RTX 5070 Ti features 16GB VRAM'). If no comparison, leave empty string.
+5. 'selected_source_url': The most authoritative source URL from the provided evidence list.
+6. 'selected_source_title': Title of that source.
 
 Respond STRICTLY in JSON:
 {
@@ -25,7 +27,8 @@ Respond STRICTLY in JSON:
   "speaker_b_status": "CONTRADICTED" | "SUPPORTED" | "UNVERIFIABLE",
   "evidence_strength": "HIGH" | "MEDIUM" | "LOW",
   "confidence": 95,
-  "correct_fact": "NVIDIA RTX 5070 has 12GB of GDDR7 memory, while the RTX 5070 Ti has 16GB.",
+  "correct_fact": "كارت RTX 5070 بيجي بـ 12 جيجا بايت VRAM مش 16",
+  "comparison_details": "RTX 5070 Ti features 16GB VRAM",
   "selected_source_url": "https://www.nvidia.com/...",
   "selected_source_title": "NVIDIA Official Product Specifications"
 }"""
@@ -34,22 +37,15 @@ Respond STRICTLY in JSON:
 class ArbitrationVerifier:
     """Queries Tavily and synthesizes evidence into an objective verdict without hallucination."""
 
-    def format_intervention_template(
+    def format_intervention_clauses(
         self,
         assessment: Dict[str, Any],
         is_arabic: bool = False
-    ) -> str:
+    ) -> Tuple[str, str]:
         """
-        Builds a hedged social template-based spoken intervention:
-        CONTRADICTED:
-        AR: "تصحيح سريع: المصدر اللي لقيته بيقول [fact]. ممكن يكون في سياق فاتني — المصدر ظاهر في الداشبورد."
-        EN: "Quick fact check: the source I found says [fact]. I may have missed context — source is on the dashboard."
-        SUPPORTED:
-        AR: "تأكيد سريع: المصدر اللي لقيته بيقول [fact]. المصدر ظاهر في الداشبورد."
-        EN: "Quick fact check: the source I found confirms [fact]. Source is on the dashboard."
-        UNVERIFIABLE:
-        AR: "تعذر التحقق من المعلومة من مصادر موثوقة."
-        EN: "Unable to verify this claim from reliable sources."
+        Builds two separate clauses for two-stage streaming:
+        1. fact_clause (<= 12 words): Anchor and objective fact without comparison.
+        2. hedge_clause: Social hedge and dashboard reference.
         Strips doubled punctuation to ensure clean spoken synthesis.
         """
         fact = assessment.get("correct_fact", "").strip()
@@ -65,18 +61,40 @@ class ArbitrationVerifier:
 
         if is_arabic:
             if has_contradiction:
-                return f"تصحيح سريع: المصدر اللي لقيته بيقول {fact}. ممكن يكون في سياق فاتني — المصدر ظاهر في الداشبورد."
+                fact_clause = f"تصحيح سريع: المصدر اللي لقيته بيقول {fact}."
+                hedge_clause = "ممكن يكون في سياق فاتني — المصدر ظاهر في الداشبورد."
             elif has_supported:
-                return f"تأكيد سريع: المصدر اللي لقيته بيقول {fact}. المصدر ظاهر في الداشبورد."
+                fact_clause = f"تأكيد سريع: المصدر اللي لقيته بيقول {fact}."
+                hedge_clause = "المصدر ظاهر في الداشبورد."
             else:
-                return "تعذر التحقق من المعلومة من مصادر موثوقة."
+                fact_clause = "تعذر التحقق من المعلومة من مصادر موثوقة."
+                hedge_clause = ""
         else:
             if has_contradiction:
-                return f"Quick fact check: the source I found says {fact}. I may have missed context — source is on the dashboard."
+                fact_clause = f"Quick fact check: the source I found says {fact}."
+                hedge_clause = "I may have missed context — source is on the dashboard."
             elif has_supported:
-                return f"Quick fact check: the source I found confirms {fact}. Source is on the dashboard."
+                fact_clause = f"Quick fact check: the source I found confirms {fact}."
+                hedge_clause = "Source is on the dashboard."
             else:
-                return "Unable to verify this claim from reliable sources."
+                fact_clause = "Unable to verify this claim from reliable sources."
+                hedge_clause = ""
+
+        return fact_clause, hedge_clause
+
+    def format_intervention_template(
+        self,
+        assessment: Dict[str, Any],
+        is_arabic: bool = False
+    ) -> str:
+        """
+        Builds a hedged social template-based spoken intervention.
+        Combines fact_clause and hedge_clause for backward compatibility.
+        """
+        fact_clause, hedge_clause = self.format_intervention_clauses(assessment, is_arabic=is_arabic)
+        if hedge_clause:
+            return f"{fact_clause} {hedge_clause}"
+        return fact_clause
 
     async def search_evidence(
         self,
@@ -100,8 +118,8 @@ class ArbitrationVerifier:
             return None, search_ms, 0, []
 
         evidence_snippets = "\n".join([
-            f"[Source {i+1} - Tier {s.get('source_tier', 3)}] {s['title']} ({s['domain']}):\n{s['snippet']}\nURL: {s['url']}"
-            for i, s in enumerate(sources[:4])
+            f"[Source {i+1} - Tier {s.get('source_tier', 3)}] {s.get('title', '')} ({s.get('domain', '')}):\n{s.get('snippet', '')[:350]}\nURL: {s.get('url', '')}"
+            for i, s in enumerate(sources[:3])
         ])
 
         has_arabic = any("\u0600" <= c <= "\u06FF" for c in (claim_a + claim_b))
@@ -129,7 +147,11 @@ class ArbitrationVerifier:
             has_arabic = any("\u0600" <= c <= "\u06FF" for c in (claim_a + claim_b))
 
             # Step 3: Enforce template-based intervention
+            fact_clause, hedge_clause = self.format_intervention_clauses(assessment, is_arabic=has_arabic)
             spoken_text = self.format_intervention_template(assessment, is_arabic=has_arabic)
+            assessment["fact_clause"] = fact_clause
+            assessment["hedge_clause"] = hedge_clause
+            assessment["comparison_details"] = assessment.get("comparison_details", "")
             assessment["spoken_intervention"] = spoken_text
 
             # Map status for backward/frontend compatibility

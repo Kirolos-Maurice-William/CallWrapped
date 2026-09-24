@@ -41,7 +41,8 @@ class PendingOffer:
         voice_client: Optional[discord.VoiceClient] = None,
         text_channel: Optional[discord.TextChannel] = None,
         user_id: Optional[int] = None,
-        stt_ms: int = 0
+        stt_ms: int = 0,
+        warm_tts_session: Optional[Any] = None
     ):
         self.offer_id = offer_id
         self.guild_id = guild_id
@@ -60,6 +61,7 @@ class PendingOffer:
         self.text_channel = text_channel
         self.user_id = user_id
         self.stt_ms = stt_ms
+        self.warm_tts_session = warm_tts_session
         self.is_resolved: bool = False
         self.expiry_task: Optional[asyncio.Task] = None
 
@@ -69,6 +71,15 @@ class PendingOffer:
             self.expiry_task.cancel()
         if self.prefetch_task and not self.prefetch_task.done():
             self.prefetch_task.cancel()
+        if self.warm_tts_session:
+            if hasattr(self.warm_tts_session, "close_sync"):
+                self.warm_tts_session.close_sync()
+            elif hasattr(self.warm_tts_session, "close"):
+                try:
+                    asyncio.create_task(self.warm_tts_session.close())
+                except Exception:
+                    pass
+            self.warm_tts_session = None
 
 
 def is_confirmation_utterance(text: str) -> bool:
@@ -689,6 +700,9 @@ class ArbitrationEngine:
             arbitration_verifier.search_evidence(search_query, target_domains=target_domains)
         )
 
+        # Pre-warm: establish and hold warm Edge-TTS connection in background alongside search prefetch (35s timeout)
+        warm_tts = speaker.create_warm_session(timeout_seconds=35.0)
+
         offer_id = f"off_{uuid.uuid4().hex[:8]}"
         offer = PendingOffer(
             offer_id=offer_id,
@@ -707,7 +721,8 @@ class ArbitrationEngine:
             voice_client=voice_client,
             text_channel=text_channel,
             user_id=user_id,
-            stt_ms=stt_ms
+            stt_ms=stt_ms,
+            warm_tts_session=warm_tts
         )
         session.pending_offer = offer
 
@@ -885,12 +900,32 @@ class ArbitrationEngine:
             session.verified_claims_count += 1
 
             # Step C: Speak verdict via TTS (the ONLY path that speaks)
+            fact_clause = assessment.get("fact_clause") or spoken_text
+            hedge_clause = assessment.get("hedge_clause") or ""
+
+            # Check warm session
+            warm_session = getattr(offer, "warm_tts_session", None)
+            handshake_ms = 0
+            if warm_session and warm_session.is_valid():
+                logger.info("🔥 [TTS Reused] Reusing warm TTS session from offer time (no new handshake)")
+                warm_session.reused = True
+                handshake_ms = 0
+            else:
+                logger.info("⚠️ [TTS Rebuild] Warm session expired or absent; rebuilding connection on confirm")
+                handshake_ms = getattr(warm_session, "handshake_ms", 0) if warm_session else 0
+                warm_session = None
+
             t_tts_start = time.monotonic()
             tts_ms = await speaker.speak(vc, spoken_text)
             t_tts_end = time.monotonic()
 
             # Step D: Headline metric: T_perceived = t_first_audio - t_confirm_end
-            ttfb_sec = (getattr(speaker, "last_ttfb_ms", 0) or 0) / 1000.0
+            clause1_ttfb_ms = getattr(speaker, "last_clause1_ttfb_ms", 0) or getattr(speaker, "last_ttfb_ms", 0) or 0
+            ttfb_sec = clause1_ttfb_ms / 1000.0
+            clause2_wait_ms = getattr(speaker, "last_clause2_wait_ms", 0) or 0
+            if hasattr(speaker, "last_handshake_ms") and speaker.last_handshake_ms is not None:
+                handshake_ms = speaker.last_handshake_ms
+
             if confirmation_end_time > 1e8:
                 t_first_audio = getattr(speaker, "last_audio_start_time", 0.0) or (time.time() - (t_tts_end - t_tts_start) + ttfb_sec)
                 t_perceived_sec = max(0.0, t_first_audio - confirmation_end_time)
@@ -900,17 +935,21 @@ class ArbitrationEngine:
             t_perceived_ms = int(t_perceived_sec * 1000)
 
             logger.info(
-                f"⏱️ [Headline Metric] T_perceived = {t_perceived_ms}ms "
-                f"(target: <2500ms, prefetch search_ms={search_ms}ms, synth_ms={synth_ms}ms, TTFB={int(ttfb_sec*1000)}ms)"
+                f"⏱️ [Headline Metric] T_perceived = {t_perceived_ms}ms (target: <1800ms, "
+                f"handshake_ms={handshake_ms}ms, clause1_ttfb_ms={clause1_ttfb_ms}ms, "
+                f"clause2_wait_ms={clause2_wait_ms}ms, prefetch search_ms={search_ms}ms, synth_ms={synth_ms}ms)"
             )
 
             # Step E: Post Discord Embed
             if tc:
                 try:
+                    comparison_details = assessment.get("comparison_details", "")
+                    comp_text = f"💡 **Details:** {comparison_details}\n\n" if comparison_details else ""
                     embed = discord.Embed(
                         title="⚖️ Verified Factual Arbitration",
                         description=(
                             f"📢 **{correct_fact}**\n\n"
+                            f"{comp_text}"
                             f"• **{offer.speaker_a}:** `{spk_a_status}`\n"
                             f"• **{offer.speaker_b}:** `{spk_b_status}`\n\n"
                             f"🎯 **Evidence Strength:** `{evidence_strength}` ({confidence}%)\n"
