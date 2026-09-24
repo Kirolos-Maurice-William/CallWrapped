@@ -40,20 +40,22 @@ class ArbitrationVerifier:
         is_arabic: bool = False
     ) -> str:
         """
-        Builds a strict template-based spoken intervention:
-        CONTRADICTED: 'Correction: {fact}. Source: {domain}.' / 'تصحيح: {fact}. المصدر: {domain}.'
-        SUPPORTED: 'That claim is verified: {fact}. Source: {domain}.' / 'المعلومة صحيحة: {fact}. المصدر: {domain}.'
-        UNVERIFIABLE: 'Unable to verify this claim from reliable sources.' / 'تعذر التحقق من المعلومة من مصادر موثوقة.'
+        Builds a hedged social template-based spoken intervention:
+        CONTRADICTED:
+        AR: "تصحيح سريع: المصدر اللي لقيته بيقول [fact]. ممكن يكون في سياق فاتني — المصدر ظاهر في الداشبورد."
+        EN: "Quick fact check: the source I found says [fact]. I may have missed context — source is on the dashboard."
+        SUPPORTED:
+        AR: "تأكيد سريع: المصدر اللي لقيته بيقول [fact]. المصدر ظاهر في الداشبورد."
+        EN: "Quick fact check: the source I found confirms [fact]. Source is on the dashboard."
+        UNVERIFIABLE:
+        AR: "تعذر التحقق من المعلومة من مصادر موثوقة."
+        EN: "Unable to verify this claim from reliable sources."
         Strips doubled punctuation to ensure clean spoken synthesis.
         """
         fact = assessment.get("correct_fact", "").strip()
         # Clean up any doubled punctuation inside and strip trailing punctuation
         fact = re.sub(r'([.،,:؛!?]){2,}', r'\1', fact)
         fact = fact.rstrip(" .،,:؛!?")
-
-        url = assessment.get("selected_source_url", "")
-        default_domain = "مصادر رسمية" if is_arabic else "Official Documentation"
-        domain = urlparse(url).netloc.replace("www.", "") if url else default_domain
 
         a_status = assessment.get("speaker_a_status")
         b_status = assessment.get("speaker_b_status")
@@ -63,16 +65,16 @@ class ArbitrationVerifier:
 
         if is_arabic:
             if has_contradiction:
-                return f"تصحيح: {fact}. المصدر: {domain}."
+                return f"تصحيح سريع: المصدر اللي لقيته بيقول {fact}. ممكن يكون في سياق فاتني — المصدر ظاهر في الداشبورد."
             elif has_supported:
-                return f"المعلومة صحيحة: {fact}. المصدر: {domain}."
+                return f"تأكيد سريع: المصدر اللي لقيته بيقول {fact}. المصدر ظاهر في الداشبورد."
             else:
                 return "تعذر التحقق من المعلومة من مصادر موثوقة."
         else:
             if has_contradiction:
-                return f"Correction: {fact}. Source: {domain}."
+                return f"Quick fact check: the source I found says {fact}. I may have missed context — source is on the dashboard."
             elif has_supported:
-                return f"That claim is verified: {fact}. Source: {domain}."
+                return f"Quick fact check: the source I found confirms {fact}. Source is on the dashboard."
             else:
                 return "Unable to verify this claim from reliable sources."
 

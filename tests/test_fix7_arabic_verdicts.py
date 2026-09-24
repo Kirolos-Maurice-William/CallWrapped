@@ -21,7 +21,10 @@ class TestFix7ArabicVerdicts(unittest.TestCase):
             "selected_source_url": "https://www.nvidia.com/geforce/50-series/"
         }
         res = arbitration_verifier.format_intervention_template(assessment, is_arabic=True)
-        self.assertEqual(res, "تصحيح: كارت 5070 بيجي بـ 12 جيجا مش 16. المصدر: nvidia.com.")
+        self.assertEqual(
+            res,
+            "تصحيح سريع: المصدر اللي لقيته بيقول كارت 5070 بيجي بـ 12 جيجا مش 16. ممكن يكون في سياق فاتني — المصدر ظاهر في الداشبورد."
+        )
         print("\n--- FIX 7 OUTPUT 1 (CONTRADICTED) ---")
         print(res)
 
@@ -33,7 +36,10 @@ class TestFix7ArabicVerdicts(unittest.TestCase):
             "selected_source_url": "https://www.filgoal.com/matches/123"
         }
         res = arbitration_verifier.format_intervention_template(assessment, is_arabic=True)
-        self.assertEqual(res, "المعلومة صحيحة: الأهلي فاز بالسوبر المصري بنتيجة 2-0. المصدر: filgoal.com.")
+        self.assertEqual(
+            res,
+            "تأكيد سريع: المصدر اللي لقيته بيقول الأهلي فاز بالسوبر المصري بنتيجة 2-0. المصدر ظاهر في الداشبورد."
+        )
         print("\n--- FIX 7 OUTPUT 2 (SUPPORTED) ---")
         print(res)
 
