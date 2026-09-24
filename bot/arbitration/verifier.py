@@ -1,3 +1,4 @@
+import re
 import logging
 from urllib.parse import urlparse
 from typing import Dict, Any, Optional, Tuple, List
@@ -14,6 +15,7 @@ RULES:
 1. 'speaker_a_status' and 'speaker_b_status': Must each be 'SUPPORTED', 'CONTRADICTED', or 'UNVERIFIABLE'.
 2. 'evidence_strength': 'HIGH' (official manufacturer/gov/peer-reviewed docs), 'MEDIUM' (reputable tech media/encyclopedia), or 'LOW' (indirect/sparse).
 3. 'correct_fact': Exactly 1 objective, concise factual sentence drawn directly from the evidence snippets.
+   LANGUAGE RULE (MANDATORY): 'correct_fact' MUST be written in the SAME LANGUAGE as the speakers' utterances. If the speakers' utterances are in Arabic, 'correct_fact' MUST be written in natural, fluent Arabic (translate from English evidence snippets as necessary; keep brand/product names, technical terms, and model numbers in Latin/digits as-is). Never output an English correct_fact for Arabic claims.
 4. 'selected_source_url': The most authoritative source URL from the provided evidence list.
 5. 'selected_source_title': Title of that source.
 
@@ -42,8 +44,13 @@ class ArbitrationVerifier:
         CONTRADICTED: 'Correction: {fact}. Source: {domain}.' / 'تصحيح: {fact}. المصدر: {domain}.'
         SUPPORTED: 'That claim is verified: {fact}. Source: {domain}.' / 'المعلومة صحيحة: {fact}. المصدر: {domain}.'
         UNVERIFIABLE: 'Unable to verify this claim from reliable sources.' / 'تعذر التحقق من المعلومة من مصادر موثوقة.'
+        Strips doubled punctuation to ensure clean spoken synthesis.
         """
         fact = assessment.get("correct_fact", "").strip()
+        # Clean up any doubled punctuation inside and strip trailing punctuation
+        fact = re.sub(r'([.،,:؛!?]){2,}', r'\1', fact)
+        fact = fact.rstrip(" .،,:؛!?")
+
         url = assessment.get("selected_source_url", "")
         default_domain = "مصادر رسمية" if is_arabic else "Official Documentation"
         domain = urlparse(url).netloc.replace("www.", "") if url else default_domain
@@ -92,10 +99,16 @@ class ArbitrationVerifier:
             for i, s in enumerate(sources[:4])
         ])
 
+        has_arabic = any("\u0600" <= c <= "\u06FF" for c in (claim_a + claim_b))
+        lang_note = (
+            "\nLanguage Note: The claims are in Arabic. 'correct_fact' MUST be written in natural Arabic (translate facts from English evidence as needed)."
+            if has_arabic else ""
+        )
+
         user_prompt = (
             f"Conversation Context:\n"
             f"- {speaker_a} claimed: \"{claim_a}\"\n"
-            f"- {speaker_b} claimed: \"{claim_b}\"\n\n"
+            f"- {speaker_b} claimed: \"{claim_b}\"{lang_note}\n\n"
             f"Authoritative Web Evidence (Sorted by Trust Tier):\n{evidence_snippets}"
         )
 
