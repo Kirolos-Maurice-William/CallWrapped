@@ -115,6 +115,40 @@ async def on_user_utterance(
 # Discord Commands
 # =============================================================================
 
+def build_privacy_notice_text() -> str:
+    """Short Arabic notice stating real-time analysis scope and zero permanent storage."""
+    return (
+        "يقوم البوت بتحليل المكالمة لحظياً (وقت التحدث، المواضيع، نوبات الإحباط، "
+        "والتحقق من الحقائق عبر البحث المباشر على الويب). "
+        "لا يتم حفظ أو تخزين أي تسجيلات صوتية أو نصوص بعد انتهاء الجلسة."
+    )
+
+
+def build_join_embed(channel_name: str, mode: str) -> discord.Embed:
+    """Builds the join announcement embed including the mandatory privacy notice."""
+    embed = discord.Embed(
+        title="🎙️ Voice Arbitrator ● LIVE (AssemblyAI Hackathon)",
+        description=(
+            f"Connected to **{channel_name}**!\n\n"
+            f"🛡️ **Current Mode:** `{mode.upper()}`\n"
+            "• `!mode referee`: **(Default)** Silent observer. Only speaks on verified factual conflicts.\n"
+            "• `!mode echo`: Test mode (repeats verbatim speech for mic check).\n"
+            "• `!stats`: Server Evidence Leaderboard & Fact-checking insights.\n"
+            "• `!dashboard`: Open Live Judge-Facing Web Dashboard.\n"
+            "• `!privacy`: Privacy policy, data retention & emotion disclaimer.\n"
+            "• `!leave`: Disconnect from voice and clear session."
+        ),
+        color=config.EMBED_COLOR_INFO
+    )
+    embed.add_field(
+        name="🔒 إشعار الخصوصية والشفافية",
+        value=build_privacy_notice_text(),
+        inline=False
+    )
+    embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
+    return embed
+
+
 @bot.command(name="join")
 async def join_channel(ctx: commands.Context):
     """Connects bot to the caller's voice channel."""
@@ -145,20 +179,7 @@ async def join_channel(ctx: commands.Context):
         guild_ctx.sink = sink
         guild_ctx.voice_client.listen(sink)
 
-        embed = discord.Embed(
-            title="🎙️ Voice Arbitrator ● LIVE (AssemblyAI Hackathon)",
-            description=(
-                f"Connected to **{voice_channel.name}**!\n\n"
-                f"🛡️ **Current Mode:** `{guild_ctx.mode.upper()}`\n"
-                "• `!mode referee`: **(Default)** Silent observer. Only speaks on verified factual conflicts.\n"
-                "• `!mode echo`: Test mode (repeats verbatim speech for mic check).\n"
-                "• `!stats`: Server Evidence Leaderboard & Fact-checking insights.\n"
-                "• `!dashboard`: Open Live Judge-Facing Web Dashboard.\n"
-                "• `!leave`: Disconnect from voice."
-            ),
-            color=config.EMBED_COLOR_INFO
-        )
-        embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
+        embed = build_join_embed(voice_channel.name, guild_ctx.mode)
         await ctx.send(embed=embed)
 
     except Exception as e:
@@ -407,6 +428,7 @@ async def show_help(ctx: commands.Context):
             "• `!stats`: Displays the server evidence & speaker accuracy leaderboard.\n"
             "• `!status`: Checks latency, API connections, and voice channel state.\n"
             "• `!dashboard`: Link to the live Next.js Judge Dashboard.\n"
+            "• `!privacy`: Privacy policy, data retention details, and emotion inference disclaimer.\n"
             "• `!clear`: Clears session turns and dispute history for a fresh demo."
         ),
         inline=False
@@ -489,6 +511,41 @@ def build_dashboard_embed() -> discord.Embed:
 async def show_dashboard(ctx: commands.Context):
     """Sends the link and embed for the live web dashboard."""
     embed = build_dashboard_embed()
+    await ctx.send(embed=embed)
+
+
+def build_privacy_embed() -> discord.Embed:
+    """Builds discord.Embed explaining live call analysis, zero retention, and emotion inference disclaimer."""
+    embed = discord.Embed(
+        title="🔒 سياسة الخصوصية والشفافية | Privacy & Transparency",
+        description=(
+            "**كيف يتعامل البوت مع بياناتك الصوتية؟**\n\n"
+            "• 🎙️ **تحليل لحظي فقط:** يتم تحليل الصوت في الذاكرة الحية المؤقتة فقط (RAM) "
+            "لحساب وقت التحدث، تصنيف المواضيع، رصد نوبات الإحباط، والتحقق الفوري من المعلومات المتناقضة عبر الويب.\n\n"
+            "• 🗑️ **انعدام التخزين الدائم:** لا يتم حفظ أو تخزين أي تسجيلات صوتية أو نصوص محادثات بعد انتهاء الجلسة. "
+            "بمجرد مغادرة القناة الصوتية (`!leave`) أو إعادة التعيين (`!clear`)، تُحذف جميع بيانات الجلسة فوراً.\n\n"
+            "• ⚠️ **تنويه نوبات الإحباط:** استنتاج المشاعر ونوبات الإحباط هو تقدير آلي (Automated AI Inference) "
+            "يعتمد على نبرة الكلمات وسياق الحديث، وقد يكون غير دقيق أو يحتمل الخطأ، ولا يُقصد به أي حكم شخصي."
+        ),
+        color=config.EMBED_COLOR_INFO
+    )
+    embed.add_field(
+        name="🛡️ Privacy Summary (EN)",
+        value=(
+            "• **Live Analysis Only**: Real-time processing of talk time, topics, frustration signals, and web fact-checking.\n"
+            "• **Zero Retention**: All recordings and transcripts are permanently cleared when the session ends (`!leave` or `!clear`).\n"
+            "• **Emotion Disclaimer**: Frustration/anger detection is an automated AI inference that may be mistaken or imprecise."
+        ),
+        inline=False
+    )
+    embed.set_footer(text="AssemblyAI Hackathon • Real-Time Voice Arbitrator • Privacy First")
+    return embed
+
+
+@bot.command(name="privacy")
+async def show_privacy(ctx: commands.Context):
+    """Displays privacy policy, data retention details, and emotion inference disclaimer."""
+    embed = build_privacy_embed()
     await ctx.send(embed=embed)
 
 
@@ -720,15 +777,18 @@ async def clear_session(ctx: commands.Context):
 
 @bot.command(name="leave")
 async def leave_channel(ctx: commands.Context):
-    """Disconnects from voice channel."""
+    """Disconnects from voice channel and resets all session state."""
+    session = arbitration_engine.get_session(ctx.guild.id)
+    session.reset()
+
     guild_ctx = get_guild_context(ctx.guild.id)
     if guild_ctx.voice_client and guild_ctx.voice_client.is_connected():
         if guild_ctx.sink:
             guild_ctx.sink.cleanup()
         await guild_ctx.voice_client.disconnect()
-        await ctx.send("👋 Disconnected from voice channel.")
+        await ctx.send("👋 Disconnected from voice channel and cleared session history.")
     else:
-        await ctx.send("❌ Not connected to any voice channel.")
+        await ctx.send("❌ Not connected to any voice channel. Session history cleared.")
 
 
 @bot.event
