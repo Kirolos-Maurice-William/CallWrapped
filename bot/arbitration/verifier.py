@@ -149,7 +149,7 @@ class ArbitrationVerifier:
             f"Authoritative Web Evidence (Sorted by Trust Tier):\n{evidence_snippets}"
         )
 
-        # Step 2: Groq LPU evaluates evidence with tightened token budget (~120 tokens)
+        # Step 2: Groq LPU evaluates evidence with tightened token budget (~180 tokens)
         messages = [
             {"role": "system", "content": VERIFICATION_SYNTHESIS_PROMPT},
             {"role": "user", "content": user_prompt}
@@ -157,7 +157,7 @@ class ArbitrationVerifier:
         assessment, tokens, llm_ms = await groq_client.complete_chat(
             messages=messages,
             response_format={"type": "json_object"},
-            max_tokens=140,
+            max_tokens=180,
             temperature=0.0
         )
         if not assessment:
