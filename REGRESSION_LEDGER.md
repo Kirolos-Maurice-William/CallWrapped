@@ -33,6 +33,7 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-24 | `3b61d48` | Unbuffered raw pipe with bufsize=0 and real voice-channel smoke test (verdict, barge-in, private refusal, 0 stalls) | `tests/smoke_real_voice.py`, `tests/test_barge_in.py` |
 | 2026-09-24 | `6f0fa7c` | Implement Two-Stage Referee (detect & offer, background prefetch, voice/!check confirmation, 30s expiry, 180s cooldown, !start mode) | `tests/test_two_stage_referee.py`, `tests/smoke_real_voice.py` |
 | 2026-09-24 | `837b1ce` | Two-clause streaming verdict and offer-time TTS pre-warming for <1800ms T_perceived | `tests/test_two_clause_prewarm.py`, `tests/smoke_real_voice.py` |
-| 2026-09-24 | `bd993ef` | Verifier fast-path grounding in Tavily include_answer and max_tokens=140 for sub-1s Groq synthesis | `tests/test_bug3_arabic_fact.py`, `tests/smoke_real_voice.py` |
+| 2026-09-24 | `95e993d` | Verifier fast-path grounding in Tavily include_answer and max_tokens=140 for sub-1s Groq synthesis | `tests/test_bug3_arabic_fact.py`, `tests/smoke_real_voice.py` |
+| 2026-09-24 | `f21628f` | Tune max_tokens=180 to prevent JSON truncation 400 Bad Request error on Groq, grounded fast-path | `tests/test_bug3_arabic_fact.py`, `tests/smoke_real_voice.py` |
 
 
