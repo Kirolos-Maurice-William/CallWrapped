@@ -79,6 +79,11 @@ class SessionState:
             logger.warning(
                 f"⚠️ [SessionReset] Dropping {dropped_count} un-flushed analytics utterances on session reset"
             )
+        if self.pending_utterances:
+            dropped_queue = len(self.pending_utterances)
+            logger.warning(
+                f"⚠️ [SessionReset] Dropping {dropped_queue} queued arbitration utterances on session reset"
+            )
         self.turns.clear()
         self.analytics_buffer.clear()
         self._topic_counts.clear()
@@ -91,6 +96,8 @@ class SessionState:
         self.is_draining = False
         self._stats_tracker.reset()
         self.analyzed_utterances.clear()
+        if hasattr(self, "claim_memory") and hasattr(self.claim_memory, "clear"):
+            self.claim_memory.clear()
         if self.analytics_timer_task and not self.analytics_timer_task.done():
             self.analytics_timer_task.cancel()
 

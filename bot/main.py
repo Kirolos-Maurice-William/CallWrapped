@@ -679,15 +679,10 @@ async def simulate_demo(ctx: commands.Context):
 
 @bot.command(name="clear")
 async def clear_session(ctx: commands.Context):
-    """Resets server session dialogue and dispute history."""
+    """Resets server session dialogue, claim memory, and arbitration queue."""
     session = arbitration_engine.get_session(ctx.guild.id)
-    session.turns.clear()
-    session.verified_claims_count = 0
-    session.disputed_claims_count = 0
-    session.speaker_stats.clear()
-    if hasattr(session, "stats_tracker"):
-        session.stats_tracker.reset()
-    await ctx.send("🧹 Session history and arbitration statistics have been reset.")
+    session.reset()
+    await ctx.send("🧹 Session history, claim memory, and arbitration queue have been reset.")
 
 
 @bot.command(name="leave")
