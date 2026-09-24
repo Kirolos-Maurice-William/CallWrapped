@@ -30,4 +30,6 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-24 | `cc681e4` | Add real Discord voice-channel live smoke test for streaming and barge-in | `tests/smoke_real_voice.py` |
 | 2026-09-24 | `dccac0e` | Implement conflict authenticity gate and private entity refusal with Egyptian few-shots (Phase B) | `tests/test_phase_b_referee_gates.py` |
 | 2026-09-24 | `83410c9` | Update spoken intervention templates to hedged social form in Arabic & English (Phase D) | `tests/test_fix7_arabic_verdicts.py`, `tests/test_bug3_arabic_fact.py` |
+| 2026-09-24 | `3b61d48` | Unbuffered raw pipe with bufsize=0 and real voice-channel smoke test (verdict, barge-in, private refusal, 0 stalls) | `tests/smoke_real_voice.py`, `tests/test_barge_in.py` |
+
 
