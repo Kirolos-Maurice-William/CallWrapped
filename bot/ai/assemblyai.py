@@ -132,5 +132,61 @@ class AssemblyAIClient:
                 logger.warning(f"[AssemblyAI] Network error: {e}")
                 return None, 0
 
+    async def transcribe_with_pii_redaction(
+        self,
+        wav_bytes: bytes,
+        policies: Optional[list] = None,
+        sub: str = "entity_name",
+        language_code: str = "ar"
+    ) -> Tuple[Optional[str], int]:
+        """Submits batch transcription with PII redaction enabled (Card 7 exhibit)."""
+        if not self.api_key or not wav_bytes:
+            return None, 0
+
+        policies = policies or ["person_name", "phone_number"]
+        t0 = time.perf_counter()
+        headers = {"Authorization": self.api_key}
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            upload_resp = await client.post(self.upload_url, headers=headers, content=wav_bytes)
+            if upload_resp.status_code != 200:
+                logger.error(f"[AssemblyAI PII] Upload failed: {upload_resp.text}")
+                return None, 0
+            upload_url = upload_resp.json().get("upload_url")
+
+            job_payload = {
+                "audio_url": upload_url,
+                "language_code": language_code,
+                "redact_pii": True,
+                "redact_pii_policies": policies,
+                "redact_pii_sub": sub
+            }
+            job_resp = await client.post(self.transcript_url, headers=headers, json=job_payload)
+            if job_resp.status_code != 200:
+                logger.error(f"[AssemblyAI PII] Job submission failed: {job_resp.text}")
+                return None, 0
+
+            job_id = job_resp.json().get("id")
+            poll_url = f"{self.transcript_url}/{job_id}"
+
+            attempts = getattr(config, "ASSEMBLYAI_POLL_ATTEMPTS", 40)
+            interval = getattr(config, "ASSEMBLYAI_POLL_INTERVAL_SEC", 0.5)
+            for _ in range(attempts):
+                await asyncio.sleep(interval)
+                poll_resp = await client.get(poll_url, headers=headers)
+                if poll_resp.status_code == 200:
+                    data = poll_resp.json()
+                    status = data.get("status")
+                    if status == "completed":
+                        redacted_text = data.get("text", "").strip()
+                        latency_ms = int((time.perf_counter() - t0) * 1000)
+                        logger.info(f"🛡️ [AssemblyAI PII Redacted] ({latency_ms}ms): {redacted_text}")
+                        return redacted_text, latency_ms
+                    elif status == "error":
+                        logger.error(f"[AssemblyAI PII] Transcription error: {data.get('error')}")
+                        return None, 0
+
+            return None, int((time.perf_counter() - t0) * 1000)
+
 
 assemblyai_client = AssemblyAIClient()

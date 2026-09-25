@@ -907,6 +907,46 @@ async def simulate_demo(ctx: commands.Context):
     ))
 
 
+@bot.command(name="judge-mode")
+async def judge_mode_command(ctx: commands.Context):
+    """Executes the 7-Card Judge Attack Mode harness and posts results to Discord."""
+    from bot.arbitration.judge_mode import run_judge_mode_harness
+
+    embed = discord.Embed(
+        title="⚔️ Judge Attack Mode — 7-Card Stress Test",
+        description=(
+            "Running live verification across all 7 adversarial scenarios:\n\n"
+            "1. **Opinion**: Subjective claim alone -> Gate rejects\n"
+            "2. **Agreement**: Both speakers agree -> No conflict\n"
+            "3. **Real Dispute**: Factual contradiction -> Verified via Tavily & Groq\n"
+            "4. **Private Entity**: Personal name/event -> Refused without search\n"
+            "5. **Weak/Ambiguous**: Unrelated statements -> Rejected\n"
+            "6. **Barge-in**: Speech during playback -> Instant abort & ffmpeg cleanup\n"
+            "7. **PII Exhibit**: Redacts personal names and phone numbers via AssemblyAI"
+        ),
+        color=config.EMBED_COLOR_INFO
+    )
+    await ctx.send(embed=embed)
+
+    results = await run_judge_mode_harness(verbose=False)
+    passed_count = sum(1 for r in results if r.get("passed"))
+
+    result_lines = []
+    for r in results:
+        status_icon = "✅" if r.get("passed") else "❌"
+        card_num = r.get("card")
+        name = r.get("name", f"Card {card_num}")
+        result_lines.append(f"{status_icon} **Card {card_num}: {name}**\n• {r.get('actual')}")
+
+    summary_embed = discord.Embed(
+        title=f"🏁 Judge Attack Mode Results ({passed_count}/7 Passed)",
+        description="\n\n".join(result_lines),
+        color=0x57F287 if passed_count == 7 else 0xED4245
+    )
+    summary_embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
+    await ctx.send(embed=summary_embed)
+
+
 @bot.command(name="clear")
 async def clear_session(ctx: commands.Context):
     """Resets server session dialogue, claim memory, and arbitration queue."""
