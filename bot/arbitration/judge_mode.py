@@ -96,8 +96,8 @@ async def run_card_3() -> Dict[str, Any]:
         search_query=query
     )
 
-    source_url = verdict.get("selected_source_url") or (sources[0]["url"] if sources else "")
-    fact_clause, hedge_clause = arbitration_verifier.format_intervention_clauses(verdict, is_arabic=True)
+    source_url = (verdict.get("selected_source_url") if verdict else "") or (sources[0]["url"] if sources else "")
+    fact_clause, hedge_clause = arbitration_verifier.format_intervention_clauses(verdict, is_arabic=True) if verdict else ("", "")
 
     passed = (
         has_conflict is True and

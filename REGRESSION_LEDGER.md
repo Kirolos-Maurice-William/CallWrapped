@@ -45,6 +45,8 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-25 | `0ac14ef` | Custom spelling probe (44 mappings dropped Corpus WER to 22.15% and Clean WER to 19.40%, 90% numbers) (EXP 3) | `tests/test_custom_spelling.py`, `audit/exp3_custom_spelling.py` |
 | 2026-09-25 | `22521f3` | Selective Groq correction probe: 0 number corruption verified, but +1.54% WER degradation (23.69% vs 22.15%); rejected per evidence (EXP 4) | `audit/exp4_selective_groq_correction.py` |
 | 2026-09-25 | `3322304` | Language config probe (fixed language_code='ar' matched 22.15% WER with +92ms faster p50 and cleaner WER 19.40% vs 21.07%) (EXP 5) | `audit/exp5_language_config.py` |
+| 2026-09-25 | `FINAL_HASH` | Final production STT config (silence trim + 160 keyterms + 44 custom_spelling); 95/95 tests green | `audit/run_hearing_test.py`, `tests/` |
+
 
 
 

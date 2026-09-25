@@ -12,12 +12,15 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.abspath("."))
 
 from audit.cleaner import clean_arabic_text
+from bot.audio.pcm import trim_trailing_silence_wav
 from bot.ai.assemblyai import (
     assemblyai_client,
     ASSEMBLYAI_CONTEXT_PROMPT,
-    ASSEMBLYAI_KEYTERMS
+    ASSEMBLYAI_KEYTERMS,
+    ASSEMBLYAI_CUSTOM_SPELLING
 )
 from bot.config import config
+
 
 LABELS_CSV = os.path.join("audit", "mgb3_clips", "labels.csv")
 RESULTS_CSV = os.path.join("audit", "mgb3_results.csv")
@@ -74,7 +77,9 @@ def extract_number_values(text: str):
 async def transcribe_clip(client: httpx.AsyncClient, wav_path: str):
     """Transcribes a single clip using production AssemblyAI settings and measures latency."""
     with open(wav_path, "rb") as f:
-        wav_bytes = f.read()
+        raw_bytes = f.read()
+
+    wav_bytes = trim_trailing_silence_wav(raw_bytes, threshold_rms=80.0, pad_ms=150)
 
     headers = {"Authorization": assemblyai_client.api_key}
     t0 = time.perf_counter()
@@ -94,9 +99,11 @@ async def transcribe_clip(client: httpx.AsyncClient, wav_path: str):
             "punctuate": True,
             "format_text": True,
             "prompt": ASSEMBLYAI_CONTEXT_PROMPT,
-            "keyterms_prompt": ASSEMBLYAI_KEYTERMS
+            "keyterms_prompt": ASSEMBLYAI_KEYTERMS,
+            "custom_spelling": ASSEMBLYAI_CUSTOM_SPELLING
         }
         job_resp = await client.post(assemblyai_client.transcript_url, headers=headers, json=job_payload)
+
         if job_resp.status_code != 200:
             return None, int((time.perf_counter() - t0) * 1000), f"Job HTTP {job_resp.status_code}"
 
