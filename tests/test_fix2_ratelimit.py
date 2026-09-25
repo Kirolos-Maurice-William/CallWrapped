@@ -71,6 +71,31 @@ class TestRateLimitParserAndRotation(unittest.TestCase):
 
         asyncio.run(run_test())
 
+    def test_complete_chat_sync_never_sleeps_more_than_two_seconds(self):
+        """
+        Verify that complete_chat_sync bounds sleep to 2.0s max on 429 responses.
+        """
+        client = GroqClient()
+        client.pool.keys = [
+            {"id": "key#1", "key": "gsk_test1", "remaining_tokens": 1000, "reset_time": 0.0},
+            {"id": "key#2", "key": "gsk_test2", "remaining_tokens": 1000, "reset_time": 0.0},
+        ]
+        mock_resp_429 = MagicMock()
+        mock_resp_429.status_code = 429
+        mock_resp_429.headers = {"retry-after": "60s"}
+        mock_resp_429.text = "Rate limit exceeded"
+
+        with patch("httpx.Client.post", return_value=mock_resp_429):
+            t_start = time.perf_counter()
+            parsed, tokens, latency = client.complete_chat_sync(
+                messages=[{"role": "user", "content": "hi"}]
+            )
+            elapsed = time.perf_counter() - t_start
+            print(f"\n[Sync Rotation Hardening Test] Elapsed: {elapsed*1000:.2f}ms for 60s rate limit reset")
+            self.assertLess(elapsed, 2.0, "Sync request path slept more than 2.0 seconds!")
+            self.assertIsNone(parsed)
+
+
 
 if __name__ == "__main__":
     unittest.main()

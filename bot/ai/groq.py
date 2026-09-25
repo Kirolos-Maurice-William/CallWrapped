@@ -334,6 +334,12 @@ class GroqClient:
                                 max(0.1, k["reset_time"] - time.time()),
                                 max(0.1, k2["reset_time"] - time.time())
                             )
+                            if sleep_wait > 2.0:
+                                logger.warning(
+                                    f"⚠️ [GroqClient] Sync rate limit reset too long ({sleep_wait:.1f}s > 2.0s). Skipping request."
+                                )
+                                latency_ms = int((time.perf_counter() - t0) * 1000)
+                                return None, {}, latency_ms
                             time.sleep(sleep_wait)
                             k_best = min(self.pool.keys, key=lambda x: x["reset_time"])
                             h_best = {"Authorization": f"Bearer {k_best['key']}", "Content-Type": "application/json"}
@@ -341,6 +347,12 @@ class GroqClient:
                             self.pool.update_headers(k_best, resp.headers)
                             k = k_best
                     else:
+                        if wait_sec > 2.0:
+                            logger.warning(
+                                f"⚠️ [GroqClient] Sync rate limit reset too long ({wait_sec:.1f}s > 2.0s). Skipping request."
+                            )
+                            latency_ms = int((time.perf_counter() - t0) * 1000)
+                            return None, {}, latency_ms
                         time.sleep(wait_sec)
                         resp = client.post(self.url, headers=headers, json=payload)
                         self.pool.update_headers(k, resp.headers)
