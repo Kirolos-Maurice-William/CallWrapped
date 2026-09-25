@@ -27,6 +27,19 @@ def convert_discord_pcm_to_wav(pcm_chunks: List[bytes]) -> bytes:
         mono_48k = mono_48k[:-remainder]
     mono_16k = mono_48k.reshape(-1, 3).mean(axis=1).astype(np.int16)
 
+    # Energy-trim trailing silence (1.5s VAD window) with 150ms safety buffer
+    frame_samples = 320  # 20ms at 16kHz
+    pad_samples = 2400   # 150ms at 16kHz
+    num_frames = len(mono_16k) // frame_samples
+    last_active_sample = len(mono_16k)
+    for i in range(num_frames - 1, -1, -1):
+        chunk = mono_16k[i * frame_samples : (i + 1) * frame_samples]
+        chunk_rms = np.sqrt(np.mean(chunk.astype(np.float32) ** 2))
+        if chunk_rms >= getattr(config, "SILENCE_THRESHOLD_RMS", 80.0):
+            last_active_sample = min(len(mono_16k), (i + 1) * frame_samples + pad_samples)
+            break
+    mono_16k = mono_16k[:last_active_sample]
+
     wav_buf = io.BytesIO()
     with wave.open(wav_buf, "wb") as wf:
         wf.setnchannels(1)
@@ -34,6 +47,51 @@ def convert_discord_pcm_to_wav(pcm_chunks: List[bytes]) -> bytes:
         wf.setframerate(16000)
         wf.writeframes(mono_16k.tobytes())
     return wav_buf.getvalue()
+
+
+def trim_trailing_silence_wav(wav_bytes: bytes, threshold_rms: float = 80.0, frame_ms: int = 20, pad_ms: int = 150) -> bytes:
+    """
+    Trims trailing silence from 16kHz 16-bit mono WAV bytes using energy threshold.
+    Preserves a pad_ms safety buffer to ensure trailing phonemes are never clipped.
+    """
+    if not wav_bytes or len(wav_bytes) < 44:
+        return wav_bytes
+    try:
+        with wave.open(io.BytesIO(wav_bytes), 'rb') as wf:
+            n_channels = wf.getnchannels()
+            sampwidth = wf.getsampwidth()
+            rate = wf.getframerate()
+            frames = wf.readframes(wf.getnframes())
+
+        samples = np.frombuffer(frames, dtype=np.int16)
+        if len(samples) == 0:
+            return wav_bytes
+
+        frame_samples = int(rate * (frame_ms / 1000.0))
+        pad_samples = int(rate * (pad_ms / 1000.0))
+        num_frames = len(samples) // frame_samples
+        if num_frames == 0:
+            return wav_bytes
+
+        last_active_sample = len(samples)
+        for i in range(num_frames - 1, -1, -1):
+            chunk = samples[i * frame_samples : (i + 1) * frame_samples]
+            chunk_rms = np.sqrt(np.mean(chunk.astype(np.float32) ** 2))
+            if chunk_rms >= threshold_rms:
+                last_active_sample = min(len(samples), (i + 1) * frame_samples + pad_samples)
+                break
+
+        trimmed_samples = samples[:last_active_sample]
+        buf = io.BytesIO()
+        with wave.open(buf, 'wb') as wf:
+            wf.setnchannels(n_channels)
+            wf.setsampwidth(sampwidth)
+            wf.setframerate(rate)
+            wf.writeframes(trimmed_samples.tobytes())
+        return buf.getvalue()
+    except Exception:
+        return wav_bytes
+
 
 
 class UserSpeechBuffer:

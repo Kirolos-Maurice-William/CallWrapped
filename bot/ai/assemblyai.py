@@ -58,6 +58,10 @@ class AssemblyAIClient:
         if not self.api_key or not wav_bytes or len(wav_bytes) < 1000:
             return None, 0
 
+        # Silence trim: energy-trim trailing silence (the 1.5s VAD window) before upload
+        from bot.audio.pcm import trim_trailing_silence_wav
+        wav_bytes = trim_trailing_silence_wav(wav_bytes, threshold_rms=getattr(config, "SILENCE_THRESHOLD_RMS", 80.0))
+
         t0 = time.perf_counter()
         headers = {"Authorization": self.api_key}
 
