@@ -30,6 +30,8 @@ import {
   SpeakerAnalytics
 } from "../components/AnalyticsWidgets";
 
+import { DisputesPanel, DisputeCard } from "../components/DisputesPanel";
+
 interface LatencyMetrics {
   stt_ms?: number;
   llm_ms?: number;
@@ -97,6 +99,7 @@ export default function VoiceArbitratorDashboard() {
   });
   const [turns, setTurns] = useState<Turn[]>([]);
   const [activeDispute, setActiveDispute] = useState<DisputeInfo | null>(null);
+  const [disputes, setDisputes] = useState<DisputeCard[]>([]);
   const [disputesHistory, setDisputesHistory] = useState<DisputeInfo[]>([]);
   const [leaderboard, setLeaderboard] = useState<{
     "Verified Claims": number;
@@ -224,6 +227,7 @@ export default function VoiceArbitratorDashboard() {
             if (data.latency) setLatency(data.latency);
             if (data.turns) setTurns(data.turns);
             if (data.active_dispute) setActiveDispute(data.active_dispute);
+            if (data.disputes) setDisputes(data.disputes);
             if (data.disputes_history) setDisputesHistory(data.disputes_history);
             if (data.leaderboard) setLeaderboard(data.leaderboard);
             if (data.analytics) applyAnalytics(data.analytics);
@@ -263,6 +267,7 @@ export default function VoiceArbitratorDashboard() {
               if (d.latency) setLatency(d.latency);
               if (d.turns) setTurns(d.turns);
               if (d.active_dispute) setActiveDispute(d.active_dispute);
+              if (d.disputes) setDisputes(d.disputes);
               if (d.disputes_history) setDisputesHistory(d.disputes_history);
               if (d.leaderboard) setLeaderboard(d.leaderboard);
               if (d.analytics) applyAnalytics(d.analytics);
@@ -273,6 +278,7 @@ export default function VoiceArbitratorDashboard() {
               if (d.latency) setLatency(d.latency);
               if (d.turns) setTurns(d.turns);
               if (d.active_dispute) setActiveDispute(d.active_dispute);
+              if (d.disputes) setDisputes(d.disputes);
               if (d.disputes_history) setDisputesHistory(d.disputes_history);
               if (d.leaderboard) setLeaderboard(d.leaderboard);
               if (d.analytics) applyAnalytics(d.analytics, msg.event);
@@ -518,6 +524,9 @@ export default function VoiceArbitratorDashboard() {
         {/* REAL-TIME CALL ANALYTICS WIDGETS */}
         <AnalyticsWidgets analytics={analytics} />
 
+        {/* DISPUTE CARDS (offered / checking / resolved / expired / refused) */}
+        <DisputesPanel disputes={disputes} />
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* LEFT/CENTER: HERO ACTIVE DISPUTE CARD & PAST DISPUTES (7 COLS) */}
           <div className="lg:col-span-7 flex flex-col space-y-6">
@@ -576,7 +585,7 @@ export default function VoiceArbitratorDashboard() {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm font-medium text-slate-200 dir-rtl text-right">
+                    <p dir="auto" className="text-sm font-medium text-slate-200">
                       "{activeDispute.claim_a}"
                     </p>
                   </div>
@@ -602,7 +611,7 @@ export default function VoiceArbitratorDashboard() {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm font-medium text-slate-200 dir-rtl text-right">
+                    <p dir="auto" className="text-sm font-medium text-slate-200">
                       "{activeDispute.claim_b}"
                     </p>
                   </div>
@@ -659,7 +668,7 @@ export default function VoiceArbitratorDashboard() {
                     </span>
                     <span className="text-[10px] text-indigo-400 font-mono">Edge Neural ar-EG-Shakir</span>
                   </div>
-                  <p className="text-sm font-medium text-slate-200 dir-rtl text-right leading-relaxed bg-slate-950/40 p-3 rounded-lg border border-slate-800">
+                  <p dir="auto" className="text-sm font-medium text-slate-200 leading-relaxed bg-slate-950/40 p-3 rounded-lg border border-slate-800">
                     "{activeDispute.spoken_intervention}"
                   </p>
                 </div>
@@ -851,7 +860,7 @@ export default function VoiceArbitratorDashboard() {
                       </span>
                     </div>
                   </div>
-                  <p className="text-sm text-slate-200 leading-relaxed dir-rtl text-right font-normal">
+                  <p dir="auto" className="text-sm text-slate-200 leading-relaxed font-normal">
                     {t.text}
                   </p>
                 </div>
