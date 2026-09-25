@@ -28,4 +28,6 @@ Thumbs.db
 *.wav
 *.mp3
 discord_bot/debug_last_audio.wav
+recordings/test_session/
+recordings/test_session_unit_test/
 

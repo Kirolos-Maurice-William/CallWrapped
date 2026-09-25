@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import asyncio
 import logging
 from pathlib import Path
 from typing import Dict, Optional, Any
@@ -98,7 +99,8 @@ async def on_user_utterance(
     speaker_name: str,
     wav_bytes: bytes,
     speech_start: float = 0.0,
-    speech_end: float = 0.0
+    speech_end: float = 0.0,
+    ended_by: str = "silence"
 ):
     """
     Asynchronous per-speaker utterance callback.
@@ -112,6 +114,20 @@ async def on_user_utterance(
     raw_text, stt_ms = await assemblyai_client.transcribe(wav_bytes, speaker_name=speaker_name)
     if not raw_text or len(raw_text.strip()) < 2:
         return
+
+    # Test-Mode Capture: asynchronously save utterance audio and metadata
+    if getattr(config, "TEST_CAPTURE_MODE", 0):
+        from bot.audio.capture import save_captured_utterance_async
+        asyncio.create_task(
+            save_captured_utterance_async(
+                speaker_name=speaker_name,
+                wav_bytes=wav_bytes,
+                asr_text=raw_text,
+                stt_latency_ms=stt_ms,
+                ended_by=ended_by,
+                timestamp=time.time()
+            )
+        )
 
     # 2. Feed into Arbitration Engine State Machine
     await arbitration_engine.process_utterance(
@@ -186,8 +202,8 @@ async def join_channel(ctx: commands.Context):
             guild_ctx.voice_client = await voice_channel.connect(cls=voice_recv.VoiceRecvClient)
 
         def make_handler(g_id: int):
-            async def handler(u_id: int, u_name: str, wav: bytes, speech_start: float = 0.0, speech_end: float = 0.0):
-                await on_user_utterance(g_id, u_id, u_name, wav, speech_start, speech_end)
+            async def handler(u_id: int, u_name: str, wav: bytes, speech_start: float = 0.0, speech_end: float = 0.0, ended_by: str = "silence"):
+                await on_user_utterance(g_id, u_id, u_name, wav, speech_start, speech_end, ended_by)
             return handler
 
         sink = AudioReceiver(
@@ -639,6 +655,38 @@ async def check_dispute(ctx: commands.Context):
         voice_client=guild_ctx.voice_client,
         text_channel=ctx.channel
     )
+
+
+@bot.command(name="start-capture")
+async def start_capture_command(ctx: commands.Context):
+    """Enables test-mode capture for finalized utterances."""
+    config.TEST_CAPTURE_MODE = 1
+    await ctx.send("🎙️ **Test Capture Mode: ON** — saving finalized utterances to `recordings/test_session/`.")
+
+
+@bot.command(name="stop-capture")
+async def stop_capture_command(ctx: commands.Context):
+    """Stops test-mode capture and generates recordings/test_session/labels_DRAFT.csv."""
+    from bot.audio.capture import generate_labels_draft_csv
+    config.TEST_CAPTURE_MODE = 0
+    csv_path = await asyncio.to_thread(generate_labels_draft_csv)
+
+    msg = (
+        "🛑 **Test Capture Stopped | تم إيقاف التسجيل**\n\n"
+        f"📁 Generated: `{csv_path}`\n\n"
+        "**Instructions / التعليمات:**\n"
+        "• **العربية:** استمع لكل ملف WAV، واكتب النص المصري الصحيح في خانة `correct_text`، ثم املأ التصنيفات:\n"
+        "  - `topic`: (football / politics / music / movies / gaming / tech / personal_life / other)\n"
+        "  - `is_claim`: (yes / no)\n"
+        "  - `anger`: (none / mild / high)\n"
+        "  - `loud`: (normal / loud)\n\n"
+        "• **English:** Listen to each WAV, type the CORRECT Egyptian text in `correct_text`, then fill:\n"
+        "  - `topic`: (football / politics / music / movies / gaming / tech / personal_life / other)\n"
+        "  - `is_claim`: (yes / no)\n"
+        "  - `anger`: (none / mild / high)\n"
+        "  - `loud`: (normal / loud)"
+    )
+    await ctx.send(msg)
 
 
 @bot.command(name="status")

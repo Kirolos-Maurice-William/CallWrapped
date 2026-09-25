@@ -111,7 +111,7 @@ class AudioReceiver(voice_recv.AudioSink):
 
         # 4. Force utterance finalization if max speech duration exceeded
         if buf.is_speaking and (now - buf.speech_start_time >= config.MAX_SPEECH_DURATION_SEC):
-            self._finalize_utterance(buf)
+            self._finalize_utterance(buf, ended_by="forcesplit")
 
     async def _silence_checker_loop(self):
         """Continuously checks each active speaker buffer independently."""
@@ -122,9 +122,9 @@ class AudioReceiver(voice_recv.AudioSink):
                 if buf.is_speaking and buf.pcm_chunks:
                     silence_gap = now - buf.last_speech_time
                     if silence_gap >= config.SILENCE_DURATION_SEC:
-                        self._finalize_utterance(buf)
+                        self._finalize_utterance(buf, ended_by="silence")
 
-    def _finalize_utterance(self, buf: UserSpeechBuffer):
+    def _finalize_utterance(self, buf: UserSpeechBuffer, ended_by: str = "silence"):
         """Dispatches completed audio for speech-to-text transcription concurrently."""
         chunks = buf.pcm_chunks
         user_id = buf.user_id
@@ -135,11 +135,15 @@ class AudioReceiver(voice_recv.AudioSink):
         buf.reset()
 
         if duration >= config.MIN_SPEECH_DURATION_SEC and len(chunks) > 5:
-            logger.info(f"🎙️ [Speech Finished] {user_name} ({duration:.1f}s, {len(chunks)} frames, window={speech_start:.2f}-{speech_end:.2f}). Processing...")
+            logger.info(f"🎙️ [Speech Finished] {user_name} ({duration:.1f}s, {len(chunks)} frames, window={speech_start:.2f}-{speech_end:.2f}, ended_by={ended_by}). Processing...")
             wav_bytes = convert_discord_pcm_to_wav(chunks)
             if wav_bytes:
+                try:
+                    coro = self.on_utterance(user_id, user_name, wav_bytes, speech_start, speech_end, ended_by)
+                except TypeError:
+                    coro = self.on_utterance(user_id, user_name, wav_bytes, speech_start, speech_end)
                 asyncio.run_coroutine_threadsafe(
-                    self.on_utterance(user_id, user_name, wav_bytes, speech_start, speech_end),
+                    coro,
                     self.loop
                 )
 

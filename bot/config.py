@@ -41,6 +41,9 @@ class BotConfig:
     default_window = "0" if any("test_fanout" in a for a in sys.argv) else "75"
     ANALYTICS_WINDOW_SEC: float = float(os.getenv("ANALYTICS_WINDOW_SEC", default_window))
 
+    # Test-Mode Capture Flag (clip factory)
+    TEST_CAPTURE_MODE: int = int(os.getenv("TEST_CAPTURE_MODE", "0"))
+
     # Two-Stage Referee Settings
     DISPUTE_OFFER_COOLDOWN_SEC: float = float(os.getenv("DISPUTE_OFFER_COOLDOWN_SEC", "180.0"))
     DISPUTE_OFFER_EXPIRY_SEC: float = float(os.getenv("DISPUTE_OFFER_EXPIRY_SEC", "30.0"))
