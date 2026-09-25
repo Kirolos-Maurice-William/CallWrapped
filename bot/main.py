@@ -14,10 +14,12 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import uuid
 from bot.config import config
 from bot.audio import AudioReceiver, install_dave_adapter
 from bot.ai import assemblyai_client, speaker
 from bot.arbitration import arbitration_engine, arbitration_verifier
+from bot.arbitration.engine import PendingOffer
 from bot.events.models import VoiceEvent, LatencyBreakdown
 from bot.events.publisher import publisher
 
@@ -701,108 +703,104 @@ async def show_status(ctx: commands.Context):
 
 @bot.command(name="arbitrate")
 async def manual_arbitrate(ctx: commands.Context, *, query: str):
-    """Direct on-demand factual arbitration query from text chat."""
+    """Direct on-demand factual arbitration query from text chat.
+    Routes through the two-stage referee offer flow (offers only, never speaks uninvited).
+    """
     guild_ctx = get_guild_context(ctx.guild.id)
-    msg = await ctx.send(f"🔍 Searching and verifying claim: `{query}`...")
+    session = arbitration_engine.get_session(ctx.guild.id)
+    now = time.time()
 
-    try:
-        verdict, search_ms, synth_ms, sources = await arbitration_verifier.verify_dispute(
-            speaker_a=ctx.author.display_name,
-            claim_a=query,
-            speaker_b="Fact Checker",
-            claim_b="Verify claim against official evidence",
-            search_query=query
+    # Cancel older unconfirmed pending offer if any
+    if session.pending_offer and not session.pending_offer.is_resolved:
+        logger.warning(
+            f"⚠️ Replacing older unconfirmed pending offer ({session.pending_offer.offer_id}) with new dispute offer"
         )
+        session.pending_offer.cancel()
 
-        status_val = str(verdict.get("status", "")).upper() if verdict else ""
-        if not verdict or status_val == "UNVERIFIABLE":
-            await msg.edit(content=f"⚠️ Unable to conclusively verify: `{query}` from available sources.")
-            return
+    session.last_offer_time = now
 
-        correct_fact = verdict.get("correct_fact", query)
-        spoken_text = verdict.get("spoken_intervention", correct_fact)
-        source_url = verdict.get("selected_source_url") or verdict.get("best_source_url", "")
-        source_title = verdict.get("selected_source_title") or verdict.get("best_source_title", "Official Source")
-        confidence = verdict.get("confidence", 95)
+    # Pre-fetch: fire Tavily search in background immediately
+    prefetch_task = asyncio.create_task(
+        arbitration_verifier.search_evidence(query)
+    )
 
-        search_ms = int(search_ms) if search_ms else 0
-        synth_ms = int(synth_ms) if synth_ms else 0
-        stt_ms = 0  # Text chat query has no speech STT
+    # Pre-warm: establish warm Edge-TTS connection in background (35s timeout)
+    warm_tts = speaker.create_warm_session(timeout_seconds=35.0)
 
-        spk_a_status = verdict.get("speaker_a_status", "")
-        spk_b_status = verdict.get("speaker_b_status", "")
+    offer_id = f"off_{uuid.uuid4().hex[:8]}"
+    correlation_id = str(uuid.uuid4())
+    offer = PendingOffer(
+        offer_id=offer_id,
+        guild_id=ctx.guild.id,
+        speaker_a=ctx.author.display_name,
+        claim_a=query,
+        speaker_b="Fact Checker",
+        claim_b=f"Verify claim against official evidence: {query}",
+        entity=query,
+        search_query=query,
+        target_domains=[],
+        prefetch_task=prefetch_task,
+        created_at=now,
+        expires_at=now + 30.0,
+        correlation_id=correlation_id,
+        voice_client=guild_ctx.voice_client,
+        text_channel=ctx.channel,
+        user_id=ctx.author.id,
+        stt_ms=0,
+        warm_tts_session=warm_tts
+    )
+    session.pending_offer = offer
 
-        winner = None
-        loser = None
-        if spk_a_status == "SUPPORTED":
-            winner = ctx.author.display_name
-        elif spk_a_status == "CONTRADICTED":
-            loser = ctx.author.display_name
+    # Schedule expiration task
+    expiry_sec = getattr(config, "DISPUTE_OFFER_EXPIRY_SEC", 30.0)
+    offer.expiry_task = asyncio.create_task(
+        arbitration_engine._offer_expiry_timer(guild_id=ctx.guild.id, offer_id=offer_id, timeout_seconds=expiry_sec)
+    )
 
-        if spk_b_status == "SUPPORTED" and not winner:
-            winner = "Fact Checker"
-        elif spk_b_status == "CONTRADICTED" and not loser:
-            loser = "Fact Checker"
+    # Post Arabic offer message to Discord text channel
+    offer_text = f"🤖 تم اقتراح التحقق من: «{query}» — أتحقق؟ قول «شوفها» أو اكتب !check"
+    await ctx.send(offer_text)
 
-        status_str = "contradicted" if "CONTRADICTED" in (spk_a_status, spk_b_status) else ("verified" if "SUPPORTED" in (spk_a_status, spk_b_status) else "unverifiable")
-
-        embed = discord.Embed(
-            title="⚖️ Factual Arbitration Verdict",
-            description=(
-                f"📢 **{correct_fact}**\n\n"
-                f"🎯 **Confidence**: `{confidence}%`\n"
-                f"🔗 **Official Source**: [{source_title}]({source_url})\n\n"
-                f"⚡ *Latency: Search {search_ms}ms | Synthesis {synth_ms}ms*"
-            ),
-            color=0x57F287
-        )
-        embed.set_footer(text="AssemblyAI Voice Agent Hackathon • Groq LPU • Tavily")
-        await msg.edit(content=None, embed=embed)
-
-        # Speak via voice if connected
-        tts_ms = 0
-        if guild_ctx.voice_client and guild_ctx.voice_client.is_connected():
-            t_tts = time.monotonic()
-            tts_res = await speaker.speak(guild_ctx.voice_client, spoken_text)
-            tts_ms = int(tts_res) if (isinstance(tts_res, (int, float)) and tts_res > 0) else int(round((time.monotonic() - t_tts) * 1000))
-
-        # Publish to dashboard
-        publisher.publish_sync_task(VoiceEvent(
-            type="intervention",
-            speaker_name=ctx.author.display_name,
-            text=spoken_text,
-            latency=LatencyBreakdown(
-                stt_ms=stt_ms,
-                llm_ms=synth_ms,
-                search_ms=search_ms,
-                tts_ms=tts_ms
-            ),
-            payload={
-                "status": status_str,
-                "confidence": confidence,
-                "correct_fact": correct_fact,
-                "winner": winner,
-                "loser": loser,
-                "speaker_a": ctx.author.display_name,
-                "claim_a": query,
-                "speaker_b": "Fact Checker",
-                "claim_b": "Verification",
-                "speaker_a_status": spk_a_status,
-                "speaker_b_status": spk_b_status,
-                "source_url": source_url,
-                "source_title": source_title,
-                "spoken_intervention": spoken_text
-            }
-        ))
-
-    except Exception as e:
-        logger.error(f"Error in manual arbitrate: {e}", exc_info=True)
-        await msg.edit(content=f"❌ Error during arbitration: {e}")
+    # Publish VoiceEvent(type="dispute_check_offered")
+    offer_event = VoiceEvent(
+        session_id=str(ctx.guild.id),
+        correlation_id=correlation_id,
+        type="dispute_check_offered",
+        speaker_id=str(ctx.author.id),
+        speaker_name=ctx.author.display_name,
+        text=offer_text,
+        timings={
+            "stt_final_at": round(now, 3),
+            "claim_done_at": round(now, 3),
+            "conflict_done_at": round(now, 3),
+            "offered_at": round(now, 3)
+        },
+        latency=LatencyBreakdown(
+            stt_ms=0,
+            llm_ms=0
+        ),
+        payload={
+            "offer_id": offer_id,
+            "speaker_a": ctx.author.display_name,
+            "claim_a": query,
+            "speaker_b": "Fact Checker",
+            "claim_b": f"Verify claim: {query}",
+            "entity": query,
+            "search_query": query,
+            "expires_in_seconds": 30.0,
+            "expires_at": round(now + 30.0, 3)
+        }
+    )
+    publisher.publish_sync_task(offer_event)
+    logger.info(
+        f"📣 [Dispute Offer Created] ({offer_id}) Manual !arbitrate offer for '{query}'. "
+        f"Search prefetch started. Awaiting confirmation (30s timeout)."
+    )
 
 
 @bot.command(name="simulate")
 async def simulate_demo(ctx: commands.Context):
-    """Injects the RTX 5070 Golden Demo dispute directly into voice and dashboard."""
+    """Injects the RTX 5070 Golden Demo dispute directly into voice and dashboard (dashboard events only, NEVER speaks)."""
     guild_ctx = get_guild_context(ctx.guild.id)
     await ctx.send("⚡ **Simulating Golden Arbitration Dispute (RTX 5070 16GB vs 12GB Demo)...**")
 
@@ -834,16 +832,16 @@ async def simulate_demo(ctx: commands.Context):
     )
 
     if verdict:
-        correct_fact = verdict.get("correct_fact", "NVIDIA RTX 5070 features 12GB GDDR7 memory.")
-        spoken_text = verdict.get("spoken_intervention", correct_fact)
+        fact_clause = verdict.get("fact_clause") or "كارت RTX 5070 بيجي بـ 12 جيجا بايت VRAM مش 16."
+        hedge_clause = verdict.get("hedge_clause") or ""
         source_url = verdict.get("selected_source_url") or verdict.get("best_source_url", "")
         source_title = verdict.get("selected_source_title") or verdict.get("best_source_title", "Official Source")
         confidence = verdict.get("confidence", 95)
         spk_a_status = verdict.get("speaker_a_status", "CONTRADICTED")
         spk_b_status = verdict.get("speaker_b_status", "SUPPORTED")
     else:
-        correct_fact = "NVIDIA GeForce RTX 5070 features 12GB GDDR7 VRAM, not 16GB."
-        spoken_text = "Correction: Nvidia's official specifications confirm the RTX 5070 features 12GB GDDR7 memory, not 16GB."
+        fact_clause = "Quick fact check: NVIDIA GeForce RTX 5070 features 12GB GDDR7 VRAM, not 16GB."
+        hedge_clause = "Source is on the dashboard."
         source_url = "https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/rtx-5070/"
         source_title = "NVIDIA Official GeForce RTX 5070 Specifications"
         confidence = 99
@@ -853,25 +851,21 @@ async def simulate_demo(ctx: commands.Context):
     search_ms = int(search_ms) if search_ms else 0
     synth_ms = int(synth_ms) if synth_ms else 0
     stt_ms = 0  # Simulated text in chat has no speech STT
+    tts_ms = 0  # !simulate NEVER speaks; dashboard events only
 
     winner = "Omar" if spk_b_status == "SUPPORTED" else ("Ahmed" if spk_a_status == "SUPPORTED" else None)
     loser = "Ahmed" if spk_a_status == "CONTRADICTED" else ("Omar" if spk_b_status == "CONTRADICTED" else None)
 
-    tts_ms = 0
-    if guild_ctx.voice_client and guild_ctx.voice_client.is_connected():
-        t_tts = time.monotonic()
-        tts_res = await speaker.speak(guild_ctx.voice_client, spoken_text)
-        tts_ms = int(tts_res) if (isinstance(tts_res, (int, float)) and tts_res > 0) else int(round((time.monotonic() - t_tts) * 1000))
-
+    verdict_display = f"{fact_clause} {hedge_clause}".strip() if hedge_clause else fact_clause
     embed = discord.Embed(
         title="⚖️ Verified Dispute Arbitration Verdict",
         description=(
-            f"📢 **{correct_fact}**\n\n"
+            f"📢 **{fact_clause}**\n\n"
             f"✅ **Accurate Speaker**: `{winner or 'Omar'}`\n"
             f"❌ **Refuted Speaker**: `{loser or 'Ahmed'}`\n"
             f"🎯 **Confidence**: `{confidence}%`\n"
             f"🔗 **Official Source**: [{source_title}]({source_url})\n\n"
-            f"⚡ **Latency Breakdown:** STT {stt_ms}ms | LLM {synth_ms}ms | Search {search_ms}ms | TTS {tts_ms}ms"
+            f"⚡ **Latency Breakdown:** STT {stt_ms}ms | LLM {synth_ms}ms | Search {search_ms}ms | TTS {tts_ms}ms (dashboard only)"
         ),
         color=0x57F287
     )
@@ -881,17 +875,18 @@ async def simulate_demo(ctx: commands.Context):
     publisher.publish_sync_task(VoiceEvent(
         type="intervention",
         speaker_name=winner or "Omar",
-        text=spoken_text,
+        text=verdict_display,
         latency=LatencyBreakdown(
             stt_ms=stt_ms,
             llm_ms=synth_ms,
             search_ms=search_ms,
-            tts_ms=tts_ms
+            tts_ms=0
         ),
         payload={
             "status": "contradicted" if "CONTRADICTED" in (spk_a_status, spk_b_status) else "supported",
             "confidence": confidence,
-            "correct_fact": correct_fact,
+            "fact_clause": fact_clause,
+            "hedge_clause": hedge_clause,
             "winner": winner,
             "loser": loser,
             "speaker_a": "Ahmed",
@@ -901,8 +896,7 @@ async def simulate_demo(ctx: commands.Context):
             "speaker_a_status": spk_a_status,
             "speaker_b_status": spk_b_status,
             "source_url": source_url,
-            "source_title": source_title,
-            "spoken_intervention": spoken_text
+            "source_title": source_title
         }
     ))
 
