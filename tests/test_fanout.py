@@ -126,7 +126,13 @@ class TestFanOutDispatcher(unittest.IsolatedAsyncioTestCase):
             print("=== VERIFYING ACCEPTANCE CRITERIA ===")
             print("=" * 75 + "\n")
 
-            # 1. Verify all 3 analytics_update events published with tokens
+            # Wait for background analytics tasks to finish
+            for _ in range(25):
+                analytics_events = [e for e in captured_events if e.type == "analytics_update"]
+                if len(analytics_events) >= 3:
+                    break
+                await asyncio.sleep(0.2)
+
             analytics_events = [e for e in captured_events if e.type == "analytics_update"]
             print(f"[Criterion 1] Classifications completed: {len(analytics_events)}/3")
             if len(analytics_events) == 0:
