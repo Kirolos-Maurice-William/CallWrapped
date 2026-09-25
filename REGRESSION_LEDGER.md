@@ -47,6 +47,7 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-25 | `3322304` | Language config probe (fixed language_code='ar' matched 22.15% WER with +92ms faster p50 and cleaner WER 19.40% vs 21.07%) (EXP 5) | `audit/exp5_language_config.py` |
 | 2026-09-25 | `dd42bfe` | Final production STT config (silence trim + 160 keyterms + 44 custom_spelling); 95/95 tests green | `audit/run_hearing_test.py`, `tests/` |
 | 2026-09-25 | `a973204` | Replace wildcard allow_origins with settings.CORS_ORIGINS (Phase 1) | `backend/app/main.py`, full suite 95/95 OK |
+| 2026-09-25 | `932f2cf` | Restore two-stage referee invariant in `!arbitrate` and `!simulate` (Phase 2) | `bot/main.py`, `tests/test_fix5_real_latencies.py`, `tests/test_fix6_arbitrate_keys.py`, full suite 95/95 OK |
 
 
 
