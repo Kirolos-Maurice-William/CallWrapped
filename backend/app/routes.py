@@ -39,6 +39,7 @@ LIVE_STATE: Dict[str, Any] = {
     },
     "turns": [],
     "active_dispute": None,
+    "disputes": [],
     "disputes_history": [],
     "leaderboard": {
         "Verified Claims": 0,
@@ -84,6 +85,61 @@ async def broadcast_event(event_data: dict):
         except Exception:
             if ws in active_connections:
                 active_connections.remove(ws)
+
+
+# --- Dispute Cards ---------------------------------------------------------
+# One card per gate-passed dispute, carrying its full lifecycle:
+#   offered -> checking -> resolved | expired | refused_private
+# Cards are keyed by offer_id (falling back to correlation_id / event_id) so
+# the offered / completed / expired events of one dispute collapse into a
+# single card instead of stacking duplicates.
+
+MAX_DISPUTE_CARDS = 5
+
+DISPUTE_CARD_FIELDS = (
+    "speaker_a", "claim_a", "speaker_b", "claim_b", "disputed_attribute",
+    "status", "refusal_reason", "source_name", "source_url",
+    "evidence_excerpt", "checked_timestamp", "t_perceived_ms"
+)
+
+
+def _first_present(payload: Dict[str, Any], *keys: str) -> Optional[Any]:
+    """Returns the first key present and non-empty in payload, else None."""
+    for key in keys:
+        value = payload.get(key)
+        if value is not None and value != "":
+            return value
+    return None
+
+
+def _dispute_card_key(event: "VoiceEventPayload") -> str:
+    """Stable identity for a dispute across its offered/completed/expired events."""
+    return str(event.payload.get("offer_id") or event.correlation_id or event.event_id)
+
+
+def _upsert_dispute_card(key: str, updates: Dict[str, Any], timestamp: float) -> Dict[str, Any]:
+    """
+    Creates or updates the dispute card identified by `key`.
+    Newest dispute first; list capped at MAX_DISPUTE_CARDS.
+    None-valued updates are dropped so later events never blank out earlier data.
+    """
+    clean = {k: v for k, v in updates.items() if v is not None}
+
+    for card in LIVE_STATE["disputes"]:
+        if card.get("dispute_id") == key:
+            card.update(clean)
+            card["last_updated"] = timestamp
+            return card
+
+    card: Dict[str, Any] = {"dispute_id": key}
+    card.update({field: None for field in DISPUTE_CARD_FIELDS})
+    card["created_at"] = timestamp
+    card["last_updated"] = timestamp
+    card.update(clean)
+
+    LIVE_STATE["disputes"].insert(0, card)
+    del LIVE_STATE["disputes"][MAX_DISPUTE_CARDS:]
+    return card
 
 
 @router.websocket("/ws")
@@ -179,6 +235,49 @@ async def ingest_voice_event(event: VoiceEventPayload):
         LIVE_STATE["leaderboard"]["Disputed Claims"] += 1
         LIVE_STATE["leaderboard"]["Verified Claims"] += 1
 
+        # Dispute card: private-entity refusal never performs a lookup, so it
+        # resolves to refused_private with no source; everything else resolves.
+        if str(payload.get("status", "")).upper() == "REFUSED_PRIVATE":
+            _upsert_dispute_card(
+                _dispute_card_key(event),
+                {
+                    "speaker_a": spk_a,
+                    "claim_a": payload.get("claim_a"),
+                    "speaker_b": spk_b,
+                    "claim_b": payload.get("claim_b"),
+                    "disputed_attribute": _first_present(
+                        payload, "disputed_attribute", "disputed_aspect", "entity", "entity_name"
+                    ),
+                    "status": "refused_private",
+                    "refusal_reason": _first_present(
+                        payload, "refusal_reason", "label", "rejection_reason"
+                    ) or "private_entity",
+                },
+                event.timestamp
+            )
+        else:
+            _upsert_dispute_card(
+                _dispute_card_key(event),
+                {
+                    "speaker_a": spk_a,
+                    "claim_a": payload.get("claim_a"),
+                    "speaker_b": spk_b,
+                    "claim_b": payload.get("claim_b"),
+                    "disputed_attribute": _first_present(
+                        payload, "disputed_attribute", "disputed_aspect", "entity", "entity_name"
+                    ),
+                    "status": "resolved",
+                    "source_name": _first_present(payload, "source_name", "source_title"),
+                    "source_url": payload.get("source_url"),
+                    "evidence_excerpt": _first_present(
+                        payload, "evidence_excerpt", "evidence_snippet"
+                    ),
+                    "checked_timestamp": event.timestamp,
+                    "t_perceived_ms": payload.get("t_perceived_ms"),
+                },
+                event.timestamp
+            )
+
         speakers = LIVE_STATE["leaderboard"]["Speakers"]
         if spk_a:
             if spk_a not in speakers:
@@ -213,22 +312,72 @@ async def ingest_voice_event(event: VoiceEventPayload):
             "text": event.text
         }
         LIVE_STATE["last_updated"] = event.timestamp
+        _upsert_dispute_card(
+            _dispute_card_key(event),
+            {
+                "speaker_a": payload.get("speaker_a"),
+                "claim_a": payload.get("claim_a"),
+                "speaker_b": payload.get("speaker_b"),
+                "claim_b": payload.get("claim_b"),
+                "disputed_attribute": _first_present(
+                    payload, "disputed_attribute", "disputed_aspect", "entity"
+                ),
+                "status": "offered",
+            },
+            event.timestamp
+        )
         logger.info(f"📣 [LiveState] Dispute offer registered: {payload.get('offer_id')}")
 
-    # 5. Dispute Check Expired
+    # 5. Dispute Check Confirmed (verification in flight)
+    elif event.type in ("dispute_check_started", "dispute_check_confirmed"):
+        payload = event.payload
+        _upsert_dispute_card(
+            _dispute_card_key(event),
+            {
+                "speaker_a": payload.get("speaker_a"),
+                "claim_a": payload.get("claim_a"),
+                "speaker_b": payload.get("speaker_b"),
+                "claim_b": payload.get("claim_b"),
+                "disputed_attribute": _first_present(
+                    payload, "disputed_attribute", "disputed_aspect", "entity"
+                ),
+                "status": "checking",
+            },
+            event.timestamp
+        )
+        LIVE_STATE["last_updated"] = event.timestamp
+        logger.info(f"🔎 [LiveState] Dispute check in flight: {payload.get('offer_id')}")
+
+    # 6. Dispute Check Expired
     elif event.type == "dispute_check_expired":
+        payload = event.payload
         LIVE_STATE["active_offer"] = None
         LIVE_STATE["last_updated"] = event.timestamp
+        _upsert_dispute_card(
+            _dispute_card_key(event),
+            {
+                "speaker_a": payload.get("speaker_a"),
+                "claim_a": payload.get("claim_a"),
+                "speaker_b": payload.get("speaker_b"),
+                "claim_b": payload.get("claim_b"),
+                "disputed_attribute": _first_present(
+                    payload, "disputed_attribute", "disputed_aspect", "entity"
+                ),
+                "status": "expired",
+                "refusal_reason": _first_present(payload, "refusal_reason", "reason"),
+            },
+            event.timestamp
+        )
         logger.info(f"⌛ [LiveState] Dispute offer expired: {event.payload.get('offer_id')}")
 
-    # 6. Fact Check Mode Update
+    # 7. Fact Check Mode Update
     elif event.type == "fact_check_mode_update":
         LIVE_STATE["fact_check_mode"] = event.payload.get("mode", "ON")
         LIVE_STATE["fact_check_mode_badge"] = event.payload.get("badge", "Fact Check Mode: ON")
         LIVE_STATE["last_updated"] = event.timestamp
         logger.info(f"🛡️ [LiveState] Fact Check Mode updated: {LIVE_STATE['fact_check_mode']}")
 
-    # 4. Analytics Aggregation (analytics_update or any event carrying analytics data)
+    # 8. Analytics Aggregation (analytics_update or any event carrying analytics data)
     topic = event.topic or event.payload.get("topic")
     anger = event.anger or event.payload.get("anger")
     anger_evidence = event.anger_evidence or event.payload.get("anger_evidence")
@@ -275,7 +424,7 @@ async def ingest_voice_event(event: VoiceEventPayload):
 
 @router.get("/live")
 async def get_live_state():
-    """Returns current live dashboard snapshot."""
+    """Returns current live dashboard snapshot (includes the dispute card list)."""
     return LIVE_STATE
 
 
@@ -302,6 +451,7 @@ async def reset_live_state():
     LIVE_STATE["fact_check_mode"] = "OFF"
     LIVE_STATE["fact_check_mode_badge"] = "Fact Check Mode: OFF"
     LIVE_STATE["disputes_history"].clear()
+    LIVE_STATE["disputes"].clear()
     LIVE_STATE["leaderboard"] = {
         "Verified Claims": 0,
         "Disputed Claims": 0,
