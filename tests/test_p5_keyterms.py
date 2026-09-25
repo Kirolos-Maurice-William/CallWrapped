@@ -20,9 +20,10 @@ class TestExpandedKeyterms(unittest.TestCase):
             print(f"  {idx:2d}. {term}")
         print("=" * 60)
 
-        # 1. Total under 60 items
-        self.assertLess(len(ASSEMBLYAI_KEYTERMS), 60, f"Keyterms count must be < 60, got {len(ASSEMBLYAI_KEYTERMS)}")
-        self.assertGreater(len(ASSEMBLYAI_KEYTERMS), 30, "Keyterms count should be reasonably expanded")
+        # 1. Total count bounds for expanded keyterms
+        self.assertLess(len(ASSEMBLYAI_KEYTERMS), 200, f"Keyterms count must be < 200, got {len(ASSEMBLYAI_KEYTERMS)}")
+        self.assertGreaterEqual(len(ASSEMBLYAI_KEYTERMS), 50, "Keyterms count should be reasonably expanded")
+
 
         # 2. Check required specific terms
         required_terms = [
@@ -34,7 +35,8 @@ class TestExpandedKeyterms(unittest.TestCase):
 
         # 3. Check no duplicates
         self.assertEqual(len(ASSEMBLYAI_KEYTERMS), len(set(ASSEMBLYAI_KEYTERMS)), "Keyterms must not contain duplicates")
-        print(f"\n[VERIFIED] All {len(required_terms)} required terms present. Total: {len(ASSEMBLYAI_KEYTERMS)}/60 items.\n")
+        print(f"\n[VERIFIED] All {len(required_terms)} required terms present. Total: {len(ASSEMBLYAI_KEYTERMS)} items.\n")
+
 
 
 if __name__ == "__main__":

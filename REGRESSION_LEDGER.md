@@ -41,5 +41,7 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-25 | `447d9b0` | Implement 7-card Judge Attack Mode adversarial harness and `!judge-mode` Discord command (Phase 4) | `bot/arbitration/judge_mode.py`, `tests/test_judge_mode.py` |
 | 2026-09-25 | `226c4d2` | Poll for background analytics task completion in discover suite; 89/89 tests passing green | `tests/test_fanout.py` |
 | 2026-09-25 | `e2ff978` | Energy-trim trailing silence before upload (-1.23% WER improvement: 29.54% vs 30.77%, p50 -18ms) (EXP 1) | `tests/test_silence_trim.py`, `audit/exp1_silence_trim.py` |
+| 2026-09-25 | `EXP2_HASH` | Keyterms ablation (expanded 160 terms won with 28.62% WER vs 29.54% on 54 terms, 90% numbers) (EXP 2) | `tests/test_p5_keyterms.py`, `audit/exp2_keyterms_ablation.py` |
+
 
 
