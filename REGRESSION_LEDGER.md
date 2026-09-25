@@ -42,6 +42,8 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-25 | `226c4d2` | Poll for background analytics task completion in discover suite; 89/89 tests passing green | `tests/test_fanout.py` |
 | 2026-09-25 | `e2ff978` | Energy-trim trailing silence before upload (-1.23% WER improvement: 29.54% vs 30.77%, p50 -18ms) (EXP 1) | `tests/test_silence_trim.py`, `audit/exp1_silence_trim.py` |
 | 2026-09-25 | `dafe5b0` | Keyterms ablation (expanded 160 terms won with 28.62% WER vs 29.54% on 54 terms, 90% numbers) (EXP 2) | `tests/test_p5_keyterms.py`, `audit/exp2_keyterms_ablation.py` |
+| 2026-09-25 | `EXP3_HASH` | Custom spelling probe (44 mappings dropped Corpus WER to 22.15% and Clean WER to 19.40%, 90% numbers) (EXP 3) | `tests/test_custom_spelling.py`, `audit/exp3_custom_spelling.py` |
+
 
 
 

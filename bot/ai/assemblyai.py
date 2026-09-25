@@ -58,9 +58,57 @@ ASSEMBLYAI_KEYTERMS = [
     "التموين", "السكر", "البنزين", "السولار"
 ]
 
-
+ASSEMBLYAI_CUSTOM_SPELLING = [
+    # Latin-from mappings (English / transliteration code-switching)
+    {"from": ["uncertain"], "to": "uncertainty"},
+    {"from": ["pinging"], "to": "ping"},
+    {"from": ["lags", "lagging"], "to": "lag"},
+    {"from": ["streaming", "streams"], "to": "stream"},
+    {"from": ["discords"], "to": "Discord"},
+    {"from": ["rtx"], "to": "RTX"},
+    {"from": ["gpus"], "to": "GPU"},
+    {"from": ["fpss"], "to": "FPS"},
+    {"from": ["vrams"], "to": "VRAM"},
+    {"from": ["gta"], "to": "GTA"},
+    {"from": ["ranks"], "to": "ranked"},
+    {"from": ["servers"], "to": "server"},
+    {"from": ["admins"], "to": "admin"},
+    {"from": ["updates"], "to": "update"},
+    {"from": ["craft"], "to": "Minecraft"},
+    {"from": ["headsets"], "to": "headset"},
+    {"from": ["routers"], "to": "router"},
+    {"from": ["fibers"], "to": "fiber"},
+    {"from": ["mics"], "to": "mic"},
+    {"from": ["packetloss"], "to": "packet"},
+    # Arabic-from mappings (Egyptian colloquial phonetic normalization)
+    {"from": ["كثيره", "كثيرة"], "to": "كتيره"},
+    {"from": ["كثير"], "to": "كتير"},
+    {"from": ["نقص"], "to": "ناقص"},
+    {"from": ["يصدق"], "to": "يسبق"},
+    {"from": ["بكم"], "to": "بيكم"},
+    {"from": ["احلي", "أحلى"], "to": "احلم"},
+    {"from": ["هنعيش"], "to": "حنعيش"},
+    {"from": ["سنتعرف", "ستعرف"], "to": "حنتعرف"},
+    {"from": ["بره"], "to": "برضه"},
+    {"from": ["ثلاث", "ثلاثة"], "to": "تلت"},
+    {"from": ["ثلاثين"], "to": "تلاتين"},
+    {"from": ["بالزعائف", "بالزعينف", "بالزعينب"], "to": "بالزعانف"},
+    {"from": ["زعائف", "زعينف", "زعينب"], "to": "زعانف"},
+    {"from": ["معدله"], "to": "معضله"},
+    {"from": ["لغوايه"], "to": "لغويه"},
+    {"from": ["اسباحه"], "to": "سباحه"},
+    {"from": ["كموس"], "to": "قاموس"},
+    {"from": ["هيلقي", "هيلقى"], "to": "حيلاقي"},
+    {"from": ["الحوزه"], "to": "ملحوظه"},
+    {"from": ["البرانويا"], "to": "البارانويا"},
+    {"from": ["كالشيزوفرانيا"], "to": "الشيزوفرانيا"},
+    {"from": ["تسبحها"], "to": "سباحه"},
+    {"from": ["قليلي"], "to": "قوليلي"},
+    {"from": ["اكلمكم"], "to": "حكلمكو"}
+]
 
 VALID_ASSEMBLYAI_MODELS = {"universal-3-5-pro", "universal-3-pro", "universal-2"}
+
 
 
 class AssemblyAIClient:
@@ -109,8 +157,10 @@ class AssemblyAIClient:
                     "punctuate": True,
                     "format_text": True,
                     "prompt": ASSEMBLYAI_CONTEXT_PROMPT,
-                    "keyterms_prompt": ASSEMBLYAI_KEYTERMS
+                    "keyterms_prompt": ASSEMBLYAI_KEYTERMS,
+                    "custom_spelling": ASSEMBLYAI_CUSTOM_SPELLING
                 }
+
                 job_resp = await client.post(self.transcript_url, headers=headers, json=job_payload)
                 if job_resp.status_code != 200:
                     logger.error(f"[AssemblyAI] Job submission failed ({job_resp.status_code}) for {speaker_name}: {job_resp.text}")
