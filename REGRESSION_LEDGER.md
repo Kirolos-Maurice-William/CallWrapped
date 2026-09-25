@@ -39,5 +39,6 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-25 | `9b6a199` | Add `DisputesPanel` rendering disputes with status badges, side-by-side claims, RTL-safe `dir="auto"`, and live WebSocket sync (Phase 2) | `npm run build`, `tests/test_dispute_cards_api.py` |
 | 2026-09-25 | `6e11630` | Implement `TEST_CAPTURE_MODE` non-blocking clip factory, session log JSONL, and `!stop-capture` draft labeling CSV generator (Phase 3) | `tests/test_capture_mode.py`, `tests/test_barge_in.py` |
 | 2026-09-25 | `447d9b0` | Implement 7-card Judge Attack Mode adversarial harness and `!judge-mode` Discord command (Phase 4) | `bot/arbitration/judge_mode.py`, `tests/test_judge_mode.py` |
+| 2026-09-25 | `226c4d2` | Poll for background analytics task completion in discover suite; 89/89 tests passing green | `tests/test_fanout.py` |
 
 
