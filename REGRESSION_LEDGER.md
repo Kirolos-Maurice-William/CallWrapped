@@ -52,6 +52,8 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-26 | `027216a` | Branding sweep to CallWrapped and Universal model fallback (Phase 4) | `bot/`, `backend/`, `frontend/`, `tests/test_fix1_stats.py`, full suite 96/96 OK |
 | 2026-09-26 | `da1cec3` | Dead code cleanup, privacy text update, and pruned dependencies (Phase 5) | `bot/`, `backend/`, `tests/`, `requirements.txt`, full suite 96/96 OK |
 | 2026-09-26 | `8f20bfd` | WebSocket origin check on `/api/ws` closing unauthorized origins with code 1008 (Phase 1 / SEC-01) | `tests/test_verify_dashboard_websocket_alive.py`, full suite 99/99 OK |
+| 2026-09-26 | `e9afbde` | Enforce 180s cooldown check in `!arbitrate` with remaining-time reply (Phase 2 / INV-01) | `tests/test_arbitrate_cooldown.py`, full suite 100/100 OK |
+
 
 
 

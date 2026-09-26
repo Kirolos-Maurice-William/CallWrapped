@@ -713,6 +713,13 @@ async def manual_arbitrate(ctx: commands.Context, *, query: str):
     session = arbitration_engine.get_session(ctx.guild.id)
     now = time.time()
 
+    cooldown_sec = getattr(config, "DISPUTE_OFFER_COOLDOWN_SEC", 180.0)
+    if session.last_offer_time > 0 and (now - session.last_offer_time) < cooldown_sec:
+        remaining = int(cooldown_sec - (now - session.last_offer_time))
+        logger.info(f"DISPUTE_SUPPRESSED: cooldown active (remaining: {remaining}s)")
+        await ctx.send(f"⏳ فترة التهدئة نشطة. يرجى الانتظار {remaining} ثانية قبل طلب تدقيق جديد. | Cooldown active: please wait {remaining}s.")
+        return
+
     # Cancel older unconfirmed pending offer if any
     if session.pending_offer and not session.pending_offer.is_resolved:
         logger.warning(

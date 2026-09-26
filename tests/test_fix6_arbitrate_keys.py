@@ -16,6 +16,9 @@ class TestFix6ArbitrateKeys(unittest.IsolatedAsyncioTestCase):
     - For UNVERIFIABLE verdict, confirm_dispute_offer returns early without verdict embed.
     """
 
+    def setUp(self):
+        arbitration_engine.sessions.pop(123456, None)
+
     async def test_selected_source_url_appears_in_embed(self):
         ctx = AsyncMock()
         ctx.guild.id = 123456
