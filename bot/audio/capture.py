@@ -1,4 +1,3 @@
-import os
 import sys
 import csv
 import json
@@ -79,20 +78,6 @@ def stop_capture_session(recordings_dir: Optional[Path] = None) -> Tuple[Path, P
 def is_capture_active() -> bool:
     """Returns True if test capture mode is enabled or an active session directory exists."""
     return bool(getattr(config, "TEST_CAPTURE_MODE", 0) or _active_session_dir is not None)
-
-
-def finalize_capture_if_active() -> Optional[Tuple[Path, Path]]:
-    """
-    If capture is currently active:
-    - Generates labels_DRAFT.csv in the active session folder
-    - Resets config.TEST_CAPTURE_MODE = 0
-    - Releases _active_session_dir
-    - Logs session folder path clearly
-    - Returns (csv_path, session_dir) or None if capture was not active.
-    """
-    if is_capture_active():
-        return stop_capture_session()
-    return None
 
 
 async def finalize_capture_if_active_async() -> Optional[Tuple[Path, Path]]:

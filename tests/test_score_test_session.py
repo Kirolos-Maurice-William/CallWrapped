@@ -1,7 +1,5 @@
 import tests._setup
-import os
 import csv
-import json
 import shutil
 import tempfile
 import unittest

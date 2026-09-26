@@ -41,9 +41,14 @@ def get_numbers(text):
             found.append((t, NUMBER_MAP[t[1:]]))
     return found
 
-with open('audit/mgb3_clips/labels.csv', 'r', encoding='utf-8') as f:
-    reader = csv.DictReader(f)
-    for r in reader:
-        nums = get_numbers(r['reference_cleaned'])
-        if nums:
-            print(f"{r['id']} ({r['genre']}): {nums}")
+if __name__ == '__main__':
+    from pathlib import Path
+    labels_path = Path(__file__).resolve().parent / "mgb3_clips" / "labels.csv"
+    if labels_path.exists():
+        with open(labels_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for r in reader:
+                nums = get_numbers(r['reference_cleaned'])
+                if nums:
+                    print(f"{r['id']} ({r['genre']}): {nums}")
+
