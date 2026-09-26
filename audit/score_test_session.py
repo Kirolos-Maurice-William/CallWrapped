@@ -1,6 +1,7 @@
 import sys
 import csv
 import time
+import wave
 import asyncio
 import logging
 import argparse
@@ -90,7 +91,6 @@ async def score_session(
         wav_bytes = wav_path.read_bytes()
         duration_sec = 0.0
         try:
-            import wave
             with wave.open(str(wav_path), "rb") as wf:
                 duration_sec = wf.getnframes() / float(wf.getframerate())
         except Exception:
