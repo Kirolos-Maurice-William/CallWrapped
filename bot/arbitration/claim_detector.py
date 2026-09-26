@@ -145,22 +145,37 @@ def infer_anger(text: str) -> Tuple[str, Optional[str]]:
 def infer_topic(text: str) -> str:
     """Classifies domain topic based on proven domain keywords."""
     t = text.lower()
-    if any(w in t for w in ["تمام", "أيوة", "ايوة", "ماشي", "شايف", "ازيك", "سلام عليكم", "زي الفل", "استنى دقيقة", "بتسجل صوتنا", "جامد"]):
-        return "null_topic"
+    words = [w.strip("،.؟!:,;-\"'") for w in t.split()]
+
+    # 1. Domain keyword checks FIRST
+    if any(w in t for w in ["rtx", "كارت", "vram", "جيجا", "ram", "معالج", "كمبيوتر"]):
+        return "tech"
     if any(w in t for w in ["أهلي", "أهلى", "زمالك", "صلاح", "سوبر", "كأس", "دوري", "بطولة", "جون", "كرة", "football"]):
         return "football"
-    if any(w in t for w in ["فيلم", "سينما", "رزق", "ممثل", "مسلسل", "movie"]):
-        return "movies"
-    if any(w in t for w in ["نواب", "قانون", "إيجار", "وزير", "حكومة", "انتخابات", "رئيس"]):
-        return "politics"
     if any(w in t for w in ["gta", "لعبة", "جيم", "رانك", "كول أوف ديوتي", "call of duty", "بلايستيشن", "كونسول"]):
         return "gaming"
     if any(w in t for w in ["ألبوم", "عمرو دياب", "تراك", "أغنية", "ويجز", "مكانك"]):
         return "music"
-    if any(w in t for w in ["rtx", "كارت", "vram", "جيجا", "ram", "معالج", "كمبيوتر"]):
-        return "tech"
+    if any(w in t for w in ["فيلم", "سينما", "رزق", "ممثل", "مسلسل", "movie"]):
+        return "movies"
+    if any(w in t for w in ["نواب", "قانون", "إيجار", "وزير", "حكومة", "انتخابات", "رئيس"]):
+        return "politics"
     if any(w in t for w in ["نوب", "هبد", "يا عم", "يا اسطى", "مطبق", "حياتنا"]):
         return "personal"
+
+    # 2. null_topic checks: word-boundary aware and bare-reaction constraints
+    null_phrases = ["سلام عليكم", "زي الفل", "استنى دقيقة", "بتسجل صوتنا"]
+    if any(p in t for p in null_phrases):
+        return "null_topic"
+
+    null_words = {"تمام", "أيوة", "ايوة", "ماشي", "شايف", "ازيك", "طيب"}
+    if any(w in null_words for w in words):
+        return "null_topic"
+
+    # "جامد" only counts as a bare-reaction signal when it appears as a standalone word in a SHORT utterance (<=3 words)
+    if "جامد" in words and len(words) <= 3:
+        return "null_topic"
+
     return "other"
 
 

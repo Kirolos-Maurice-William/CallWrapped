@@ -288,6 +288,39 @@ class TestSplitClassifier(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("مفيش بيانات في المكالمة دي لسه.", recap_text, "Recap must not report empty session")
         print("[PROOF VERIFIED] Recap flush correctly flushed pending buffer and rendered complete stats.\n")
 
+    def test_infer_topic_precedence_and_boundary_cases(self):
+        """
+        Phase 1 (TRACE4-01):
+        - Domain keyword check FIRST: composite sentences starting with backchannels or
+          containing slang adjectives must yield domain topic (tech, football), NOT null_topic.
+        - Word-boundary aware bare-reaction matching: 'جامد' or 'تمام' alone yield null_topic.
+        """
+        from bot.arbitration.claim_detector import infer_topic
+
+        # Case 1: Backchannel prefix + tech content -> tech
+        res1 = infer_topic("تمام، كارت الـ RTX 5070 نازل بـ 12 جيجا")
+        self.assertEqual(res1, "tech", f"Expected tech, got {res1}")
+
+        # Case 2: Football team + slang adjective 'جامد' -> football
+        res2 = infer_topic("الأهلي فريق جامد")
+        self.assertEqual(res2, "football", f"Expected football, got {res2}")
+
+        # Case 3: Bare reaction 'جامد' alone -> null_topic
+        res3 = infer_topic("جامد")
+        self.assertEqual(res3, "null_topic", f"Expected null_topic, got {res3}")
+
+        # Case 4: Bare backchannel 'تمام' alone -> null_topic
+        res4 = infer_topic("تمام")
+        self.assertEqual(res4, "null_topic", f"Expected null_topic, got {res4}")
+
+        print("\n" + "=" * 65)
+        print("=== TRACE4-01 VERIFIED: infer_topic PRECEDENCE & BOUNDARY CASES ===")
+        print(f"1. 'تمام، كارت الـ RTX 5070 نازل بـ 12 جيجا' -> {res1}")
+        print(f"2. 'الأهلي فريق جامد' -> {res2}")
+        print(f"3. 'جامد' -> {res3}")
+        print(f"4. 'تمام' -> {res4}")
+        print("=" * 65 + "\n")
+
 
 if __name__ == "__main__":
     unittest.main()
