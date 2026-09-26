@@ -73,20 +73,7 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-26 | `b946f65` | Taxonomy v2 Phase 1: adopt null_topic and personal in BATCH_ANALYTICS_PROMPT with Egyptian dialogue-act rules | `bot/arbitration/claim_detector.py`, live 17-sample battery 100% verified, full suite 110/110 OK |
 | 2026-09-26 | `d821245` | Taxonomy v2 Phase 2 & 3: Topical-only share, coverage metric, null/topical split accuracy, and SwDA/Schegloff streak bridging | `bot/arbitration/stats.py`, `audit/score_test_session.py`, `bot/main.py`, `frontend/components/AnalyticsWidgets.tsx`, `tests/test_stats.py`, full suite 115/115 OK |
 | 2026-09-26 | `6dbbfbb` | Taxonomy v2 Phase 4: Relabel Batch 1 and re-score (Topical Acc 85.7%, Null Det Acc 77.8%, Claim 96.0%, Anger 100%, 0 false anger, 0 false referee triggers) | `recordings/test_session/2026-09-26_1817/labels_DRAFT.csv`, `audit/score_results_batch1.md`, full suite 115/115 OK |
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+| 2026-09-26 | `6b14a0c` | Fix TRACE4-01: infer_topic fallback precedence (domain check first, word-boundary bare reaction) | `bot/arbitration/claim_detector.py`, `tests/test_split_classifier.py`, full suite 116/116 OK |
+| 2026-09-26 | `a87fc98` | Fix TRACE4-02: remove unreferenced standalone helpers `compute_topic_percentages` and `compute_topical_coverage` | `bot/arbitration/stats.py`, `tests/test_stats.py`, full suite 116/116 OK |
+| 2026-09-26 | `699224c` | Fix TRACE4-03: move import wave to top-level module imports | `audit/score_test_session.py`, full suite 116/116 OK |
+| 2026-09-26 | `011fdc7` | Fix TRACE4-04: treat blank topic cell as unannotated, exclude from topical and null denominators | `audit/score_test_session.py`, `tests/test_score_test_session.py`, full suite 116/116 OK |
