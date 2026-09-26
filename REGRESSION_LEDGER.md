@@ -65,6 +65,7 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-26 | `30e4c84` | Report both micro corpus WER and macro clip WER with micro headline (Phase 2 / TRACE-03) | `audit/score_results.md`, full suite 107/107 OK |
 | 2026-09-26 | `5ee2d46` | Add __main__ guard in check_numbers, remove unused imports and unreferenced finalize_capture_if_active (Phase 3 / TRACE-02 + TRACE-04) | `audit/check_numbers.py`, full suite 107/107 OK |
 | 2026-09-26 | `3ec4d59` | Implement topic/anger parity with batched classifier, 0-denominator protection, and missing column tolerance (Phase 4) | `tests/test_score_test_session.py`, full suite 107/107 OK |
+| 2026-09-26 | `b876ee2` | Add third Groq API key (GROQ_API_KEY_3) to rotation pool and dynamic cascade retry | `bot/ai/groq.py`, `tests/test_groq_rotation.py`, full suite 108/108 OK |
 
 
 
