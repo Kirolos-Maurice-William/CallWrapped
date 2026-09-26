@@ -43,16 +43,37 @@ INSTANT_CLAIM_SCHEMA = {
     }
 }
 
-# Batched Topic & Anger Prompt (Reuses proven ANGER RULE + twin-pair examples)
+# Batched Topic & Anger Prompt (Reuses proven ANGER RULE + twin-pair examples + Taxonomy v2 null_topic)
 BATCH_ANALYTICS_PROMPT = """Analyze a window of voice chat utterances (Egyptian Arabic/English).
 For each numbered line "Speaker: Text", classify topic, anger level, and anger evidence.
 
 JSON schema: return an object with "results": array of items for EVERY line in order:
 - line_number: integer (1-based)
-- topic: football|politics|music|movies|gaming|tech|personal_life|other
+- topic: football|politics|music|movies|gaming|tech|personal|other|null_topic
 - anger: none|mild|high
 - anger_evidence: verbatim quote of frustration/anger or ""
 Write anger_evidence in the SAME language as the input utterance.
+
+TOPIC RULES:
+1. Public topic examples (1 per topic):
+- football: "الأهلي كسب كأس السوبر"
+- politics: "مجلس النواب وافق على القانون"
+- music: "عمرو دياب نزل ألبوم جديد"
+- movies: "فيلم ولاد رزق في السينما"
+- gaming: "كول أوف ديوتي والرانك بيعصب"
+- tech: "كارت الـ RTX 5070 نازل بـ 12 جيجا"
+- personal: "هنزل أقابل أصحابي بالليل"
+- other: "الجو حر أوي النهارده"
+
+2. null_topic rule:
+null_topic = the line has NO semantic subject: backchannels/acknowledgments ('تمام', 'أيوة', 'ماشي', 'شايف'), greetings ('ازيك', 'سلام عليكم'), call logistics ('بتسجل صوتنا', 'هات الصوت', 'استنى دقيقة'), isolated reactions ('زي الفل', 'جامد' as bare reaction), isolated laughter.
+Personal content (family, plans, feelings, daily events) = 'personal', NOT null_topic.
+When unsure between personal and null: does the line convey information about the speaker's life? personal. Is it pure conversational glue? null_topic.
+
+null_topic examples (3 examples):
+- "ازيك يا مصطفى عامل ايه" -> null_topic
+- "تمام سامعك كويس" -> null_topic
+- "بتسجل صوتنا استنى دقيقة" -> null_topic
 
 ANGER RULE (check in order):
 1. Joking markers present: "هههه", "LOL", "😂", playful teasing, exaggeration for laughs -> anger: none
@@ -65,7 +86,7 @@ Twin-pair examples:
 "انت زبالة يا عم ههههه ضحكتني" -> none (same insult + laughter)
 "زهقت من السيرفر ده بجد" -> mild
 "زهقت منك يا وحوش هههه" -> none
-banter: "يا نوب ضيعتنا" -> personal_life, anger: none; "بطل هبد وروح نام" -> other, anger: none
+banter: "يا نوب ضيعتنا" -> personal, anger: none; "بطل هبد وروح نام" -> other, anger: none
 """
 
 BATCH_ANALYTICS_SCHEMA = {
@@ -82,7 +103,7 @@ BATCH_ANALYTICS_SCHEMA = {
                         "line_number": {"type": "integer"},
                         "topic": {
                             "type": "string",
-                            "enum": ["football", "politics", "music", "movies", "gaming", "tech", "personal_life", "other"]
+                            "enum": ["football", "politics", "music", "movies", "gaming", "tech", "personal", "other", "null_topic"]
                         },
                         "anger": {
                             "type": "string",
@@ -124,6 +145,8 @@ def infer_anger(text: str) -> Tuple[str, Optional[str]]:
 def infer_topic(text: str) -> str:
     """Classifies domain topic based on proven domain keywords."""
     t = text.lower()
+    if any(w in t for w in ["تمام", "أيوة", "ايوة", "ماشي", "شايف", "ازيك", "سلام عليكم", "زي الفل", "استنى دقيقة", "بتسجل صوتنا", "جامد"]):
+        return "null_topic"
     if any(w in t for w in ["أهلي", "أهلى", "زمالك", "صلاح", "سوبر", "كأس", "دوري", "بطولة", "جون", "كرة", "football"]):
         return "football"
     if any(w in t for w in ["فيلم", "سينما", "رزق", "ممثل", "مسلسل", "movie"]):
@@ -136,8 +159,8 @@ def infer_topic(text: str) -> str:
         return "music"
     if any(w in t for w in ["rtx", "كارت", "vram", "جيجا", "ram", "معالج", "كمبيوتر"]):
         return "tech"
-    if any(w in t for w in ["نوب", "هبد", "يا عم", "يا اسطى", "مطبق"]):
-        return "personal_life"
+    if any(w in t for w in ["نوب", "هبد", "يا عم", "يا اسطى", "مطبق", "حياتنا"]):
+        return "personal"
     return "other"
 
 
