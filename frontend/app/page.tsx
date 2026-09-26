@@ -115,6 +115,7 @@ export default function CallWrappedDashboard() {
   const [discordInviteUrl, setDiscordInviteUrl] = useState<string>(
     "https://discord.com/oauth2/authorize?client_id=1550926707517558864&permissions=36718592&scope=bot%20applications.commands"
   );
+  const [factCheckModeBadge, setFactCheckModeBadge] = useState<string>("Fact Check Mode: OFF");
 
   const formatModelName = (modelId?: string) => {
     if (!modelId) return "AssemblyAI Universal";
@@ -224,6 +225,8 @@ export default function CallWrappedDashboard() {
             setIsConnected(true);
             if (data.assemblyai_model) setSpeechModel(formatModelName(data.assemblyai_model));
             if (data.discord_invite_url) setDiscordInviteUrl(data.discord_invite_url);
+            if (data.fact_check_mode_badge) setFactCheckModeBadge(data.fact_check_mode_badge);
+            else if (data.fact_check_mode) setFactCheckModeBadge(`Fact Check Mode: ${data.fact_check_mode}`);
             if (data.latency) setLatency(data.latency);
             if (data.turns) setTurns(data.turns);
             if (data.active_dispute) setActiveDispute(data.active_dispute);
@@ -264,6 +267,8 @@ export default function CallWrappedDashboard() {
               const d = msg.data;
               if (d.assemblyai_model) setSpeechModel(formatModelName(d.assemblyai_model));
               if (d.discord_invite_url) setDiscordInviteUrl(d.discord_invite_url);
+              if (d.fact_check_mode_badge) setFactCheckModeBadge(d.fact_check_mode_badge);
+              else if (d.fact_check_mode) setFactCheckModeBadge(`Fact Check Mode: ${d.fact_check_mode}`);
               if (d.latency) setLatency(d.latency);
               if (d.turns) setTurns(d.turns);
               if (d.active_dispute) setActiveDispute(d.active_dispute);
@@ -275,6 +280,8 @@ export default function CallWrappedDashboard() {
               const d = msg.live_state;
               if (d.assemblyai_model) setSpeechModel(formatModelName(d.assemblyai_model));
               if (d.discord_invite_url) setDiscordInviteUrl(d.discord_invite_url);
+              if (d.fact_check_mode_badge) setFactCheckModeBadge(d.fact_check_mode_badge);
+              else if (d.fact_check_mode) setFactCheckModeBadge(`Fact Check Mode: ${d.fact_check_mode}`);
               if (d.latency) setLatency(d.latency);
               if (d.turns) setTurns(d.turns);
               if (d.active_dispute) setActiveDispute(d.active_dispute);
@@ -291,6 +298,13 @@ export default function CallWrappedDashboard() {
             if (msg.type === "analytics_update" && msg.event) {
               // Direct analytics update event
               applyAnalytics(msg.analytics || analytics, msg.event);
+            }
+
+            if (msg.type === "fact_check_mode_update" || msg.event?.type === "fact_check_mode_update") {
+              const badge = msg.event?.payload?.badge || msg.payload?.badge;
+              const mode = msg.event?.payload?.mode || msg.payload?.mode;
+              if (badge) setFactCheckModeBadge(badge);
+              else if (mode) setFactCheckModeBadge(`Fact Check Mode: ${mode}`);
             }
           } catch (e) {
             console.error("WS message parse error:", e);
@@ -428,6 +442,19 @@ export default function CallWrappedDashboard() {
             <span className="font-medium text-slate-300">
               {isConnected ? (connectionType === "ws" ? "LIVE STREAMING" : "POLLING ACTIVE") : "DISCONNECTED"}
             </span>
+          </div>
+
+          {/* Fact Check Mode Badge */}
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-semibold tracking-wide transition-all ${
+              factCheckModeBadge.toUpperCase().includes("ON")
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-sm shadow-emerald-500/10"
+                : "bg-slate-800/80 border-slate-700 text-slate-400"
+            }`}
+            title="Fact Check Mode policy: offers only, zero uninvited speech"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>{factCheckModeBadge}</span>
           </div>
 
           {/* Discord Bot Invite */}

@@ -1,0 +1,1333 @@
+{
+  "phase1e_scratch": [
+    {
+      "path": "run_cloud.py",
+      "type": "root_script",
+      "size": 1928
+    },
+    {
+      "path": "start_all.bat",
+      "type": "root_script",
+      "size": 701
+    },
+    {
+      "path": "start_backend.bat",
+      "type": "root_script",
+      "size": 600
+    },
+    {
+      "path": "start_bot.bat",
+      "type": "root_script",
+      "size": 641
+    },
+    {
+      "path": "start_frontend.bat",
+      "type": "root_script",
+      "size": 356
+    },
+    {
+      "path": "tests\\smoke_real_voice.py",
+      "type": "non_standard_test_file",
+      "size": 14011
+    },
+    {
+      "path": "tests\\verify_apis.py",
+      "type": "non_standard_test_file",
+      "size": 6930
+    },
+    {
+      "path": "tests\\_setup.py",
+      "type": "non_standard_test_file",
+      "size": 469
+    },
+    {
+      "path": "audit\\benchmark_edge_tts_ttfb.py",
+      "type": "audit_root_file",
+      "size": 5756
+    },
+    {
+      "path": "audit\\check_numbers.py",
+      "type": "audit_root_file",
+      "size": 1794
+    },
+    {
+      "path": "audit\\cleaner.py",
+      "type": "audit_root_file",
+      "size": 2019
+    },
+    {
+      "path": "audit\\event_1.json",
+      "type": "audit_root_file",
+      "size": 270
+    },
+    {
+      "path": "audit\\event_2.json",
+      "type": "audit_root_file",
+      "size": 257
+    },
+    {
+      "path": "audit\\event_3.json",
+      "type": "audit_root_file",
+      "size": 298
+    },
+    {
+      "path": "audit\\event_4.json",
+      "type": "audit_root_file",
+      "size": 595
+    },
+    {
+      "path": "audit\\event_5.json",
+      "type": "audit_root_file",
+      "size": 725
+    },
+    {
+      "path": "audit\\exp1_silence_trim.py",
+      "type": "audit_root_file",
+      "size": 9514
+    },
+    {
+      "path": "audit\\exp2_keyterms_ablation.py",
+      "type": "audit_root_file",
+      "size": 11890
+    },
+    {
+      "path": "audit\\exp3_custom_spelling.py",
+      "type": "audit_root_file",
+      "size": 10425
+    },
+    {
+      "path": "audit\\exp4_selective_groq_correction.py",
+      "type": "audit_root_file",
+      "size": 7744
+    },
+    {
+      "path": "audit\\exp5_language_config.py",
+      "type": "audit_root_file",
+      "size": 7124
+    },
+    {
+      "path": "audit\\find_substitutions.py",
+      "type": "audit_root_file",
+      "size": 816
+    },
+    {
+      "path": "audit\\inspect_mgb3.py",
+      "type": "audit_root_file",
+      "size": 979
+    },
+    {
+      "path": "audit\\mgb3_exp1_silence_results.csv",
+      "type": "audit_root_file",
+      "size": 14331
+    },
+    {
+      "path": "audit\\mgb3_exp2_a_no_keyterms.csv",
+      "type": "audit_root_file",
+      "size": 13928
+    },
+    {
+      "path": "audit\\mgb3_exp2_c_expanded_150.csv",
+      "type": "audit_root_file",
+      "size": 13958
+    },
+    {
+      "path": "audit\\mgb3_exp2_d_best_of_grouped.csv",
+      "type": "audit_root_file",
+      "size": 13898
+    },
+    {
+      "path": "audit\\mgb3_exp3_arabic_from.csv",
+      "type": "audit_root_file",
+      "size": 13936
+    },
+    {
+      "path": "audit\\mgb3_exp3_combined_best.csv",
+      "type": "audit_root_file",
+      "size": 13955
+    },
+    {
+      "path": "audit\\mgb3_exp3_latin_from.csv",
+      "type": "audit_root_file",
+      "size": 13909
+    },
+    {
+      "path": "audit\\mgb3_exp4_groq_correction.csv",
+      "type": "audit_root_file",
+      "size": 11275
+    },
+    {
+      "path": "audit\\mgb3_exp5_lang_detect.csv",
+      "type": "audit_root_file",
+      "size": 14004
+    },
+    {
+      "path": "audit\\mgb3_results.csv",
+      "type": "audit_root_file",
+      "size": 14182
+    },
+    {
+      "path": "audit\\PROJECT_AUDIT.md",
+      "type": "audit_root_file",
+      "size": 41314
+    },
+    {
+      "path": "audit\\run_hearing_test.py",
+      "type": "audit_root_file",
+      "size": 15041
+    },
+    {
+      "path": "audit\\run_t1_models.py",
+      "type": "audit_root_file",
+      "size": 2126
+    },
+    {
+      "path": "audit\\run_t2_prompt_caching.py",
+      "type": "audit_root_file",
+      "size": 2746
+    },
+    {
+      "path": "audit\\run_t3_structured_outputs.py",
+      "type": "audit_root_file",
+      "size": 5160
+    },
+    {
+      "path": "audit\\run_t4_reasoning_effort.py",
+      "type": "audit_root_file",
+      "size": 3828
+    },
+    {
+      "path": "audit\\run_t5_ratelimit_headers.py",
+      "type": "audit_root_file",
+      "size": 1259
+    },
+    {
+      "path": "audit\\run_t6_latencies.py",
+      "type": "audit_root_file",
+      "size": 11260
+    },
+    {
+      "path": "audit\\run_t7_tavily_capabilities.py",
+      "type": "audit_root_file",
+      "size": 1281
+    },
+    {
+      "path": "audit\\select_and_save_clips.py",
+      "type": "audit_root_file",
+      "size": 3016
+    },
+    {
+      "path": "audit\\t1_groq_model_verify.py",
+      "type": "audit_root_file",
+      "size": 5312
+    },
+    {
+      "path": "audit\\t2_tavily_search.py",
+      "type": "audit_root_file",
+      "size": 3011
+    },
+    {
+      "path": "audit\\t3_edge_tts.py",
+      "type": "audit_root_file",
+      "size": 2240
+    },
+    {
+      "path": "audit\\t4_assemblyai_transcribe.py",
+      "type": "audit_root_file",
+      "size": 5094
+    },
+    {
+      "path": "audit\\t5_full_pipeline.py",
+      "type": "audit_root_file",
+      "size": 6767
+    },
+    {
+      "path": "audit\\test_preconnected_ws.py",
+      "type": "audit_root_file",
+      "size": 2277
+    },
+    {
+      "path": "audit\\user_prompt.txt",
+      "type": "audit_root_file",
+      "size": 7682
+    },
+    {
+      "path": "audit\\__init__.py",
+      "type": "audit_root_file",
+      "size": 17
+    }
+  ],
+  "phase2": {
+    "model_hits": [
+      {
+        "file": "backend\\app\\config.py",
+        "line": 26,
+        "matches": [
+          "GEMINI_API_KEY"
+        ],
+        "text": "GEMINI_API_KEY: str = \"\""
+      },
+      {
+        "file": "frontend\\app\\page.tsx",
+        "line": 120,
+        "matches": [
+          "Universal-3.6"
+        ],
+        "text": "if (!modelId) return \"Universal-3.6 Pro\";"
+      }
+    ],
+    "va_hits_count": 49,
+    "cw_hits_count": 9,
+    "va_hits": [
+      {
+        "file": "bot\\main.py",
+        "line": 66,
+        "text": "logger = logging.getLogger(\"VoiceArbitratorBot\")"
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 163,
+        "text": "title=\"🎙️ Voice Arbitrator ● LIVE (AssemblyAI Hackathon)\","
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 437,
+        "text": "title=\"⚖️ Voice Arbitrator — AssemblyAI Voice Agent Hackathon\","
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 484,
+        "text": "title=\"⚙️ Voice Arbitrator — Operational Status\","
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 541,
+        "text": "embed.set_footer(text=\"AssemblyAI Hackathon • Real-Time Voice Arbitrator\")"
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 576,
+        "text": "embed.set_footer(text=\"AssemblyAI Hackathon • Real-Time Voice Arbitrator • Privacy First\")"
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 978,
+        "text": "print(f\"  Voice Arbitrator Bot is ONLINE! (AssemblyAI Hackathon)\")"
+      },
+      {
+        "file": "bot\\__init__.py",
+        "line": 2,
+        "text": "AI Third Participant - Discord Voice Arbitrator"
+      },
+      {
+        "file": "backend\\app\\main.py",
+        "line": 23,
+        "text": "logger = logging.getLogger(\"voice_arbitrator\")"
+      },
+      {
+        "file": "backend\\app\\main.py",
+        "line": 32,
+        "text": "logger.info(\"Shutting down Voice Arbitrator backend.\")"
+      },
+      {
+        "file": "backend\\app\\main.py",
+        "line": 36,
+        "text": "title=\"Voice Arbitrator API\","
+      },
+      {
+        "file": "backend\\app\\main.py",
+        "line": 58,
+        "text": "\"service\": \"Voice Arbitrator\","
+      },
+      {
+        "file": "backend\\app\\routes.py",
+        "line": 17,
+        "text": "# Live Analytics State for Voice Arbitrator"
+      },
+      {
+        "file": "backend\\app\\routes.py",
+        "line": 29,
+        "text": "# Live State for Voice Arbitrator"
+      },
+      {
+        "file": "frontend\\app\\page.tsx",
+        "line": 80,
+        "text": "export default function VoiceArbitratorDashboard() {"
+      },
+      {
+        "file": "frontend\\app\\page.tsx",
+        "line": 412,
+        "text": "VOICE ARBITRATOR"
+      },
+      {
+        "file": "frontend\\app\\page.tsx",
+        "line": 439,
+        "text": "title=\"Invite Voice Arbitrator Bot to your Discord Server\""
+      },
+      {
+        "file": "audit\\PROJECT_AUDIT.md",
+        "line": 1,
+        "text": "# Voice Arbitrator — Comprehensive Project Audit & Live API Fact Verification"
+      },
+      {
+        "file": "audit\\PROJECT_AUDIT.md",
+        "line": 468,
+        "text": "5. `92b2f14` feat(voice-arbitrator): complete cloud-native architecture for AssemblyAI Voice Agent Hackathon"
+      },
+      {
+        "file": "audit\\PROJECT_AUDIT.md",
+        "line": 794,
+        "text": "The Voice Arbitrator architecture achieves a functional, completely cloud-native real-time fact-checking pipeline. The c"
+      },
+      {
+        "file": "audit\\quality\\audit_phase2.py",
+        "line": 31,
+        "text": "# 2b: Branding sweep: \"Voice Arbitrator\" vs \"CallWrapped\""
+      },
+      {
+        "file": "audit\\quality\\audit_phase2.py",
+        "line": 32,
+        "text": "print(\"\\n--- 2b: Branding sweep: 'Voice Arbitrator' / 'VoiceArbitrator' ---\")"
+      },
+      {
+        "file": "audit\\quality\\audit_phase2.py",
+        "line": 52,
+        "text": "print(f\"Total CallWrapped mentions: {cw_count}, Total Voice Arbitrator mentions: {va_count}\")"
+      },
+      {
+        "file": "audit\\quality\\deep_audit.py",
+        "line": 92,
+        "text": "# 2b: Branding sweep: Voice Arbitrator vs CallWrapped"
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 284,
+        "text": "\"text\": \"logger = logging.getLogger(\\\"VoiceArbitratorBot\\\")\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 289,
+        "text": "\"text\": \"title=\\\"🎙️ Voice Arbitrator ● LIVE (AssemblyAI Hackathon)\\\",\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 294,
+        "text": "\"text\": \"title=\\\"⚖️ Voice Arbitrator — AssemblyAI Voice Agent Hackathon\\\",\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 299,
+        "text": "\"text\": \"title=\\\"⚙️ Voice Arbitrator — Operational Status\\\",\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 304,
+        "text": "\"text\": \"embed.set_footer(text=\\\"AssemblyAI Hackathon • Real-Time Voice Arbitrator\\\")\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 309,
+        "text": "\"text\": \"embed.set_footer(text=\\\"AssemblyAI Hackathon • Real-Time Voice Arbitrator • Privacy First\\\")\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 314,
+        "text": "\"text\": \"print(f\\\"  Voice Arbitrator Bot is ONLINE! (AssemblyAI Hackathon)\\\")\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 319,
+        "text": "\"text\": \"AI Third Participant - Discord Voice Arbitrator\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 324,
+        "text": "\"text\": \"logger = logging.getLogger(\\\"voice_arbitrator\\\")\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 329,
+        "text": "\"text\": \"logger.info(\\\"Shutting down Voice Arbitrator backend.\\\")\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 334,
+        "text": "\"text\": \"title=\\\"Voice Arbitrator API\\\",\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 339,
+        "text": "\"text\": \"\\\"service\\\": \\\"Voice Arbitrator\\\",\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 344,
+        "text": "\"text\": \"# Live Analytics State for Voice Arbitrator\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 349,
+        "text": "\"text\": \"# Live State for Voice Arbitrator\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 354,
+        "text": "\"text\": \"export default function VoiceArbitratorDashboard() {\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 359,
+        "text": "\"text\": \"VOICE ARBITRATOR\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 364,
+        "text": "\"text\": \"title=\\\"Invite Voice Arbitrator Bot to your Discord Server\\\"\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 369,
+        "text": "\"text\": \"# Voice Arbitrator — Comprehensive Project Audit & Live API Fact Verification\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 374,
+        "text": "\"text\": \"5. `92b2f14` feat(voice-arbitrator): complete cloud-native architecture for AssemblyAI Voice Agent Hackathon\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 379,
+        "text": "\"text\": \"The Voice Arbitrator architecture achieves a functional, completely cloud-native real-time fact-checking pipeli"
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 384,
+        "text": "\"text\": \"# 2b: Branding sweep: \\\"Voice Arbitrator\\\" vs \\\"CallWrapped\\\"\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 389,
+        "text": "\"text\": \"print(\\\"\\\\n--- 2b: Branding sweep: 'Voice Arbitrator' / 'VoiceArbitrator' ---\\\")\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 394,
+        "text": "\"text\": \"print(f\\\"Total CallWrapped mentions: {cw_count}, Total Voice Arbitrator mentions: {va_count}\\\")\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 399,
+        "text": "\"text\": \"# 2b: Branding sweep: Voice Arbitrator vs CallWrapped\""
+      },
+      {
+        "file": "audit\\quality\\deep_audit_results.json",
+        "line": 412,
+        "text": "\"text\": \"print(f\\\"  Voice Arbitrator Bot is ONLINE! (AssemblyAI Hackathon)\\\")\""
+      }
+    ],
+    "markers": [],
+    "print_hits": [
+      {
+        "file": "bot\\main.py",
+        "line": 977,
+        "text": "print(\"\\n\" + \"=\" * 55)"
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 978,
+        "text": "print(f\"  Voice Arbitrator Bot is ONLINE! (AssemblyAI Hackathon)\")"
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 979,
+        "text": "print(f\"  Logged in as: {bot.user.name}\")"
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 980,
+        "text": "print(f\"  Mode: Silent Referee (Intervention Only)\")"
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 981,
+        "text": "print(f\"  Ears: AssemblyAI {config.speech_model_display} Code-Switching\")"
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 982,
+        "text": "print(f\"  Brain: Groq LPU Epistemic Analyzer\")"
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 983,
+        "text": "print(f\"  Evidence: Tavily Ground-Truth Search\")"
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 984,
+        "text": "print(\"=\" * 55 + \"\\n\")"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 318,
+        "text": "print(\"\\n\" + \"=\" * 78)"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 319,
+        "text": "print(\"⚔️ JUDGE ATTACK MODE — 7-CARD ADVERSARIAL STRESS TEST HARNESS\")"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 320,
+        "text": "print(\"=\" * 78)"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 324,
+        "text": "print(f\"\\n[{label}] Running...\")"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 330,
+        "text": "print(f\"  Scenario: {res['scenario']}\")"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 331,
+        "text": "print(f\"  Expected: {res['expected']}\")"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 332,
+        "text": "print(f\"  Actual:   {res['actual']}\")"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 333,
+        "text": "print(f\"  Result:   {status_tag}\")"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 345,
+        "text": "print(f\"  Result:   FAIL ❌ ({e})\")"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 348,
+        "text": "print(\"\\n\" + \"=\" * 78)"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 350,
+        "text": "print(f\"🏁 SUMMARY: {passed_count}/{len(results)} Cards Passed\")"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 351,
+        "text": "print(\"=\" * 78 + \"\\n\")"
+      }
+    ],
+    "id_hits": [
+      {
+        "id": "1550926707517558864",
+        "file": "backend\\app\\config.py",
+        "line": 46,
+        "text": "DISCORD_CLIENT_ID: str = os.getenv(\"DISCORD_CLIENT_ID\", \"1550926707517558864\")"
+      },
+      {
+        "id": "1550926707517558864",
+        "file": "backend\\app\\config.py",
+        "line": 52,
+        "text": "if (not cid or cid == \"1550926707517558864\") and self.DISCORD_BOT_TOKEN:"
+      }
+    ],
+    "magic_numbers": [
+      {
+        "file": "backend\\app\\config.py",
+        "line": 47,
+        "text": "DISCORD_INVITE_PERMISSIONS: str = os.getenv(\"DISCORD_INVITE_PERMISSIONS\", \"36718592\")"
+      },
+      {
+        "file": "backend\\app\\config.py",
+        "line": 62,
+        "text": "return f\"https://discord.com/oauth2/authorize?client_id={cid}&permissions={self.DISCORD_INVITE_PERMISSIONS}&scope=bot%20"
+      }
+    ]
+  },
+  "phase3": {
+    "async_no_await": [
+      {
+        "file": "bot\\main.py",
+        "line": 975,
+        "name": "on_ready"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 334,
+        "name": "_empty"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 329,
+        "name": "_mock_save_stream"
+      },
+      {
+        "file": "bot\\arbitration\\engine.py",
+        "line": 785,
+        "name": "_expire_pending_offer"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 196,
+        "name": "run_card_6"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 226,
+        "name": "dummy_cb"
+      },
+      {
+        "file": "backend\\app\\main.py",
+        "line": 55,
+        "name": "health_check"
+      },
+      {
+        "file": "backend\\app\\routes.py",
+        "line": 426,
+        "name": "get_live_state"
+      },
+      {
+        "file": "backend\\app\\routes.py",
+        "line": 432,
+        "name": "get_analytics"
+      }
+    ],
+    "blocking_calls": [
+      {
+        "file": "bot\\ai\\groq.py",
+        "line": 337,
+        "type": "time.sleep (blocking in async)",
+        "text": "time.sleep(sleep_wait)"
+      },
+      {
+        "file": "bot\\ai\\groq.py",
+        "line": 344,
+        "type": "time.sleep (blocking in async)",
+        "text": "time.sleep(wait_sec)"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 240,
+        "type": "time.sleep (blocking in async)",
+        "text": "time.sleep(0.05)"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 357,
+        "type": "asyncio.run (nested event loop risk)",
+        "text": "asyncio.run(run_judge_mode_harness(verbose=True))"
+      }
+    ],
+    "network_sites": [
+      {
+        "file": "bot\\config.py",
+        "line": 17,
+        "text": "\"\"\"Central configuration for the AssemblyAI Third Participant Voice Agent.\"\"\"",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\config.py",
+        "line": 23,
+        "text": "# AssemblyAI Speech-to-Text (tied to .env: SPEECH_MODELS or ASSEMBLYAI_MODEL)",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 113,
+        "text": "# 1. Transcribe speech using AssemblyAI Universal-3.5 Pro (Preserves raw transcript as evidence!)",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 163,
+        "text": "title=\"🎙️ Voice Arbitrator ● LIVE (AssemblyAI Hackathon)\",",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 183,
+        "text": "embed.set_footer(text=f\"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 437,
+        "text": "title=\"⚖️ Voice Arbitrator — AssemblyAI Voice Agent Hackathon\",",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 471,
+        "text": "embed.set_footer(text=f\"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily Ground-Truth • Edge-TTS\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 494,
+        "text": "f\"• **AssemblyAI {config.speech_model_display}:** ✅ Active (Native Code-Switching)\\n\"",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 541,
+        "text": "embed.set_footer(text=\"AssemblyAI Hackathon • Real-Time Voice Arbitrator\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 576,
+        "text": "embed.set_footer(text=\"AssemblyAI Hackathon • Real-Time Voice Arbitrator • Privacy First\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 606,
+        "text": "embed.set_footer(text=f\"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 759,
+        "text": "embed.set_footer(text=\"AssemblyAI Voice Agent Hackathon • Groq LPU • Tavily\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 878,
+        "text": "embed.set_footer(text=f\"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 925,
+        "text": "\"7. **PII Exhibit**: Redacts personal names and phone numbers via AssemblyAI\"",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 946,
+        "text": "summary_embed.set_footer(text=f\"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 978,
+        "text": "print(f\"  Voice Arbitrator Bot is ONLINE! (AssemblyAI Hackathon)\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 981,
+        "text": "print(f\"  Ears: AssemblyAI {config.speech_model_display} Code-Switching\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\__init__.py",
+        "line": 3,
+        "text": "Built for AssemblyAI Voice Agent Hackathon 2026.",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 8,
+        "text": "logger = logging.getLogger(\"AssemblyAI\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 18,
+        "text": "# Contextual prompts for AssemblyAI Universal-3.5 Pro Code-Switching",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 114,
+        "text": "class AssemblyAIClient:",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 116,
+        "text": "AssemblyAI Universal-3.5 Pro Client.",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 138,
+        "text": "async with httpx.AsyncClient(timeout=30.0) as client:",
+        "has_timeout_in_line": true
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 143,
+        "text": "logger.error(f\"[AssemblyAI] Upload failed ({upload_resp.status_code}): {upload_resp.text}\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 166,
+        "text": "logger.error(f\"[AssemblyAI] Job submission failed ({job_resp.status_code}) for {speaker_name}: {job_resp.text}\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 197,
+        "text": "logger.info(f\"✅ [AssemblyAI Raw] ({latency_ms}ms, conf={avg_conf:.0%}): {text}\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 201,
+        "text": "logger.warning(f\"[AssemblyAI] Transcription error for {speaker_name}: {err_msg}\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 205,
+        "text": "logger.warning(f\"[AssemblyAI] STT timeout, utterance dropped for {speaker_name} ({latency_ms}ms, {attempts} attempts)\")",
+        "has_timeout_in_line": true
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 208,
+        "text": "logger.warning(f\"[AssemblyAI] Network error: {e}\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 226,
+        "text": "async with httpx.AsyncClient(timeout=30.0) as client:",
+        "has_timeout_in_line": true
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 229,
+        "text": "logger.error(f\"[AssemblyAI PII] Upload failed: {upload_resp.text}\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 242,
+        "text": "logger.error(f\"[AssemblyAI PII] Job submission failed: {job_resp.text}\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 259,
+        "text": "logger.info(f\"🛡️ [AssemblyAI PII Redacted] ({latency_ms}ms): {redacted_text}\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 262,
+        "text": "logger.error(f\"[AssemblyAI PII] Transcription error: {data.get('error')}\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 268,
+        "text": "assemblyai_client = AssemblyAIClient()",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\groq.py",
+        "line": 95,
+        "text": "def update_headers(self, key_entry: Dict[str, Any], headers: httpx.Headers, status_code: int = 200):",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\groq.py",
+        "line": 152,
+        "text": "async with httpx.AsyncClient(timeout=15.0) as client:",
+        "has_timeout_in_line": true
+      },
+      {
+        "file": "bot\\ai\\groq.py",
+        "line": 298,
+        "text": "with httpx.Client(timeout=15.0) as client:",
+        "has_timeout_in_line": true
+      },
+      {
+        "file": "bot\\ai\\tavily.py",
+        "line": 96,
+        "text": "async with httpx.AsyncClient(timeout=5.0) as client:",
+        "has_timeout_in_line": true
+      },
+      {
+        "file": "bot\\ai\\tavily.py",
+        "line": 97,
+        "text": "resp = await client.post(\"https://api.tavily.com/search\", json=body)",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\tavily.py",
+        "line": 125,
+        "text": "async with httpx.AsyncClient(timeout=4.0) as client:",
+        "has_timeout_in_line": true
+      },
+      {
+        "file": "bot\\ai\\tavily.py",
+        "line": 148,
+        "text": "tavily_client = TavilyClient()",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 145,
+        "text": "self.connector: Optional[aiohttp.TCPConnector] = None",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 156,
+        "text": "self.connector = aiohttp.TCPConnector(",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 164,
+        "text": "temp_session = aiohttp.ClientSession(",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 173,
+        "text": "timeout=aiohttp.ClientTimeout(total=4.0)",
+        "has_timeout_in_line": true
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 340,
+        "text": "comm1 = edge_tts.Communicate(",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 358,
+        "text": "comm2 = edge_tts.Communicate(",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\__init__.py",
+        "line": 3,
+        "text": "from .tavily import tavily_client",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\ai\\__init__.py",
+        "line": 6,
+        "text": "__all__ = [\"assemblyai_client\", \"groq_client\", \"tavily_client\", \"speaker\"]",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\arbitration\\engine.py",
+        "line": 961,
+        "text": "embed.set_footer(text=f\"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 22,
+        "text": "from bot.ai.tavily import tavily_client",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 135,
+        "text": "orig_search = tavily_client.search",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 142,
+        "text": "tavily_client.search = spy_search",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 161,
+        "text": "tavily_client.search = orig_search",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 265,
+        "text": "through AssemblyAI batch with redact_pii=true, policies [person_name, phone_number],",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 268,
+        "text": "scenario = 'PII exhibit: synthetic Arabic transcript through AssemblyAI batch with redact_pii=true'",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 274,
+        "text": "communicate = edge_tts.Communicate(raw_prompt_text, \"ar-EG-ShakirNeural\")",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 291,
+        "text": "f\"       Redacted Text: '{redacted_text}' (AssemblyAI {latency_ms}ms)\"",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\arbitration\\verifier.py",
+        "line": 5,
+        "text": "from bot.ai.tavily import tavily_client",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\arbitration\\verifier.py",
+        "line": 106,
+        "text": "return await tavily_client.search(search_query, target_domains=target_domains)",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\events\\models.py",
+        "line": 31,
+        "text": "Unified Event Schema for the AssemblyAI Voice Agent Hackathon.",
+        "has_timeout_in_line": false
+      },
+      {
+        "file": "bot\\events\\publisher.py",
+        "line": 21,
+        "text": "async with httpx.AsyncClient(timeout=1.5) as client:",
+        "has_timeout_in_line": true
+      },
+      {
+        "file": "backend\\app\\config.py",
+        "line": 21,
+        "text": "# AssemblyAI",
+        "has_timeout_in_line": false
+      }
+    ],
+    "silent_exceptions": [
+      {
+        "file": "bot\\main.py",
+        "line": 35,
+        "type": "except (ValueError, TypeError): pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\main.py",
+        "line": 51,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\groq.py",
+        "line": 31,
+        "type": "except ValueError: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\groq.py",
+        "line": 104,
+        "type": "except ValueError: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tavily.py",
+        "line": 142,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 176,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 75,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 99,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 103,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 109,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 115,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 121,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 181,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 210,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 225,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 220,
+        "type": "except (asyncio.CancelledError, Exception): pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\arbitration\\engine.py",
+        "line": 249,
+        "type": "except asyncio.CancelledError: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\arbitration\\engine.py",
+        "line": 782,
+        "type": "except asyncio.CancelledError: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\arbitration\\engine.py",
+        "line": 427,
+        "type": "except Exception: logger.debug only",
+        "code": "logger.debug(f'Could not post to text channel: {e}')"
+      },
+      {
+        "file": "bot\\arbitration\\engine.py",
+        "line": 734,
+        "type": "except Exception: logger.debug only",
+        "code": "logger.debug(f'Could not post dispute offer to text channel: {e}')"
+      },
+      {
+        "file": "bot\\arbitration\\engine.py",
+        "line": 963,
+        "type": "except Exception: logger.debug only",
+        "code": "logger.debug(f'Could not send embed to text channel: {e}')"
+      },
+      {
+        "file": "bot\\arbitration\\engine.py",
+        "line": 80,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\arbitration\\judge_mode.py",
+        "line": 9,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\audio\\dave_adapter.py",
+        "line": 38,
+        "type": "except Exception: logger.debug only",
+        "code": "logger.debug(f'[DAVE Decrypt] Notice: {e}')"
+      },
+      {
+        "file": "bot\\audio\\receiver.py",
+        "line": 155,
+        "type": "except Exception: pass",
+        "code": "pass"
+      },
+      {
+        "file": "bot\\events\\publisher.py",
+        "line": 23,
+        "type": "except Exception: logger.debug only",
+        "code": "logger.debug(f'[EventPublisher] Notice: could not post event to {endpoint} ({e})"
+      },
+      {
+        "file": "bot\\events\\publisher.py",
+        "line": 31,
+        "type": "except RuntimeError: pass",
+        "code": "pass"
+      },
+      {
+        "file": "backend\\app\\config.py",
+        "line": 60,
+        "type": "except Exception: pass",
+        "code": "pass"
+      }
+    ],
+    "resource_leaks": [
+      {
+        "file": "bot\\ai\\tts.py",
+        "line": 43,
+        "type": "subprocess.Popen call",
+        "text": "self.process = subprocess.Popen("
+      }
+    ]
+  },
+  "phase4": {
+    "star_imports": []
+  },
+  "phase6": {
+    "log_secret_risks": [
+      {
+        "file": "bot\\main.py",
+        "line": 989,
+        "text": "logger.error(\"❌ DISCORD_BOT_TOKEN is missing in .env!\")"
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 201,
+        "text": "logger.warning(f\"[AssemblyAI] Transcription error for {speaker_name}: {err_msg}\")"
+      },
+      {
+        "file": "bot\\ai\\assemblyai.py",
+        "line": 262,
+        "text": "logger.error(f\"[AssemblyAI PII] Transcription error: {data.get('error')}\")"
+      }
+    ],
+    "hardcoded_keys": [],
+    "cors_info": [
+      {
+        "line": 12,
+        "text": "from fastapi.middleware.cors import CORSMiddleware"
+      },
+      {
+        "line": 43,
+        "text": "CORSMiddleware,"
+      },
+      {
+        "line": 44,
+        "text": "allow_origins=[\"*\"],"
+      }
+    ]
+  }
+}

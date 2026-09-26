@@ -449,8 +449,10 @@ async def show_help(ctx: commands.Context):
     embed.add_field(
         name="🎙️ Voice Channel Management",
         value=(
+            "• `!start`: Joins your voice channel and begins autonomous referee monitoring.\n"
             "• `!join`: Connects the bot to your current voice channel.\n"
-            "• `!leave`: Disconnects the bot from voice.\n"
+            "• `!leave`: Disconnects the bot from voice and resets session.\n"
+            "• `!judge-mode`: Toggles the 7-card Judge Attack Mode adversarial test harness.\n"
             "• `!mode referee`: *(Default)* Silent observer. Only speaks on verified factual disputes.\n"
             "• `!mode echo`: Mic-check mode (repeats verbatim audio).\n"
             "• `!mode assistant`: Interactive assistant mode."
@@ -460,14 +462,17 @@ async def show_help(ctx: commands.Context):
     embed.add_field(
         name="⚡ Instant Arbitration & Demo Tools",
         value=(
+            "• `!check`: Confirms a pending dispute verification offer (or voice: «شوفها»).\n"
             "• `!arbitrate <query>`: On-demand fact verification query (e.g. `!arbitrate RTX 5070 VRAM`).\n"
             "• `!simulate`: Executes the RTX 5070 16GB vs 12GB Golden Demo scenario.\n"
-            "• `!recap`: Displays real-time session recap (talk minutes, streaks, anger leaderboard, top topics).\n"
+            "• `!recap`: Displays real-time session recap (talk minutes, streaks, frustration, top topics).\n"
             "• `!stats`: Displays the server evidence & speaker accuracy leaderboard.\n"
             "• `!status`: Checks latency, API connections, and voice channel state.\n"
             "• `!dashboard`: Link to the live Next.js Judge Dashboard.\n"
-            "• `!privacy`: Privacy policy, data retention details, and emotion inference disclaimer.\n"
-            "• `!clear`: Clears session turns and dispute history for a fresh demo."
+            "• `!privacy`: Privacy policy, data retention details, and in-memory processing info.\n"
+            "• `!clear`: Clears session turns and dispute history for a fresh demo.\n"
+            "• `!start-capture`: Enables test-mode audio capture to `recordings/test_session/`.\n"
+            "• `!stop-capture`: Stops capture and generates draft labeling CSV."
         ),
         inline=False
     )
@@ -592,10 +597,11 @@ async def show_privacy(ctx: commands.Context):
 def build_fact_check_mode_embed(is_on: bool = True) -> discord.Embed:
     """Builds discord.Embed announcing Fact Check Mode status and consent notice."""
     notice = build_privacy_notice_text()
+    status_str = "ON" if is_on else "OFF"
     embed = discord.Embed(
-        title="🎙️ Fact Check Mode: ON",
+        title=f"🎙️ Fact Check Mode: {status_str}",
         description=(
-            "✅ **Fact Check Mode: ON** (offers only — bot never speaks uninvited)\n\n"
+            f"✅ **Fact Check Mode: {status_str}** (offers only — bot never speaks uninvited)\n\n"
             "🔒 **إشعار الخصوصية والشفافية:**\n"
             f"{notice}\n\n"
             "💡 عند رصد أي اختلاف في المعلومات بين المتحدثين، سيقترح البوت التحقق كتابياً. "
