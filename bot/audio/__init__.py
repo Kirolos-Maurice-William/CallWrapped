@@ -9,6 +9,9 @@ from .capture import (
     stop_capture_session,
     get_active_session_dir,
     create_session_dir,
+    is_capture_active,
+    finalize_capture_if_active,
+    finalize_capture_if_active_async,
 )
 
 __all__ = [
@@ -23,4 +26,7 @@ __all__ = [
     "stop_capture_session",
     "get_active_session_dir",
     "create_session_dir",
+    "is_capture_active",
+    "finalize_capture_if_active",
+    "finalize_capture_if_active_async",
 ]

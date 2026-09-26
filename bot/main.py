@@ -970,7 +970,15 @@ async def clear_session(ctx: commands.Context):
     """Resets server session dialogue, claim memory, and arbitration queue."""
     session = arbitration_engine.get_session(ctx.guild.id)
     session.reset()
-    await ctx.send("🧹 Session history, claim memory, and arbitration queue have been reset.")
+
+    from bot.audio.capture import finalize_capture_if_active_async
+    capture_info = await finalize_capture_if_active_async()
+    capture_msg = ""
+    if capture_info:
+        csv_path, session_dir = capture_info
+        capture_msg = f"\n📁 **Capture Finalized:** `{csv_path}` (Session: `{session_dir.name}`)"
+
+    await ctx.send(f"🧹 Session history, claim memory, and arbitration queue have been reset.{capture_msg}")
 
 
 @bot.command(name="leave")
@@ -979,14 +987,21 @@ async def leave_channel(ctx: commands.Context):
     session = arbitration_engine.get_session(ctx.guild.id)
     session.reset()
 
+    from bot.audio.capture import finalize_capture_if_active_async
+    capture_info = await finalize_capture_if_active_async()
+    capture_msg = ""
+    if capture_info:
+        csv_path, session_dir = capture_info
+        capture_msg = f"\n📁 **Capture Finalized:** `{csv_path}` (Session: `{session_dir.name}`)"
+
     guild_ctx = get_guild_context(ctx.guild.id)
     if guild_ctx.voice_client and guild_ctx.voice_client.is_connected():
         if guild_ctx.sink:
             guild_ctx.sink.cleanup()
         await guild_ctx.voice_client.disconnect()
-        await ctx.send("👋 Disconnected from voice channel and cleared session history.")
+        await ctx.send(f"👋 Disconnected from voice channel and cleared session history.{capture_msg}")
     else:
-        await ctx.send("❌ Not connected to any voice channel. Session history cleared.")
+        await ctx.send(f"❌ Not connected to any voice channel. Session history cleared.{capture_msg}")
 
 
 @bot.event

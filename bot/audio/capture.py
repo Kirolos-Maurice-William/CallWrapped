@@ -76,6 +76,32 @@ def stop_capture_session(recordings_dir: Optional[Path] = None) -> Tuple[Path, P
     return csv_file, session_dir
 
 
+def is_capture_active() -> bool:
+    """Returns True if test capture mode is enabled or an active session directory exists."""
+    return bool(getattr(config, "TEST_CAPTURE_MODE", 0) or _active_session_dir is not None)
+
+
+def finalize_capture_if_active() -> Optional[Tuple[Path, Path]]:
+    """
+    If capture is currently active:
+    - Generates labels_DRAFT.csv in the active session folder
+    - Resets config.TEST_CAPTURE_MODE = 0
+    - Releases _active_session_dir
+    - Logs session folder path clearly
+    - Returns (csv_path, session_dir) or None if capture was not active.
+    """
+    if is_capture_active():
+        return stop_capture_session()
+    return None
+
+
+async def finalize_capture_if_active_async() -> Optional[Tuple[Path, Path]]:
+    """Non-blocking async version of finalize_capture_if_active via asyncio.to_thread."""
+    if is_capture_active():
+        return await asyncio.to_thread(stop_capture_session)
+    return None
+
+
 def _clean_speaker_name(speaker_name: str) -> str:
     """Sanitizes speaker name for filesystem safety while preserving Arabic and alphanumeric chars."""
     cleaned = "".join(c for c in speaker_name if c.isalnum() or c in ("-", "_", " ")).strip()

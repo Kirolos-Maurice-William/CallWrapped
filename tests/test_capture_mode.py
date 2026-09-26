@@ -19,7 +19,7 @@ from bot.audio.capture import (
     get_active_session_dir,
     DEFAULT_RECORDINGS_DIR
 )
-from bot.main import stop_capture_command, start_capture_command
+from bot.main import stop_capture_command, start_capture_command, leave_channel
 
 
 class TestCaptureMode(unittest.IsolatedAsyncioTestCase):
@@ -320,6 +320,65 @@ class TestCaptureMode(unittest.IsolatedAsyncioTestCase):
             print(f"\n📁 {folder.name}/")
             for item in sorted(folder.iterdir()):
                 print(f"   └── 📄 {item.name} ({item.stat().st_size} bytes)")
+        print("=" * 65 + "\n")
+
+    async def test_e_leave_finalizes_active_capture_session(self):
+        """
+        Acceptance test for CAP-02 (Phase 1):
+        start-capture -> save 1 clip -> simulate !leave ->
+        CSV exists in the session folder, capture flag is 0, session dir released.
+        """
+        dummy_wav = b"RIFF" + b"\x00" * 36 + b"data" + b"\x07\x08" * 50
+
+        # 1. Start capture session
+        session_dir = start_capture_session(base_dir=self.test_dir)
+        self.assertTrue(session_dir.exists())
+        self.assertEqual(config.TEST_CAPTURE_MODE, 1)
+        self.assertEqual(get_active_session_dir(), session_dir)
+
+        # 2. Save 1 clip
+        entry = await save_captured_utterance_async(
+            speaker_name="Mostafa",
+            wav_bytes=dummy_wav,
+            asr_text="كلام قبل الخروج النهائي",
+            stt_latency_ms=110.0,
+            ended_by="silence"
+        )
+        self.assertIsNotNone(entry)
+        self.assertTrue((session_dir / entry["wav_filename"]).exists())
+
+        # 3. Simulate !leave
+        mock_ctx = AsyncMock()
+        mock_ctx.guild.id = 999111
+        await leave_channel(mock_ctx)
+
+        # 4. Invariant checks
+        self.assertEqual(config.TEST_CAPTURE_MODE, 0, "Capture flag must be reset to 0 on !leave")
+        self.assertIsNone(get_active_session_dir(), "Session dir must be released on !leave")
+
+        csv_path = session_dir / "labels_DRAFT.csv"
+        self.assertTrue(csv_path.exists(), "labels_DRAFT.csv must exist in session folder")
+
+        with open(csv_path, "r", encoding="utf-8-sig") as f:
+            rows = list(csv.DictReader(f))
+        self.assertEqual(len(rows), 1, "CSV must contain the 1 captured clip")
+        self.assertEqual(rows[0]["wav_filename"], entry["wav_filename"])
+        self.assertEqual(rows[0]["speaker"], "Mostafa")
+
+        mock_ctx.send.assert_awaited_once()
+        sent_msg = mock_ctx.send.await_args[0][0]
+        self.assertIn("Capture Finalized", sent_msg)
+        self.assertIn("labels_DRAFT.csv", sent_msg)
+
+        print("\n" + "=" * 65)
+        print("=== CAP-02 ACCEPTANCE: !leave FINALIZES ACTIVE CAPTURE ===")
+        print("=" * 65)
+        print(f"Session Folder:  {session_dir}")
+        print(f"Draft CSV:       {csv_path} (exists: {csv_path.exists()})")
+        print(f"CSV Rows:        {len(rows)}")
+        print(f"Capture Flag:    {config.TEST_CAPTURE_MODE}")
+        print(f"Active Dir:      {get_active_session_dir()}")
+        print(f"Discord Message:\n{sent_msg}")
         print("=" * 65 + "\n")
 
 

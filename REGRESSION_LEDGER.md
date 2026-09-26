@@ -56,6 +56,7 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-26 | `44f5d52` | Complete repo-wide branding sweep to CallWrapped and synchronize `.env.example` with active configuration (Phase 3 / BRD-01 + CFG-01) | `git grep -in "voice arbitrator"` -> 0 hits, full suite 100/100 OK |
 | 2026-09-26 | `ca7fa7e` | Safe recordings migration clustering stacked clips by >10-minute gap, preserving human labels (Phase 2) | `tests/test_migrate_recordings.py`, full suite 104/104 OK |
 | 2026-09-26 | `f8a5cdc` | Document TEST_CAPTURE_MODE in .env.example, update !help with per-session folders, verify !privacy (Phase 3) | `tests/test_p1_privacy.py`, full suite 104/104 OK |
+| 2026-09-26 | `3d060b8` | Auto-finalize active capture on !leave and !clear, report CSV path to Discord (Phase 1 / CAP-02) | `tests/test_capture_mode.py`, full suite 105/105 OK |
 
 
 
