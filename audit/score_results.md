@@ -1,8 +1,8 @@
 # Step 9: Captured Test Session Scoring Report
 
-**Session Folder:** `test_score_session_vz224c0e`  
+**Session Folder:** `2026-09-26_smoke_rehearsal`  
 **Source Labels File:** `labels_DRAFT.csv`  
-**Evaluation Date:** 2026-09-26 15:50:19  
+**Evaluation Date:** 2026-09-26 16:35:13  
 **STT Engine:** AssemblyAI Universal-3.5 Pro (Native Code-Switching)  
 **Epistemic Engine:** Groq LPU (`qwen/qwen3.8-27b`)  
 
@@ -10,8 +10,8 @@
 
 | Metric | Result | Target Benchmark | Status |
 |---|---|---|---|
-| **Overall WER** | **16.72%** | Beat 30.8% baseline | ✅ PASS |
-| **Clean Audio WER** | **16.72%** | Beat 25.1% baseline | ✅ PASS |
+| **Overall WER** | **8.91%** | Beat 30.8% baseline | ✅ PASS |
+| **Clean Audio WER** | **8.91%** | Beat 25.1% baseline | ✅ PASS |
 | **Number Accuracy** | **100.0%** (0/0) | ≥ 90% | ✅ PASS |
 | **Topic Classification** | **33.3%** | ≥ 80% | ⚠️ REVIEW |
 | **Claim Agreement** | **100.0%** | ≥ 75% | ✅ PASS |
@@ -24,14 +24,14 @@
 
 | Clip ID | Speaker | Loud | WER | Human Reference (`correct_text`) | AssemblyAI Raw (`asr_text`) | Topic (Pred/True) | Claim (Pred/True) | Anger (Pred/True) |
 |---|---|---|---|---|---|---|---|---|
-| `clip_001` | Ahmed | normal | **12.5%** | لكن تميزت في الفترة الأخيرة هي رياضة السباحة بالزعانف تابعونا النهارده في حلم جديد وإحلم معانا | لكن تميزت في الفترة الأخيرة هي رياضة استباحة بالزعانف تبعونا النهاردة في حلم جديد واحلم معانا | other / sports | No / No | none / none |
-| `clip_002` | Tamer | normal | **28.6%** | سلامات عليكم حكلمكو النهارده عن ال uncertainty | السلام عليكم. أكلمكم النهاردة عن ال uncertainty. | other / other | No / No | none / none |
-| `clip_003` | Kareem | normal | **9.1%** | فهو لا يعدو كونه سلوكا وكل سلوك على ضوء الحتمية السيكولوجية | فهو لا يعد كونه سلوكا وكل سلوك على ضوء الحتمية السيكولوجية | other / movies | No / No | none / none |
+| `clip_001` | Ahmed | normal | **7.7%** | أعزائي الشباب أهلا بيكم وحلقة جديدة وحلم جديد من إحلم معانا حنعيش النهارده في حلمنا مع مجموعة من الشباب متميز جدا في رياضة يمكن جديدة علينا | أعزائي الشباب أهلا بيكم وحلقة جديدة وحلم جديد من احلم معانا حنعيش النهاردة في حلمنا مع مجموعة من الشباب متميز جدا فريضة يمكن جديدة علينا | other / sports | No / No | none / none |
+| `clip_002` | Omar | normal | **19.0%** | لو حد بص على ال الترجمة بتاعتها في القاموس حيلاقي عدم اليقين بس ده ترجمة مش دقيقة برضه هو يقين ناقص | لو حد بس على الترجمة بتاعتك في قاموس حيلاقي عدم اليقين بس ده ترجمة مش دقيقة برضه هو يقين ناقص | other / other | No / No | none / none |
+| `clip_003` | Tamer | normal | **0.0%** | الأمر المؤكد إذا أن الخيال مهما انطلق بعيدا عن الواقع | الامر المؤكد اذا ان الخيال مهما انطلق بعيدا عن الواقع | other / movies | No / No | none / none |
 
 
 ## 4. Skipped Clips (Unlabeled by Human)
 
 | Clip ID | Filename | Speaker | Reason |
 |---|---|---|---|
-| `clip_004` | `unlabeled_clip.wav` | Ziad | Empty correct_text (unlabeled by human) |
+| `clip_004` | `1790426815_Ziad.wav` | Ziad | Empty correct_text (unlabeled by human) |
 

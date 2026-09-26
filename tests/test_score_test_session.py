@@ -8,7 +8,7 @@ import unittest
 import asyncio
 from pathlib import Path
 
-from audit.score_test_session import score_session, DEFAULT_RESULTS_FILE
+from audit.score_test_session import score_session
 from bot.config import PROJECT_ROOT
 
 
@@ -144,9 +144,6 @@ class TestScoreTestSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(post_rows), 4)
         self.assertEqual(post_rows[3]["correct_text"], "")
         self.assertEqual(post_rows[0]["correct_text"], rows[0]["correct_text"])
-
-        # Also write to default results file for project record
-        DEFAULT_RESULTS_FILE.write_text(md_text, encoding="utf-8")
 
         print("\n" + "=" * 65)
         print("=== SCR-01 ACCEPTANCE: STEP 9 SCORER REPORT ===")
