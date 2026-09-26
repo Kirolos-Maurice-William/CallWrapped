@@ -134,39 +134,53 @@ def save_captured_utterance_sync(
     else:
         target_dir = start_capture_session()
 
-    target_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
 
-    ts = timestamp if timestamp is not None else time.time()
-    safe_speaker = _clean_speaker_name(speaker_name)
-    base_filename = f"{int(ts)}_{safe_speaker}.wav"
-    wav_path = target_dir / base_filename
-
-    counter = 1
-    while wav_path.exists():
-        base_filename = f"{int(ts)}_{safe_speaker}_{counter}.wav"
+        ts = timestamp if timestamp is not None else time.time()
+        safe_speaker = _clean_speaker_name(speaker_name)
+        base_filename = f"{int(ts)}_{safe_speaker}.wav"
         wav_path = target_dir / base_filename
-        counter += 1
 
-    # Write WAV audio
-    with open(wav_path, "wb") as f:
-        f.write(wav_bytes)
+        counter = 1
+        while wav_path.exists():
+            base_filename = f"{int(ts)}_{safe_speaker}_{counter}.wav"
+            wav_path = target_dir / base_filename
+            counter += 1
 
-    log_entry = {
-        "timestamp": ts,
-        "speaker_name": speaker_name,
-        "wav_filename": base_filename,
-        "asr_text": asr_text,
-        "stt_latency_ms": stt_latency_ms,
-        "ended_by": ended_by
-    }
+        # Write WAV audio
+        with open(wav_path, "wb") as f:
+            f.write(wav_bytes)
 
-    # Append JSONL log in the session directory ONLY
-    log_file = target_dir / "session_log.jsonl"
-    with open(log_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+        log_entry = {
+            "timestamp": ts,
+            "speaker_name": speaker_name,
+            "wav_filename": base_filename,
+            "asr_text": asr_text,
+            "stt_latency_ms": stt_latency_ms,
+            "ended_by": ended_by
+        }
 
-    logger.info(f"🎙️ [Capture] Saved utterance clip: {base_filename} ({ended_by}) in {target_dir.name}")
-    return log_entry
+        # Append JSONL log in the session directory ONLY
+        log_file = target_dir / "session_log.jsonl"
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+        logger.info(f"🎙️ [Capture] Saved utterance clip: {base_filename} ({ended_by}) in {target_dir.name}")
+        return log_entry
+    except OSError as e:
+        logger.error(f"❌ [Capture Failed] Filesystem error saving utterance to {target_dir}: {e}")
+        # Degrade gracefully: pipeline continues, utterance recorded as capture_failed
+        return {
+            "timestamp": timestamp if timestamp is not None else time.time(),
+            "speaker_name": speaker_name,
+            "wav_filename": None,
+            "asr_text": asr_text,
+            "stt_latency_ms": stt_latency_ms,
+            "ended_by": ended_by,
+            "capture_status": "capture_failed",
+            "error": str(e)
+        }
 
 
 async def save_captured_utterance_async(

@@ -381,6 +381,46 @@ class TestCaptureMode(unittest.IsolatedAsyncioTestCase):
         print(f"Discord Message:\n{sent_msg}")
         print("=" * 65 + "\n")
 
+    async def test_f_save_captured_utterance_oserror_graceful_degradation(self):
+        """
+        Acceptance test for CAP-01 (Phase 2):
+        When a filesystem error (e.g. permission/not a directory) occurs,
+        save_captured_utterance degrades gracefully without crashing the pipeline,
+        logging the error and returning capture_status='capture_failed'.
+        """
+        config.TEST_CAPTURE_MODE = 1
+        # Create a file and try using a path inside it to trigger NotADirectoryError (subclass of OSError)
+        self.test_dir.mkdir(parents=True, exist_ok=True)
+        blocker = self.test_dir / "blocker_file"
+        blocker.write_text("I am a file, not a directory", encoding="utf-8")
+        invalid_dir = blocker / "nested_dir"
+
+        with self.assertLogs("CaptureMode", level="ERROR") as cm:
+            res = save_captured_utterance_sync(
+                speaker_name="Ahmed",
+                wav_bytes=b"RIFF_TEST",
+                asr_text="كلام عند حدوث خطأ قرص",
+                stt_latency_ms=120.0,
+                ended_by="silence",
+                recordings_dir=invalid_dir
+            )
+
+        self.assertIsNotNone(res)
+        self.assertEqual(res["capture_status"], "capture_failed")
+        self.assertIsNone(res["wav_filename"])
+        self.assertEqual(res["asr_text"], "كلام عند حدوث خطأ قرص")
+        self.assertIn("error", res)
+
+        error_logs = " ".join(cm.output)
+        self.assertIn("[Capture Failed]", error_logs)
+
+        print("\n" + "=" * 65)
+        print("=== CAP-01 ACCEPTANCE: OSERROR GRACEFUL DEGRADATION ===")
+        print("=" * 65)
+        print(f"Logged Error:\n{error_logs}")
+        print(f"Returned Entry:\n{res}")
+        print("=" * 65 + "\n")
+
 
 if __name__ == "__main__":
     unittest.main()
