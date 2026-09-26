@@ -4,7 +4,7 @@ import time
 import json
 import asyncio
 import logging
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, Tuple, List, Set
 import httpx
 from bot.config import config
 
@@ -58,9 +58,19 @@ class KeyPool:
 
     def _init_pool(self):
         candidates = [
-            ("key#1", config.GROQ_API_KEY),
-            ("key#2", getattr(config, "GROQ_API_KEY_2", ""))
+            ("key#1", getattr(config, "GROQ_API_KEY", "")),
+            ("key#2", getattr(config, "GROQ_API_KEY_2", "")),
+            ("key#3", getattr(config, "GROQ_API_KEY_3", ""))
         ]
+        # Dynamically discover any higher keys (e.g. GROQ_API_KEY_4, etc.)
+        i = 4
+        while True:
+            extra_key = getattr(config, f"GROQ_API_KEY_{i}", "") or os.getenv(f"GROQ_API_KEY_{i}", "")
+            if not extra_key or not extra_key.strip():
+                break
+            candidates.append((f"key#{i}", extra_key))
+            i += 1
+
         for key_id, raw_key in candidates:
             if raw_key and raw_key.strip():
                 self.keys.append({
@@ -87,10 +97,22 @@ class KeyPool:
         best = max(available, key=lambda k: k["remaining_tokens"])
         return best
 
-    def get_other_key(self, current_key: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Returns the alternate key if available."""
-        others = [k for k in self.keys if k["id"] != current_key["id"]]
-        return others[0] if others else None
+    def get_other_key(self, current_key: Dict[str, Any], excluded_ids: Optional[Set[str]] = None) -> Optional[Dict[str, Any]]:
+        """Returns the alternate key if available, prioritizing available keys with most remaining tokens."""
+        if excluded_ids is None:
+            excluded = {current_key["id"]}
+        else:
+            excluded = set(excluded_ids) | {current_key["id"]}
+
+        others = [k for k in self.keys if k["id"] not in excluded]
+        if not others:
+            return None
+
+        now = time.time()
+        available = [k for k in others if now >= k["reset_time"]]
+        if available:
+            return max(available, key=lambda k: k["remaining_tokens"])
+        return min(others, key=lambda k: k["reset_time"])
 
     def update_headers(self, key_entry: Dict[str, Any], headers: httpx.Headers, status_code: int = 200):
         """Updates remaining tokens and reset time from response headers."""
@@ -157,8 +179,9 @@ class GroqClient:
                 resp = await client.post(self.url, headers=headers, json=payload)
                 self.pool.update_headers(k, resp.headers, resp.status_code)
 
-                # HTTP 429: Immediately retry ONCE with OTHER key
-                if resp.status_code == 429:
+                # HTTP 429: Immediately retry with other keys in pool
+                attempted_ids = {k["id"]}
+                while resp.status_code == 429:
                     wait_sec = parse_reset_duration(
                         resp.headers.get("retry-after") or
                         resp.headers.get("x-ratelimit-reset-tokens")
@@ -166,64 +189,50 @@ class GroqClient:
                     k["remaining_tokens"] = 0
                     k["reset_time"] = time.time() + wait_sec
 
-                    k2 = self.pool.get_other_key(k)
-                    if k2:
-                        headers2 = {
-                            "Authorization": f"Bearer {k2['key']}",
+                    k_next = self.pool.get_other_key(k, excluded_ids=attempted_ids)
+                    if k_next:
+                        attempted_ids.add(k_next["id"])
+                        headers_next = {
+                            "Authorization": f"Bearer {k_next['key']}",
                             "Content-Type": "application/json"
                         }
-                        resp2 = await client.post(self.url, headers=headers2, json=payload)
-                        self.pool.update_headers(k2, resp2.headers, resp2.status_code)
+                        resp_next = await client.post(self.url, headers=headers_next, json=payload)
+                        self.pool.update_headers(k_next, resp_next.headers, resp_next.status_code)
 
-                        if resp2.status_code == 200:
-                            logger.info(f"🔄 [{k['id']} 429 → {k2['id']} retry ok]")
-                            resp = resp2
-                            k = k2
-                        elif resp2.status_code == 429:
-                            # Both keys exhausted
-                            wait_sec2 = parse_reset_duration(
-                                resp2.headers.get("retry-after") or
-                                resp2.headers.get("x-ratelimit-reset-tokens")
-                            )
-                            k2["remaining_tokens"] = 0
-                            k2["reset_time"] = time.time() + wait_sec2
-                            sleep_wait = min(
-                                max(0.0, k["reset_time"] - time.time()),
-                                max(0.0, k2["reset_time"] - time.time())
-                            )
-                            if sleep_wait > 2.0:
-                                logger.warning(
-                                    f"⚠️ [GroqClient] Both keys hit 429 with long resets ({sleep_wait:.1f}s > 2.0s). Skipping request."
-                                )
-                                latency_ms = int((time.perf_counter() - t0) * 1000)
-                                return None, {}, latency_ms
-                            elif sleep_wait > 0:
-                                logger.warning(f"⚠️ [GroqClient] Both keys hit 429. Waiting {sleep_wait:.2f}s reset...")
-                                await asyncio.sleep(sleep_wait)
-                                k_best = min(self.pool.keys, key=lambda x: x["reset_time"])
-                                h_best = {"Authorization": f"Bearer {k_best['key']}", "Content-Type": "application/json"}
-                                resp = await client.post(self.url, headers=h_best, json=payload)
-                                self.pool.update_headers(k_best, resp.headers)
-                                k = k_best
+                        if resp_next.status_code == 200:
+                            logger.info(f"🔄 [{k['id']} 429 → {k_next['id']} retry ok]")
+                            resp = resp_next
+                            k = k_next
+                            break
+                        else:
+                            resp = resp_next
+                            k = k_next
                     else:
-                        # Single key or both currently unavailable
-                        sleep_wait = max(0.0, k["reset_time"] - time.time())
-                        if k2:
-                            sleep_wait = min(sleep_wait, max(0.0, k2["reset_time"] - time.time()))
-                        if sleep_wait > 2.0:
-                            logger.warning(
-                                f"⚠️ [{k['id']} 429] Rate limit reset too long ({sleep_wait:.1f}s > 2.0s). Skipping request."
-                            )
-                            latency_ms = int((time.perf_counter() - t0) * 1000)
-                            return None, {}, latency_ms
-                        elif sleep_wait > 0:
-                            logger.warning(f"⚠️ [{k['id']} 429] Rate limit hit. Waiting {sleep_wait:.2f}s...")
-                            await asyncio.sleep(sleep_wait)
-                            k_best = min(self.pool.keys, key=lambda x: x["reset_time"])
-                            h_best = {"Authorization": f"Bearer {k_best['key']}", "Content-Type": "application/json"}
-                            resp = await client.post(self.url, headers=h_best, json=payload)
-                            self.pool.update_headers(k_best, resp.headers)
-                            k = k_best
+                        # All keys in pool exhausted
+                        break
+
+                if resp.status_code == 429:
+                    sleep_wait = min(
+                        max(0.0, key_entry["reset_time"] - time.time())
+                        for key_entry in self.pool.keys
+                    ) if self.pool.keys else 0.0
+
+                    keys_count = len(self.pool.keys)
+                    keys_label = "Both keys" if keys_count == 2 else f"All {keys_count} keys"
+                    if sleep_wait > 2.0:
+                        logger.warning(
+                            f"⚠️ [GroqClient] {keys_label} hit 429 with long resets ({sleep_wait:.1f}s > 2.0s). Skipping request."
+                        )
+                        latency_ms = int((time.perf_counter() - t0) * 1000)
+                        return None, {}, latency_ms
+                    elif sleep_wait > 0:
+                        logger.warning(f"⚠️ [GroqClient] {keys_label} hit 429. Waiting {sleep_wait:.2f}s reset...")
+                        await asyncio.sleep(sleep_wait)
+                        k_best = min(self.pool.keys, key=lambda x: x["reset_time"])
+                        h_best = {"Authorization": f"Bearer {k_best['key']}", "Content-Type": "application/json"}
+                        resp = await client.post(self.url, headers=h_best, json=payload)
+                        self.pool.update_headers(k_best, resp.headers, resp.status_code)
+                        k = k_best
 
         except Exception as e:
             latency_ms = int((time.perf_counter() - t0) * 1000)
@@ -303,7 +312,9 @@ class GroqClient:
                 resp = client.post(self.url, headers=headers, json=payload)
                 self.pool.update_headers(k, resp.headers, resp.status_code)
 
-                if resp.status_code == 429:
+                # HTTP 429: Immediately retry with other keys in pool
+                attempted_ids = {k["id"]}
+                while resp.status_code == 429:
                     wait_sec = parse_reset_duration(
                         resp.headers.get("retry-after") or
                         resp.headers.get("x-ratelimit-reset-tokens")
@@ -311,51 +322,48 @@ class GroqClient:
                     k["remaining_tokens"] = 0
                     k["reset_time"] = time.time() + wait_sec
 
-                    k2 = self.pool.get_other_key(k)
-                    if k2:
-                        headers2 = {
-                            "Authorization": f"Bearer {k2['key']}",
+                    k_next = self.pool.get_other_key(k, excluded_ids=attempted_ids)
+                    if k_next:
+                        attempted_ids.add(k_next["id"])
+                        headers_next = {
+                            "Authorization": f"Bearer {k_next['key']}",
                             "Content-Type": "application/json"
                         }
-                        resp2 = client.post(self.url, headers=headers2, json=payload)
-                        self.pool.update_headers(k2, resp2.headers, resp2.status_code)
-                        if resp2.status_code == 200:
-                            logger.info(f"🔄 [{k['id']} 429 → {k2['id']} retry ok]")
-                            resp = resp2
-                            k = k2
-                        elif resp2.status_code == 429:
-                            wait_sec2 = parse_reset_duration(
-                                resp2.headers.get("retry-after") or
-                                resp2.headers.get("x-ratelimit-reset-tokens")
-                            )
-                            k2["remaining_tokens"] = 0
-                            k2["reset_time"] = time.time() + wait_sec2
-                            sleep_wait = min(
-                                max(0.1, k["reset_time"] - time.time()),
-                                max(0.1, k2["reset_time"] - time.time())
-                            )
-                            if sleep_wait > 2.0:
-                                logger.warning(
-                                    f"⚠️ [GroqClient] Sync rate limit reset too long ({sleep_wait:.1f}s > 2.0s). Skipping request."
-                                )
-                                latency_ms = int((time.perf_counter() - t0) * 1000)
-                                return None, {}, latency_ms
-                            time.sleep(sleep_wait)
-                            k_best = min(self.pool.keys, key=lambda x: x["reset_time"])
-                            h_best = {"Authorization": f"Bearer {k_best['key']}", "Content-Type": "application/json"}
-                            resp = client.post(self.url, headers=h_best, json=payload)
-                            self.pool.update_headers(k_best, resp.headers)
-                            k = k_best
+                        resp_next = client.post(self.url, headers=headers_next, json=payload)
+                        self.pool.update_headers(k_next, resp_next.headers, resp_next.status_code)
+                        if resp_next.status_code == 200:
+                            logger.info(f"🔄 [{k['id']} 429 → {k_next['id']} retry ok]")
+                            resp = resp_next
+                            k = k_next
+                            break
+                        else:
+                            resp = resp_next
+                            k = k_next
                     else:
-                        if wait_sec > 2.0:
-                            logger.warning(
-                                f"⚠️ [GroqClient] Sync rate limit reset too long ({wait_sec:.1f}s > 2.0s). Skipping request."
-                            )
-                            latency_ms = int((time.perf_counter() - t0) * 1000)
-                            return None, {}, latency_ms
-                        time.sleep(wait_sec)
-                        resp = client.post(self.url, headers=headers, json=payload)
-                        self.pool.update_headers(k, resp.headers)
+                        # All keys in pool exhausted
+                        break
+
+                if resp.status_code == 429:
+                    sleep_wait = min(
+                        max(0.1, key_entry["reset_time"] - time.time())
+                        for key_entry in self.pool.keys
+                    ) if self.pool.keys else 0.0
+
+                    keys_count = len(self.pool.keys)
+                    keys_label = "Both keys" if keys_count == 2 else f"All {keys_count} keys"
+                    if sleep_wait > 2.0:
+                        logger.warning(
+                            f"⚠️ [GroqClient] Sync rate limit reset too long ({sleep_wait:.1f}s > 2.0s). Skipping request."
+                        )
+                        latency_ms = int((time.perf_counter() - t0) * 1000)
+                        return None, {}, latency_ms
+                    elif sleep_wait > 0:
+                        time.sleep(sleep_wait)
+                        k_best = min(self.pool.keys, key=lambda x: x["reset_time"])
+                        h_best = {"Authorization": f"Bearer {k_best['key']}", "Content-Type": "application/json"}
+                        resp = client.post(self.url, headers=h_best, json=payload)
+                        self.pool.update_headers(k_best, resp.headers, resp.status_code)
+                        k = k_best
 
         except Exception as e:
             latency_ms = int((time.perf_counter() - t0) * 1000)

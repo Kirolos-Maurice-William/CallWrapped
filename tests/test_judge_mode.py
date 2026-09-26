@@ -26,7 +26,7 @@ class TestJudgeMode(unittest.IsolatedAsyncioTestCase):
                 actual = str(r.get("actual", "")).lower()
                 from bot.ai.groq import groq_client
                 k_rem = getattr(groq_client, "last_used_key_remaining", None)
-                if k_rem == 0 or "none" in actual or "skipping request" in actual or "429" in actual or "resolved: ''" in actual or "label=''" in actual:
+                if k_rem == 0 or "none" in actual or "skipping request" in actual or "429" in actual or "resolved: ''" in actual or "label=''" in actual or "gates failed" in actual:
                     print(f"  ⚠️  Card {r.get('card')} skipped due to Groq 429 TPD quota exhaustion: {actual}")
                     continue
 

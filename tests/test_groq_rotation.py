@@ -99,6 +99,67 @@ class TestGroqRotation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tokens.get("key_id"), "key#2", "Tokens must report the key that finished the request")
         print("[PROOF VERIFIED] key#1 429 → key#2 retry ok\n")
 
+    async def test_mocked_429_three_key_rotation(self):
+        """
+        Part A2: Unit test with cascading 429 on key#1 and key#2.
+        Proves retry cascades through key#2 to key#3 and succeeds without sleeping.
+        Asserts call sequence is key#1 -> key#2 -> key#3 and key#3 finishes the request.
+        """
+        print("\n" + "=" * 70)
+        print("=== PART A2: UNIT TEST - MOCKED 429 CASCADE RETRY ON KEY#3 ===")
+        print("=" * 70)
+
+        client = GroqClient()
+        client.pool.keys = [
+            {"id": "key#1", "key": "dummy_key_1", "remaining_tokens": 100000, "reset_time": 0.0},
+            {"id": "key#2", "key": "dummy_key_2", "remaining_tokens": 100000, "reset_time": 0.0},
+            {"id": "key#3", "key": "dummy_key_3", "remaining_tokens": 100000, "reset_time": 0.0}
+        ]
+
+        call_log = []
+
+        async def mock_post(url, headers, json):
+            auth_header = headers.get("Authorization", "")
+            if "dummy_key_1" in auth_header:
+                call_log.append("key#1")
+                req = httpx.Request("POST", url)
+                h = httpx.Headers({"retry-after": "5", "x-ratelimit-remaining-tokens": "0", "x-ratelimit-reset-tokens": "5s"})
+                return httpx.Response(429, request=req, headers=h, text='{"error": "rate_limit_exceeded"}')
+            elif "dummy_key_2" in auth_header:
+                call_log.append("key#2")
+                req = httpx.Request("POST", url)
+                h = httpx.Headers({"retry-after": "5", "x-ratelimit-remaining-tokens": "0", "x-ratelimit-reset-tokens": "5s"})
+                return httpx.Response(429, request=req, headers=h, text='{"error": "rate_limit_exceeded"}')
+            elif "dummy_key_3" in auth_header:
+                call_log.append("key#3")
+                req = httpx.Request("POST", url)
+                h = httpx.Headers({"x-ratelimit-remaining-tokens": "95000"})
+                resp_json = {
+                    "choices": [{
+                        "message": {
+                            "content": '{"is_factual_claim": true, "claim": "Mocked 3-Key Fact", "entity": "Test3", "metric": "3"}'
+                        }
+                    }],
+                    "usage": {"prompt_tokens": 60, "completion_tokens": 25}
+                }
+                import json as json_lib
+                return httpx.Response(200, request=req, headers=h, text=json_lib.dumps(resp_json))
+            raise ValueError(f"Unexpected key in auth header: {auth_header}")
+
+        with patch("httpx.AsyncClient.post", side_effect=mock_post):
+            messages = [{"role": "user", "content": "Test prompt"}]
+            parsed, tokens, latency_ms = await client.complete_chat(messages)
+
+        print(f"Call sequence: {' -> '.join(call_log)}")
+        print(f"Result parsed: {parsed}")
+        print(f"Tokens: {tokens}")
+
+        self.assertEqual(call_log, ["key#1", "key#2", "key#3"], "Expected key#1 -> key#2 -> key#3 retry cascade")
+        self.assertIsNotNone(parsed)
+        self.assertTrue(parsed.get("is_factual_claim"))
+        self.assertEqual(tokens.get("key_id"), "key#3", "Tokens must report key#3 as the key that finished the request")
+        print("[PROOF VERIFIED] key#1 429 → key#2 429 → key#3 retry ok\n")
+
     async def test_six_rapid_real_classification_calls(self):
         """
         Part B: Real-run proof: Fire up to 6 rapid real classification calls.

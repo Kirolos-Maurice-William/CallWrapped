@@ -106,8 +106,9 @@ async def run_card_3() -> Dict[str, Any]:
         bool(fact_clause)
     )
 
+    gate_status = "passed" if has_conflict else "failed"
     actual = (
-        f"Gates passed ({lat_conf}ms) -> Offer created -> Auto-confirmed -> "
+        f"Gates {gate_status} ({lat_conf}ms) -> Offer created -> Auto-confirmed -> "
         f"Tavily ({search_ms}ms, {len(sources)} sources) -> Verifier ({synth_ms}ms) -> "
         f"Resolved: '{fact_clause}' | Source: {source_url}"
     )
