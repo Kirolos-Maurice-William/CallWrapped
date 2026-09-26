@@ -72,6 +72,29 @@ class TestDashboardWebSocketStreaming(unittest.TestCase):
         print("✅ [PROOF VERIFIED] Dashboard WebSocket remained 100% connected & responsive!")
         print("=" * 65 + "\n")
 
+    def test_ws_origin_allowed(self):
+        """Test (a): Origin http://localhost:3000 -> accepted."""
+        with TestClient(app) as client:
+            with client.websocket_connect("/api/ws", headers={"Origin": "http://localhost:3000"}) as ws:
+                initial = ws.receive_json()
+                self.assertEqual(initial.get("type"), "initial_state")
+
+    def test_ws_origin_rejected(self):
+        """Test (b): Origin http://evil.com -> rejected before accept with code 1008."""
+        from starlette.websockets import WebSocketDisconnect
+        with TestClient(app) as client:
+            with self.assertRaises(WebSocketDisconnect) as cm:
+                with client.websocket_connect("/api/ws", headers={"Origin": "http://evil.com"}):
+                    pass
+            self.assertEqual(cm.exception.code, 1008)
+
+    def test_ws_no_origin_allowed(self):
+        """Test (c): no Origin header -> accepted."""
+        with TestClient(app) as client:
+            with client.websocket_connect("/api/ws") as ws:
+                initial = ws.receive_json()
+                self.assertEqual(initial.get("type"), "initial_state")
+
 
 if __name__ == "__main__":
     unittest.main()

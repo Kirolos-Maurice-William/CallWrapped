@@ -51,6 +51,8 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-25 | `0c35b20` | Bound complete_chat_sync rate limit sleep to 2.0s max (Phase 3) | `bot/ai/groq.py`, `tests/test_fix2_ratelimit.py`, full suite 96/96 OK |
 | 2026-09-26 | `027216a` | Branding sweep to CallWrapped and Universal model fallback (Phase 4) | `bot/`, `backend/`, `frontend/`, `tests/test_fix1_stats.py`, full suite 96/96 OK |
 | 2026-09-26 | `da1cec3` | Dead code cleanup, privacy text update, and pruned dependencies (Phase 5) | `bot/`, `backend/`, `tests/`, `requirements.txt`, full suite 96/96 OK |
+| 2026-09-26 | `8f20bfd` | WebSocket origin check on `/api/ws` closing unauthorized origins with code 1008 (Phase 1 / SEC-01) | `tests/test_verify_dashboard_websocket_alive.py`, full suite 99/99 OK |
+
 
 
 

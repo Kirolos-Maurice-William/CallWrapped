@@ -145,6 +145,19 @@ def _upsert_dispute_card(key: str, updates: Dict[str, Any], timestamp: float) ->
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket connection for live dashboard streaming."""
+    origin = websocket.headers.get("origin")
+    allowed_origins = (
+        settings.cors_origin_list
+        if hasattr(settings, "cors_origin_list")
+        else [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+        if isinstance(settings.CORS_ORIGINS, str)
+        else list(settings.CORS_ORIGINS)
+    )
+    if origin and origin not in allowed_origins:
+        logger.warning("Rejected WebSocket connection from unauthorized origin: %s", origin)
+        await websocket.close(code=1008)
+        return
+
     await websocket.accept()
     active_connections.append(websocket)
     try:
