@@ -88,6 +88,13 @@ async def score_session(
             continue
 
         wav_bytes = wav_path.read_bytes()
+        duration_sec = 0.0
+        try:
+            import wave
+            with wave.open(str(wav_path), "rb") as wf:
+                duration_sec = wf.getnframes() / float(wf.getframerate())
+        except Exception:
+            duration_sec = max(0.5, len(wav_bytes) / 32000.0)
 
         # Step 1a: Transcribe with production AssemblyAI settings
         raw_asr, stt_ms = await assemblyai_client.transcribe(wav_bytes, speaker_name=speaker)
@@ -130,8 +137,18 @@ async def score_session(
         human_anger = (row.get("anger") or "none").strip().lower()
         human_loud = (row.get("loud") or "normal").strip().lower()
 
-        # Topic match
-        topic_match = bool(human_topic and human_topic == model_topic)
+        # Topic evaluation (Taxonomy v2: Topical vs Null)
+        human_is_null = human_topic in ("null_topic", "null", "none", "بدون موضوع", "")
+        model_is_null = model_topic in ("null_topic", "null", "none", "بدون موضوع", "")
+        null_match = bool(human_is_null and model_is_null)
+        topical_match = bool(
+            (not human_is_null) and (not model_is_null) and (
+                human_topic == model_topic
+                or (human_topic in ("sports", "football") and model_topic in ("sports", "football"))
+                or (human_topic in ("personal", "personal_life") and model_topic in ("personal", "personal_life"))
+            )
+        )
+        topic_match = null_match if human_is_null else topical_match
 
         # Claim match
         claim_match = (is_claim_detected == human_is_claim)
@@ -157,11 +174,16 @@ async def score_session(
             "num_matches": num_matches,
             "ref_num_count": len(ref_nums),
             "stt_ms": stt_ms,
+            "duration_sec": duration_sec,
             "is_claim_detected": is_claim_detected,
             "human_is_claim": human_is_claim,
             "claim_match": claim_match,
             "model_topic": model_topic,
             "human_topic": human_topic,
+            "human_is_null": human_is_null,
+            "model_is_null": model_is_null,
+            "null_match": null_match,
+            "topical_match": topical_match,
             "topic_match": topic_match,
             "model_anger": model_anger,
             "human_anger": human_anger,
@@ -195,7 +217,21 @@ async def score_session(
                 r["anger_evidence"] = b_res.get("anger_evidence", "")
                 # Update matches with production predictions
                 h_top = r["human_topic"]
-                r["topic_match"] = bool(h_top and (h_top == b_topic or (h_top in ("sports", "football") and b_topic in ("sports", "football"))))
+                h_null = r["human_is_null"]
+                m_null = b_topic in ("null_topic", "null", "none", "بدون موضوع", "")
+                r["model_is_null"] = m_null
+                null_match = bool(h_null and m_null)
+                topical_match = bool(
+                    (not h_null) and (not m_null) and (
+                        h_top == b_topic
+                        or (h_top in ("sports", "football") and b_topic in ("sports", "football"))
+                        or (h_top in ("personal", "personal_life") and b_topic in ("personal", "personal_life"))
+                    )
+                )
+                r["null_match"] = null_match
+                r["topical_match"] = topical_match
+                r["topic_match"] = null_match if h_null else topical_match
+
                 exact_anger = (b_anger == r["human_anger"])
                 both_angry = (b_anger in ("mild", "high") and r["human_anger"] in ("mild", "high"))
                 r["anger_match"] = exact_anger or both_angry
@@ -250,6 +286,25 @@ async def score_session(
     topic_matches = sum(1 for r in scored_records if r["topic_match"])
     topic_acc = (topic_matches / n_scored * 100.0) if n_scored > 0 else 0.0
 
+    # Phase 2 metrics: Topical Accuracy vs Null Detection Accuracy
+    topical_records = [r for r in scored_records if not r["human_is_null"]]
+    null_records = [r for r in scored_records if r["human_is_null"]]
+
+    topical_matches = sum(1 for r in topical_records if r["topical_match"])
+    topical_acc = (topical_matches / len(topical_records) * 100.0) if topical_records else 0.0
+
+    null_matches = sum(1 for r in null_records if r["null_match"])
+    null_acc = (null_matches / len(null_records) * 100.0) if null_records else 0.0
+
+    # Topical Coverage: % of audio duration classified as topical by model vs human
+    total_audio_sec = sum(r.get("duration_sec", 0.0) for r in scored_records)
+    human_topical_sec = sum(r.get("duration_sec", 0.0) for r in topical_records)
+    model_topical_records = [r for r in scored_records if not r["model_is_null"]]
+    model_topical_sec = sum(r.get("duration_sec", 0.0) for r in model_topical_records)
+
+    human_topical_coverage_pct = (human_topical_sec / total_audio_sec * 100.0) if total_audio_sec > 0 else 0.0
+    model_topical_coverage_pct = (model_topical_sec / total_audio_sec * 100.0) if total_audio_sec > 0 else 0.0
+
     claim_matches = sum(1 for r in scored_records if r["claim_match"])
     claim_acc = (claim_matches / n_scored * 100.0) if n_scored > 0 else 0.0
 
@@ -280,7 +335,16 @@ async def score_session(
         "total_ref_numbers": total_ref_nums,
         "matched_numbers": total_matched_nums,
         "number_accuracy_pct": num_accuracy,
+        "topical_count": len(topical_records),
+        "topical_matches": topical_matches,
+        "topical_accuracy_pct": topical_acc,
+        "null_count": len(null_records),
+        "null_matches": null_matches,
+        "null_accuracy_pct": null_acc,
         "topic_accuracy_pct": topic_acc,
+        "total_audio_sec": total_audio_sec,
+        "human_topical_coverage_pct": human_topical_coverage_pct,
+        "model_topical_coverage_pct": model_topical_coverage_pct,
         "claim_agreement_pct": claim_acc,
         "anger_agreement_pct": anger_acc,
         "human_none_anger_count": len(human_none_anger),
@@ -323,8 +387,6 @@ def render_markdown_report(summary: Dict[str, Any]) -> str:
         micro_status = "✅ PASS" if summary["micro_wer"] < 0.308 else "⚠️ REVIEW"
         macro_res = f"**{summary['macro_wer'] * 100:.2f}%**"
         macro_status = "—"
-        topic_res = f"**{summary['topic_accuracy_pct']:.1f}%**"
-        topic_status = "✅ PASS" if summary["topic_accuracy_pct"] >= 80.0 else "⚠️ REVIEW"
         claim_res = f"**{summary['claim_agreement_pct']:.1f}%**"
         claim_status = "✅ PASS" if summary["claim_agreement_pct"] >= 75.0 else "⚠️ REVIEW"
         anger_res = f"**{summary['anger_agreement_pct']:.1f}%**"
@@ -334,12 +396,31 @@ def render_markdown_report(summary: Dict[str, Any]) -> str:
         micro_status = "—"
         macro_res = "n/a (0 samples)"
         macro_status = "—"
-        topic_res = "n/a (0 samples)"
-        topic_status = "—"
         claim_res = "n/a (0 samples)"
         claim_status = "—"
         anger_res = "n/a (0 samples)"
         anger_status = "—"
+
+    if summary.get("topical_count", 0) > 0:
+        topical_res = f"**{summary['topical_accuracy_pct']:.1f}%** ({summary['topical_matches']}/{summary['topical_count']})"
+        topical_status = "✅ PASS" if summary["topical_accuracy_pct"] >= 80.0 else "⚠️ REVIEW"
+    else:
+        topical_res = "n/a (0 samples)"
+        topical_status = "—"
+
+    if summary.get("null_count", 0) > 0:
+        null_res = f"**{summary['null_accuracy_pct']:.1f}%** ({summary['null_matches']}/{summary['null_count']})"
+        null_status = "✅ PASS" if summary["null_accuracy_pct"] >= 80.0 else "⚠️ REVIEW"
+    else:
+        null_res = "n/a (0 samples)"
+        null_status = "—"
+
+    if summary.get("total_audio_sec", 0) > 0:
+        cov_res = f"**Model: {summary['model_topical_coverage_pct']:.1f}% / Human: {summary['human_topical_coverage_pct']:.1f}%**"
+        cov_status = "ℹ️ REPORTED"
+    else:
+        cov_res = "n/a (0 samples)"
+        cov_status = "—"
 
     if summary["clean_count"] > 0:
         clean_micro_res = f"**{summary['clean_micro_wer'] * 100:.2f}%**"
@@ -371,7 +452,9 @@ def render_markdown_report(summary: Dict[str, Any]) -> str:
     md.append(f"| **Clean Audio Micro WER** | {clean_micro_res} | Beat 25.1% baseline | {clean_micro_status} |")
     md.append(f"| **Clean Audio Macro WER** | {clean_macro_res} | Informational | {clean_macro_status} |")
     md.append(f"| **Number Accuracy** | {num_res} | ≥ 90% | {num_status} |")
-    md.append(f"| **Topic Classification** | {topic_res} | ≥ 80% | {topic_status} |")
+    md.append(f"| **Topical Accuracy** | {topical_res} | ≥ 80% (topical rows only) | {topical_status} |")
+    md.append(f"| **Null Detection Accuracy** | {null_res} | ≥ 80% (null_topic rows only) | {null_status} |")
+    md.append(f"| **Topical Coverage** | {cov_res} | Model vs Human audio share | {cov_status} |")
     md.append(f"| **Claim Agreement** | {claim_res} | ≥ 75% | {claim_status} |")
     md.append(f"| **Anger Agreement** | {anger_res} | Tolerance (mild/high) | {anger_status} |")
     md.append(f"| **False-Anger Rate** | {fa_res} | ≤ 15% | {fa_status} |")

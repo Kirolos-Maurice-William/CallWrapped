@@ -55,9 +55,18 @@ interface Props {
 export function AnalyticsWidgets({ analytics }: Props) {
   const { topic_totals, speakers, total_talk_seconds, total_angry_episodes, longest_streak } = analytics;
 
-  // Topic totals calculations
-  const totalTopicCount = Object.values(topic_totals || {}).reduce((acc, c) => acc + c, 0);
-  const topicEntries = Object.entries(topic_totals || {}).sort((a, b) => b[1] - a[1]);
+  // Topic totals calculations: exclude null_topic from pie, compute coverage
+  const topicalEntries = Object.entries(topic_totals || {}).filter(
+    ([t]) => t !== "null_topic" && t !== "null" && t !== "بدون موضوع" && t !== "none"
+  );
+  const nullCount =
+    (topic_totals?.["null_topic"] || 0) +
+    (topic_totals?.["null"] || 0) +
+    (topic_totals?.["بدون موضوع"] || 0);
+  const totalTopicalCount = topicalEntries.reduce((acc, [, c]) => acc + c, 0);
+  const totalAllTopics = totalTopicalCount + nullCount;
+  const topicalCoveragePct = totalAllTopics > 0 ? (totalTopicalCount / totalAllTopics) * 100 : 0;
+  const topicEntries = topicalEntries.sort((a, b) => b[1] - a[1]);
 
   // Speaker entries
   const speakerEntries = Object.values(speakers || {}).sort((a, b) => b.talk_seconds - a.talk_seconds);
@@ -91,10 +100,10 @@ export function AnalyticsWidgets({ analytics }: Props) {
               </h4>
             </div>
 
-            {totalTopicCount > 0 ? (
+            {totalTopicalCount > 0 ? (
               <div className="space-y-2.5">
                 {topicEntries.map(([topic, count], idx) => {
-                  const pct = (count / totalTopicCount) * 100;
+                  const pct = (count / totalTopicalCount) * 100;
                   const color = TOPIC_COLORS[idx % TOPIC_COLORS.length];
                   return (
                     <div key={topic} className="space-y-1">
@@ -120,9 +129,10 @@ export function AnalyticsWidgets({ analytics }: Props) {
               </div>
             )}
           </div>
-          {totalTopicCount > 0 && (
-            <div className="mt-3 pt-2 border-t border-slate-800/60 text-[10px] font-mono text-slate-500 text-right">
-              Total mentions: {totalTopicCount}
+          {totalAllTopics > 0 && (
+            <div className="mt-3 pt-2 border-t border-slate-800/60 text-[10px] font-mono text-slate-400 flex justify-between">
+              <span>Topical Coverage: {topicalCoveragePct.toFixed(1)}%</span>
+              <span className="text-slate-500">Excl. {nullCount} null</span>
             </div>
           )}
         </div>

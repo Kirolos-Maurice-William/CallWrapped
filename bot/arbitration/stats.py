@@ -21,11 +21,22 @@ class SpeakerStats:
     angry_episodes: int = 0
     last_anger_time: float = 0.0
     first_anger_quote: Optional[str] = None
+    # Topic streak tracking (Taxonomy v2)
+    current_topic: Optional[str] = None
+    current_topic_streak: float = 0.0
+    longest_topic_streak_seconds: float = 0.0
+    longest_topic: Optional[str] = None
+    topic_streak_count: int = 0
 
     @property
     def current_streak_seconds(self) -> float:
         """Alias for current_streak in seconds."""
         return self.current_streak
+
+    @property
+    def topic_streak(self) -> float:
+        """Alias for current_topic_streak in seconds."""
+        return self.current_topic_streak
 
     def record_anger(
         self,
@@ -79,13 +90,41 @@ class SpeakerStats:
             "last_utterance_end": round(self.last_utterance_end, 3),
             "angry_episodes": self.angry_episodes,
             "last_anger_time": round(self.last_anger_time, 3),
-            "first_anger_quote": self.first_anger_quote
+            "first_anger_quote": self.first_anger_quote,
+            "current_topic": self.current_topic,
+            "current_topic_streak": round(self.current_topic_streak, 3),
+            "longest_topic_streak_seconds": round(self.longest_topic_streak_seconds, 3),
+            "longest_topic": self.longest_topic,
+            "topic_streak_count": self.topic_streak_count
         }
+
+
+def compute_topic_percentages(topic_durations: Dict[str, float]) -> Dict[str, float]:
+    """
+    Computes topic share over TOPICAL rows only:
+    topic share = topical time in class k / total topical time.
+    null_topic is excluded from denominator.
+    """
+    topical = {
+        t: d for t, d in topic_durations.items()
+        if t not in ("null_topic", "null", "none", "بدون موضوع", "")
+    }
+    total_topical = sum(topical.values())
+    if total_topical <= 0:
+        return {}
+    return {t: (d / total_topical) * 100.0 for t, d in topical.items()}
+
+
+def compute_topical_coverage(topical_time: float, total_talk_time: float) -> float:
+    """Computes topical coverage metric: topical_time / total_talk_time."""
+    if total_talk_time <= 0:
+        return 0.0
+    return topical_time / total_talk_time
 
 
 class SessionStatsTracker:
     """
-    Tracks per-speaker real-time speech statistics and monologue streaks.
+    Tracks per-speaker real-time speech statistics, monologue streaks, and topic streaks.
     STREAK DEFINITION:
     Consecutive utterances by the same speaker where the gap between this utterance's
     start and the speaker's prior utterance end is < 5s AND no other user spoke in between.
@@ -95,6 +134,9 @@ class SessionStatsTracker:
         self.session_id = session_id or "default"
         self.speakers: Dict[str, SpeakerStats] = {}
         self.last_speaker_id: Optional[str] = None
+        self.primary_speaker_id: Optional[str] = None
+        self.topic_durations: Dict[str, float] = {}
+        self.topic_counts: Dict[str, int] = {}
 
     def get_speaker(self, speaker_id: str) -> Optional[SpeakerStats]:
         return self.speakers.get(str(speaker_id))
@@ -118,12 +160,13 @@ class SessionStatsTracker:
         speaker_name: Optional[str] = None,
         anger: Optional[Any] = None,
         anger_quote: Optional[str] = None,
-        classification: Optional[Dict[str, Any]] = None
+        classification: Optional[Dict[str, Any]] = None,
+        topic: Optional[str] = None
     ) -> SpeakerStats:
         """
         Records an utterance derived strictly from RMS speech-window timestamps.
         Never infers duration from WAV byte counts or transcript lengths.
-        Optionally records anger classification.
+        Optionally records anger classification and topic streak bridging.
         """
         spk_key = str(speaker_id)
         duration = max(0.0, speech_end - speech_start)
@@ -133,30 +176,88 @@ class SessionStatsTracker:
         stats.total_speak_seconds += duration
         stats.utterance_count += 1
 
-        # 2. Break active streaks for all OTHER speakers since this speaker spoke
-        for other_id, other_stats in self.speakers.items():
-            if other_id != spk_key:
-                other_stats.current_streak = 0.0
+        # 2. Extract and normalize topic
+        extracted_topic = topic
+        if extracted_topic is None and classification is not None:
+            extracted_topic = classification.get("topic")
 
-        # 3. Evaluate streak for the active speaker
-        another_user_spoke = (self.last_speaker_id is not None and self.last_speaker_id != spk_key)
-        gap = (speech_start - stats.last_utterance_end) if stats.last_utterance_end > 0 else float('inf')
+        norm_topic = extracted_topic.strip().lower() if extracted_topic is not None else ""
+        if extracted_topic is not None:
+            self.topic_durations[norm_topic] = self.topic_durations.get(norm_topic, 0.0) + duration
+            self.topic_counts[norm_topic] = self.topic_counts.get(norm_topic, 0) + 1
 
-        if not another_user_spoke and gap < 5.0 and stats.last_utterance_end > 0:
-            # Streak continues (e.g. 15s force-split continuation or short pause < 5s)
-            stats.current_streak += duration
-        else:
-            # New streak begins
+        is_null = (norm_topic in ("null_topic", "null", "none", "بدون موضوع", "")) if norm_topic else False
+
+        # Phase 3: Research-backed Schegloff (1982) listener backchannel rule:
+        # A listener's null_topic utterance (< 2.0s duration) is an acknowledgment,
+        # not floor-taking, and does NOT break the primary speaker's active monologue or topic streak.
+        is_listener_backchannel = (
+            self.primary_speaker_id is not None
+            and spk_key != self.primary_speaker_id
+            and is_null
+            and duration < 2.0
+        )
+
+        if is_listener_backchannel:
+            # Backchannel speaker gets speaker stats recorded, but does not take the floor
+            stats.last_utterance_end = speech_end
             stats.current_streak = duration
+            if stats.current_streak > stats.longest_streak_seconds:
+                stats.longest_streak_seconds = stats.current_streak
+            # Primary floor-holder's streaks remain untouched
+        else:
+            # Floor taken or held by spk_key
+            # Break active streaks for all OTHER speakers
+            for other_id, other_stats in self.speakers.items():
+                if other_id != spk_key:
+                    other_stats.current_streak = 0.0
+                    other_stats.current_topic = None
+                    other_stats.current_topic_streak = 0.0
 
-        # Update high-water mark
-        if stats.current_streak > stats.longest_streak_seconds:
-            stats.longest_streak_seconds = stats.current_streak
+            another_user_spoke = (self.primary_speaker_id is not None and self.primary_speaker_id != spk_key)
+            gap = (speech_start - stats.last_utterance_end) if stats.last_utterance_end > 0 else float('inf')
 
-        stats.last_utterance_end = speech_end
-        self.last_speaker_id = spk_key
+            # Evaluate monologue streak
+            if not another_user_spoke and gap < 5.0 and stats.last_utterance_end > 0:
+                stats.current_streak += duration
+            else:
+                stats.current_streak = duration
 
-        # 4. Pure Python anger episode tracking on top of classifier output
+            if stats.current_streak > stats.longest_streak_seconds:
+                stats.longest_streak_seconds = stats.current_streak
+
+            # Evaluate topic streak (Phase 3: SwDA streak bridging)
+            if extracted_topic is not None:
+                if is_null:
+                    # null_topic does NOT break a speaker's topic streak if gap < 5s and no floor change
+                    if another_user_spoke or gap >= 5.0:
+                        stats.current_topic = None
+                        stats.current_topic_streak = 0.0
+                    # Else: bridged! Topic remains unchanged, duration is EXCLUDED from topic streak seconds
+                else:
+                    if (
+                        not another_user_spoke
+                        and gap < 5.0
+                        and stats.current_topic == norm_topic
+                        and stats.current_topic_streak > 0
+                    ):
+                        # Same topic continued (even if bridged across intervening null_topic)
+                        stats.current_topic_streak += duration
+                    else:
+                        # New topic streak begins
+                        stats.current_topic = norm_topic
+                        stats.current_topic_streak = duration
+                        stats.topic_streak_count += 1
+
+                    if stats.current_topic_streak > stats.longest_topic_streak_seconds:
+                        stats.longest_topic_streak_seconds = stats.current_topic_streak
+                        stats.longest_topic = norm_topic
+
+            stats.last_utterance_end = speech_end
+            self.primary_speaker_id = spk_key
+            self.last_speaker_id = spk_key
+
+        # Anger tracking
         if classification is not None:
             stats.record_anger(timestamp=speech_end, anger=classification)
         elif anger is not None:
@@ -165,9 +266,44 @@ class SessionStatsTracker:
         logger.debug(
             f"[TalkStats] Speaker {spk_key} ({speaker_name}): dur={duration:.2f}s, "
             f"total={stats.total_speak_seconds:.2f}s, streak={stats.current_streak:.2f}s, "
-            f"longest={stats.longest_streak_seconds:.2f}s, angry_episodes={stats.angry_episodes}"
+            f"topic={stats.current_topic}, topic_streak={stats.current_topic_streak:.2f}s"
         )
         return stats
+
+    def get_topic_share(self) -> Dict[str, float]:
+        """
+        Documented formula (Taxonomy v2):
+        topic share = topical time in class k / total topical time.
+        null_topic is strictly excluded from the denominator.
+        """
+        topical_durations = {
+            t: d for t, d in self.topic_durations.items()
+            if t not in ("null_topic", "null", "none", "بدون موضوع", "")
+        }
+        total_topical_time = sum(topical_durations.values())
+        if total_topical_time <= 0:
+            return {}
+        return {
+            t: round((d / total_topical_time) * 100.0, 1)
+            for t, d in topical_durations.items()
+        }
+
+    def get_topical_coverage(self) -> float:
+        """
+        Documented formula (Taxonomy v2):
+        Topical coverage = topical_time / total_talk_time.
+        """
+        total_talk_time = sum(s.total_speak_seconds for s in self.speakers.values())
+        if total_talk_time <= 0:
+            total_talk_time = sum(self.topic_durations.values())
+        if total_talk_time <= 0:
+            return 0.0
+
+        topical_time = sum(
+            d for t, d in self.topic_durations.items()
+            if t not in ("null_topic", "null", "none", "بدون موضوع", "")
+        )
+        return round(topical_time / total_talk_time, 4)
 
     def record_anger(
         self,
@@ -190,3 +326,6 @@ class SessionStatsTracker:
         """Clears all session statistics."""
         self.speakers.clear()
         self.last_speaker_id = None
+        self.primary_speaker_id = None
+        self.topic_durations.clear()
+        self.topic_counts.clear()

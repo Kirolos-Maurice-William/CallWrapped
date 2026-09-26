@@ -231,7 +231,133 @@ class TestSpeakerTalkStatistics(unittest.TestCase):
         self.assertEqual(s.angry_episodes, 1)
         self.assertAlmostEqual(s.last_anger_time, 50.0, places=3)
 
+    def test_phase2_topic_share_excludes_null_topic_and_computes_coverage(self):
+        """
+        Phase 2 Acceptance:
+        - topic share percentage denominator EXCLUDES null_topic
+        - topic share = (topical time in class k) / (total topical time)
+        - Topical coverage = topical_time / total_talk_time
+        - All-null edge case yields empty share and 0.0 coverage
+        """
+        tracker = SessionStatsTracker(session_id="topic_share_test")
+
+        # 60s football, 40s tech, 20s null_topic (total 120s talk, 100s topical)
+        tracker.record_utterance("alice", 0.0, 60.0, "Alice", topic="football")
+        tracker.record_utterance("bob", 60.0, 100.0, "Bob", topic="tech")
+        tracker.record_utterance("alice", 100.0, 120.0, "Alice", topic="null_topic")
+
+        shares = tracker.get_topic_share()
+        self.assertIn("football", shares)
+        self.assertIn("tech", shares)
+        self.assertNotIn("null_topic", shares)
+        self.assertAlmostEqual(shares["football"], 60.0, places=1)
+        self.assertAlmostEqual(shares["tech"], 40.0, places=1)
+
+        coverage = tracker.get_topical_coverage()
+        self.assertAlmostEqual(coverage, 100.0 / 120.0, places=3)
+
+        # All-null edge case
+        empty_tracker = SessionStatsTracker(session_id="empty_share_test")
+        empty_tracker.record_utterance("alice", 0.0, 10.0, "Alice", topic="null_topic")
+        self.assertEqual(empty_tracker.get_topic_share(), {})
+        self.assertAlmostEqual(empty_tracker.get_topical_coverage(), 0.0)
+
+    def test_phase3_topic_streak_bridging_with_null_topic(self):
+        """
+        Phase 3 Acceptance (a):
+        - A speaker's null_topic utterance does NOT break their active topic streak if gap < 5s.
+        - Null duration is EXCLUDED from topic streak seconds, acting as a bridge.
+        - streak length += both topical utterances.
+        """
+        tracker = SessionStatsTracker(session_id="streak_bridge_test")
+
+        # Utterance 1: Alice speaks football 10s (0.0 -> 10.0)
+        s1 = tracker.record_utterance("alice", 0.0, 10.0, "Alice", topic="football")
+        self.assertEqual(s1.current_topic, "football")
+        self.assertAlmostEqual(s1.current_topic_streak, 10.0, places=3)
+        self.assertEqual(s1.topic_streak_count, 1)
+
+        # Utterance 2: Alice utters 'تمام' (null_topic, 1.2s: 11.0 -> 12.2, gap 1.0s < 5s)
+        s2 = tracker.record_utterance("alice", 11.0, 12.2, "Alice", topic="null_topic")
+        self.assertEqual(s2.current_topic, "football", "null_topic bridges topic streak")
+        self.assertAlmostEqual(s2.current_topic_streak, 10.0, places=3, msg="null duration is excluded from topic streak")
+        self.assertEqual(s2.topic_streak_count, 1)
+
+        # Utterance 3: Alice continues on football 8s (13.0 -> 21.0, gap 0.8s < 5s)
+        s3 = tracker.record_utterance("alice", 13.0, 21.0, "Alice", topic="football")
+        self.assertEqual(s3.current_topic, "football")
+        self.assertAlmostEqual(s3.current_topic_streak, 18.0, places=3, msg="10s + 8s topical speech")
+        self.assertAlmostEqual(s3.longest_topic_streak_seconds, 18.0, places=3)
+        self.assertEqual(s3.topic_streak_count, 1, "Must remain 1 continuous streak")
+
+    def test_phase3_listener_backchannel_does_not_break_floor_or_topic_streak(self):
+        """
+        Phase 3 Acceptance (b):
+        - Schegloff (1982) listener backchannel rule:
+          A listener's null_topic utterance (< 2.0s duration) does NOT break
+          the primary speaker's active monologue or topic streak.
+        """
+        tracker = SessionStatsTracker(session_id="listener_backchannel_test")
+
+        # 1. Alice speaks football 10s (0.0 -> 10.0)
+        tracker.record_utterance("alice", 0.0, 10.0, "Alice", topic="football")
+
+        # 2. Bob utters listener backchannel 'أيوة' (null_topic, 1.0s < 2.0s: 11.0 -> 12.0)
+        tracker.record_utterance("bob", 11.0, 12.0, "Bob", topic="null_topic")
+
+        # Alice's active streak should NOT be broken by listener's backchannel
+        alice_mid = tracker.get_speaker("alice")
+        self.assertEqual(alice_mid.current_topic, "football")
+        self.assertAlmostEqual(alice_mid.current_topic_streak, 10.0, places=3)
+        self.assertAlmostEqual(alice_mid.current_streak, 10.0, places=3)
+
+        # 3. Alice continues on football 6s (13.0 -> 19.0, gap 3.0s < 5s from Alice's 10.0s end)
+        s_alice_final = tracker.record_utterance("alice", 13.0, 19.0, "Alice", topic="football")
+        self.assertEqual(s_alice_final.current_topic, "football")
+        self.assertAlmostEqual(s_alice_final.current_streak, 16.0, places=3, msg="Monologue streak continues")
+        self.assertAlmostEqual(s_alice_final.current_topic_streak, 16.0, places=3, msg="Topic streak continues")
+        self.assertEqual(s_alice_final.topic_streak_count, 1)
+
+    def test_phase3_listener_substantive_speech_breaks_floor_and_topic_streak(self):
+        """
+        Phase 3 Acceptance (c):
+        - If listener B speaks a substantive line (non-null), the streak ends normally.
+        """
+        tracker = SessionStatsTracker(session_id="substantive_interruption_test")
+
+        # Alice speaks football 10s
+        tracker.record_utterance("alice", 0.0, 10.0, "Alice", topic="football")
+
+        # Bob takes floor with substantive speech (gaming, 4.0s)
+        tracker.record_utterance("bob", 11.0, 15.0, "Bob", topic="gaming")
+
+        alice = tracker.get_speaker("alice")
+        self.assertEqual(alice.current_streak, 0.0)
+        self.assertIsNone(alice.current_topic)
+        self.assertEqual(alice.current_topic_streak, 0.0)
+
+    def test_phase3_topic_switch_ends_topic_streak(self):
+        """
+        Phase 3 Acceptance (d):
+        - If speaker A switches to another topical class ('politics'), the streak ends normally.
+        """
+        tracker = SessionStatsTracker(session_id="topic_switch_test")
+
+        # Alice speaks football 10s
+        tracker.record_utterance("alice", 0.0, 10.0, "Alice", topic="football")
+
+        # Alice switches to politics 5s
+        tracker.record_utterance("alice", 11.0, 16.0, "Alice", topic="politics")
+
+        alice = tracker.get_speaker("alice")
+        self.assertEqual(alice.current_topic, "politics")
+        self.assertAlmostEqual(alice.current_topic_streak, 5.0, places=3)
+        self.assertEqual(alice.topic_streak_count, 2)
+        self.assertAlmostEqual(alice.longest_topic_streak_seconds, 10.0, places=3)
+        self.assertEqual(alice.longest_topic, "football")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

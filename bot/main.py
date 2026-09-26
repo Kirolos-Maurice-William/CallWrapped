@@ -410,14 +410,23 @@ def render_recap(session_state: Any) -> str:
     else:
         lines.append("\n😡 محدش عصب في المكالمة دي... كده مش طبيعي 😂")
 
-    # Section D: Top-3 topics with %
+    # Section D: Top-3 topics with % (Taxonomy v2: TOPICAL only, null_topic excluded)
     lines.append("\n🏷️ **أكتر مواضيع اتكلمتوا فيها:**")
-    total_topics_count = sum(topic_counts.values())
-    if total_topics_count > 0:
-        top_3 = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:3]
+    topical_counts = {t: c for t, c in topic_counts.items() if t not in ("null_topic", "null", "none", "بدون موضوع")}
+    null_count = topic_counts.get("null_topic", 0) + topic_counts.get("null", 0) + topic_counts.get("بدون موضوع", 0)
+    total_topical_count = sum(topical_counts.values())
+    total_all_count = total_topical_count + null_count
+    coverage_pct = (total_topical_count / total_all_count * 100.0) if total_all_count > 0 else 0.0
+
+    if total_topical_count > 0:
+        top_3 = sorted(topical_counts.items(), key=lambda x: x[1], reverse=True)[:3]
         for rank, (top_name, top_cnt) in enumerate(top_3, 1):
-            t_pct = (top_cnt / total_topics_count) * 100.0
+            t_pct = (top_cnt / total_topical_count) * 100.0
             lines.append(f"{rank}. **{top_name}**: {t_pct:.1f}% ({top_cnt})")
+        if null_count > 0:
+            lines.append(f"ℹ️ نسبة التغطية الموضوعية: {coverage_pct:.1f}% (مستبعد {null_count} جمل بدون موضوع)")
+    elif null_count > 0:
+        lines.append(f"مفيش مواضيع مسجلة (كل الكلام كان دردشة/تنسيق بدون موضوع - {null_count} جمل).")
     else:
         lines.append("مفيش مواضيع مسجلة لسه.")
 
