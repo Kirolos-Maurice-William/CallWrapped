@@ -5,7 +5,6 @@ import threading
 import subprocess
 from pathlib import Path
 from typing import Optional, Any
-import inspect
 import aiohttp
 import discord
 import edge_tts
@@ -331,10 +330,7 @@ class InterventionSpeaker:
                         return _mock_save_stream()
                     if callable(stream_attr):
                         return stream_attr()
-                    async def _empty():
-                        if False:
-                            yield {}
-                    return _empty()
+                    return stream_attr
 
                 # Clause 1 Stream
                 comm1 = edge_tts.Communicate(

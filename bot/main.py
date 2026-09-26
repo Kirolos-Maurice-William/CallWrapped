@@ -155,6 +155,7 @@ def build_privacy_notice_text() -> str:
     return (
         "يقوم البوت بتحليل المكالمة لحظياً (وقت التحدث، المواضيع، نوبات الإحباط، "
         "والتحقق من الحقائق عبر البحث المباشر على الويب). "
+        "يتم معالجة الصوت داخل الذاكرة فقط إلا في حال تفعيل وضع الالتقاط صراحةً من قبل المشرفين (!start-capture). "
         "لا يتم حفظ أو تخزين أي تسجيلات صوتية أو نصوص بعد انتهاء الجلسة."
     )
 
@@ -558,7 +559,8 @@ def build_privacy_embed() -> discord.Embed:
         description=(
             "**كيف يتعامل البوت مع بياناتك الصوتية؟**\n\n"
             "• 🎙️ **تحليل لحظي فقط:** يتم تحليل الصوت في الذاكرة الحية المؤقتة فقط (RAM) "
-            "لحساب وقت التحدث، تصنيف المواضيع، رصد نوبات الإحباط، والتحقق الفوري من المعلومات المتناقضة عبر الويب.\n\n"
+            "لحساب وقت التحدث، تصنيف المواضيع، رصد نوبات الإحباط، والتحقق الفوري من المعلومات المتناقضة عبر الويب. "
+            "يتم معالجة الصوت داخل الذاكرة المؤقتة فقط (in-memory) إلا في حال تفعيل وضع الالتقاط صراحةً بواسطة المشرفين (`!start-capture`).\n\n"
             "• 🗑️ **انعدام التخزين الدائم:** لا يتم حفظ أو تخزين أي تسجيلات صوتية أو نصوص محادثات بعد انتهاء الجلسة. "
             "بمجرد مغادرة القناة الصوتية (`!leave`) أو إعادة التعيين (`!clear`)، تُحذف جميع بيانات الجلسة فوراً.\n\n"
             "• ⚠️ **تنويه نوبات الإحباط:** استنتاج المشاعر ونوبات الإحباط هو تقدير آلي (Automated AI Inference) "
@@ -570,6 +572,7 @@ def build_privacy_embed() -> discord.Embed:
         name="🛡️ Privacy Summary (EN)",
         value=(
             "• **Live Analysis Only**: Real-time processing of talk time, topics, frustration signals, and web fact-checking.\n"
+            "• **In-Memory Processing**: Audio is processed strictly in-memory unless capture mode is explicitly enabled by admins (!start-capture).\n"
             "• **Zero Retention**: All recordings and transcripts are permanently cleared when the session ends (`!leave` or `!clear`).\n"
             "• **Emotion Disclaimer**: Frustration/anger detection is an automated AI inference that may be mistaken or imprecise."
         ),

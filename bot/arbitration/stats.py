@@ -186,21 +186,6 @@ class SessionStatsTracker:
         stats.record_anger(timestamp=timestamp, anger=anger, quote=anger_quote)
         return stats
 
-    def record_classification(
-        self,
-        speaker_id: str,
-        timestamp: float,
-        classification: Dict[str, Any],
-        speaker_name: Optional[str] = None
-    ) -> SpeakerStats:
-        """
-        Convenience method to record classifier output directly.
-        """
-        spk_key = str(speaker_id)
-        stats = self.get_or_create_speaker(spk_key, speaker_name)
-        stats.record_anger(timestamp=timestamp, anger=classification)
-        return stats
-
     def reset(self):
         """Clears all session statistics."""
         self.speakers.clear()

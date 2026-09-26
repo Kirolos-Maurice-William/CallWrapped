@@ -214,20 +214,20 @@ class TestSpeakerTalkStatistics(unittest.TestCase):
 
         # 1. Angry classification via dict
         c1 = {"anger": "mild", "anger_evidence": "زهقت خلاص", "topic": "gaming", "is_factual_claim": False}
-        s = tracker.record_classification("player1", timestamp=10.0, classification=c1)
+        s = tracker.record_anger("player1", timestamp=10.0, anger=c1)
         self.assertEqual(s.angry_episodes, 1)
         self.assertAlmostEqual(s.last_anger_time, 10.0, places=3)
         self.assertEqual(s.first_anger_quote, "زهقت خلاص")
 
         # 2. Neutral utterance at t=30.0s (anger='none')
         c2 = {"anger": "none", "anger_evidence": None, "topic": "other", "is_factual_claim": False}
-        s = tracker.record_classification("player1", timestamp=30.0, classification=c2)
+        s = tracker.record_anger("player1", timestamp=30.0, anger=c2)
         self.assertEqual(s.angry_episodes, 1)
         self.assertAlmostEqual(s.last_anger_time, 10.0, places=3)  # last_anger_time untouched
 
         # 3. Second angry utterance at t=50.0s (within 90s of t=10.0s -> continues episode 1)
         c3 = {"anger": "high", "anger_evidence": "حرام كدة بجد", "topic": "gaming", "is_factual_claim": False}
-        s = tracker.record_classification("player1", timestamp=50.0, classification=c3)
+        s = tracker.record_anger("player1", timestamp=50.0, anger=c3)
         self.assertEqual(s.angry_episodes, 1)
         self.assertAlmostEqual(s.last_anger_time, 50.0, places=3)
 

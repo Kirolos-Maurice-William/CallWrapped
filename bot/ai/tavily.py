@@ -139,8 +139,8 @@ class TavilyClient:
                             "snippet": abstract,
                             "source_tier": 2
                         }], latency_ms
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"⚠️ [Tavily] Search query failed: {e}")
 
         return [], int((time.perf_counter() - t0) * 1000)
 

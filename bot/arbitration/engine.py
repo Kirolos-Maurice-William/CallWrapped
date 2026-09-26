@@ -133,7 +133,6 @@ class SessionState:
         self.last_analytics_flush: float = time.time()
         self._topic_counts: Dict[str, int] = {}
         self._flush_lock = asyncio.Lock()
-        self._is_sync_flushing: bool = False
         self.analytics_timer_task: Optional[asyncio.Task] = None
         self.pending_offer: Optional[PendingOffer] = None
         self.last_offer_time: float = 0.0
@@ -279,36 +278,6 @@ class ArbitrationEngine:
             session.last_analytics_flush = time.time()
 
             self._apply_batch_results(session, guild_id, buffer_to_process, results, tokens, reason)
-
-    def flush_analytics_sync(self, guild_id: int, reason: str = "sync_flush"):
-        """
-        Batched Path (sync): Synchronously flushes pending buffer before !recap rendering or session end.
-        On failure or 429: retries once, then KEEPS the buffer.
-        """
-        session = self.get_session(guild_id)
-        if not session.analytics_buffer:
-            return
-
-        if session._is_sync_flushing:
-            return
-        session._is_sync_flushing = True
-        try:
-            buffer_to_process = list(session.analytics_buffer)
-            try:
-                results, tokens, latency_ms = claim_detector.batch_classify_sync(buffer_to_process)
-            except Exception as e:
-                logger.warning(
-                    f"⚠️ [BatchAnalytics Sync] Batch classification failed after retry: {e}. "
-                    f"Keeping {len(buffer_to_process)} buffered items for next window."
-                )
-                return
-
-            session.analytics_buffer = session.analytics_buffer[len(buffer_to_process):]
-            session.last_analytics_flush = time.time()
-
-            self._apply_batch_results(session, guild_id, buffer_to_process, results, tokens, reason)
-        finally:
-            session._is_sync_flushing = False
 
     def _apply_batch_results(
         self,
@@ -876,7 +845,6 @@ class ArbitrationEngine:
 
             confidence = assessment.get("confidence", 95)
             spoken_text = assessment.get("spoken_intervention", "")
-            correct_fact = assessment.get("correct_fact", "")
             source_url = assessment.get("selected_source_url", "")
             source_title = assessment.get("selected_source_title", "Official Source")
             evidence_strength = assessment.get("evidence_strength", "HIGH")
@@ -900,7 +868,7 @@ class ArbitrationEngine:
             session.verified_claims_count += 1
 
             # Step C: Speak verdict via TTS (the ONLY path that speaks)
-            fact_clause = assessment.get("fact_clause") or spoken_text
+            fact_clause = assessment.get("fact_clause") or assessment.get("correct_fact") or spoken_text
             hedge_clause = assessment.get("hedge_clause") or ""
 
             # Check warm session
@@ -948,7 +916,7 @@ class ArbitrationEngine:
                     embed = discord.Embed(
                         title="⚖️ Verified Factual Arbitration",
                         description=(
-                            f"📢 **{correct_fact}**\n\n"
+                            f"📢 **{fact_clause}**\n\n"
                             f"{comp_text}"
                             f"• **{offer.speaker_a}:** `{spk_a_status}`\n"
                             f"• **{offer.speaker_b}:** `{spk_b_status}`\n\n"
@@ -990,7 +958,7 @@ class ArbitrationEngine:
                     "status": assessment.get("status", "CONTRADICTED"),
                     "confidence": confidence,
                     "evidence_strength": evidence_strength,
-                    "correct_fact": correct_fact,
+                    "correct_fact": fact_clause,
                     "speaker_a": offer.speaker_a,
                     "claim_a": offer.claim_a,
                     "speaker_a_status": spk_a_status,
