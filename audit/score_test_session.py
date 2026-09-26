@@ -179,6 +179,32 @@ async def score_session(
         if cp_id:
             claim_pairs.setdefault(cp_id, []).append(record)
 
+    # Step 1c-ii: Production Batched Classifier for Topic and Anger
+    if scored_records:
+        try:
+            batch_utterances = [
+                {"speaker_name": r["speaker"], "text": r["asr_text"]}
+                for r in scored_records
+            ]
+            batch_results, batch_tokens, batch_ms = await claim_detector.batch_classify(batch_utterances)
+            for r, b_res in zip(scored_records, batch_results):
+                b_topic = (b_res.get("topic") or "other").strip().lower()
+                b_anger = (b_res.get("anger") or "none").strip().lower()
+                r["model_topic"] = b_topic
+                r["model_anger"] = b_anger
+                r["anger_evidence"] = b_res.get("anger_evidence", "")
+                # Update matches with production predictions
+                h_top = r["human_topic"]
+                r["topic_match"] = bool(h_top and (h_top == b_topic or (h_top in ("sports", "football") and b_topic in ("sports", "football"))))
+                exact_anger = (b_anger == r["human_anger"])
+                both_angry = (b_anger in ("mild", "high") and r["human_anger"] in ("mild", "high"))
+                r["anger_match"] = exact_anger or both_angry
+                r["exact_anger"] = exact_anger
+                r["both_angry"] = both_angry
+                r["false_anger"] = (r["human_anger"] in ("none", "") and b_anger in ("mild", "high"))
+        except Exception as e:
+            logger.warning(f"⚠️ [Batch Analytics] Batched classifier unavailable ({e}), using instant/heuristic.")
+
     # Step 1d: Contradiction pair referee gate firing check
     referee_checks: List[Dict[str, Any]] = []
     for cp_id, pair_records in claim_pairs.items():
@@ -219,7 +245,7 @@ async def score_session(
 
     total_ref_nums = sum(r["ref_num_count"] for r in scored_records)
     total_matched_nums = sum(r["num_matches"] for r in scored_records)
-    num_accuracy = (total_matched_nums / total_ref_nums * 100.0) if total_ref_nums > 0 else 100.0
+    num_accuracy = (total_matched_nums / total_ref_nums * 100.0) if total_ref_nums > 0 else 0.0
 
     topic_matches = sum(1 for r in scored_records if r["topic_match"])
     topic_acc = (topic_matches / n_scored * 100.0) if n_scored > 0 else 0.0
@@ -239,6 +265,8 @@ async def score_session(
         "labels_file": csv_file.name,
         "total_rows": len(rows),
         "scored_count": n_scored,
+        "clean_count": len(clean_records),
+        "loud_count": len(loud_records),
         "skipped_count": len(skipped_records),
         "overall_wer": micro_wer,
         "micro_wer": micro_wer,
@@ -255,6 +283,8 @@ async def score_session(
         "topic_accuracy_pct": topic_acc,
         "claim_agreement_pct": claim_acc,
         "anger_agreement_pct": anger_acc,
+        "human_none_anger_count": len(human_none_anger),
+        "false_anger_count": false_anger_count,
         "false_anger_rate_pct": false_anger_rate,
         "referee_pairs_evaluated": len(referee_checks),
         "referee_pairs_fired": sum(1 for p in referee_checks if p["referee_fired"]),
@@ -286,27 +316,79 @@ def render_markdown_report(summary: Dict[str, Any]) -> str:
     md.append("## 1. Executive Metric Summary\n")
     md.append("| Metric | Result | Target Benchmark | Status |")
     md.append("|---|---|---|---|")
-    md.append(f"| **Micro WER (Corpus)** | **{summary['micro_wer'] * 100:.2f}%** | Beat 30.8% baseline | {'✅ PASS' if summary['micro_wer'] < 0.308 else '⚠️ REVIEW'} |")
-    md.append(f"| **Macro WER (Clip Avg)** | **{summary['macro_wer'] * 100:.2f}%** | Informational | — |")
-    md.append(f"| **Clean Audio Micro WER** | **{summary['clean_micro_wer'] * 100:.2f}%** | Beat 25.1% baseline | {'✅ PASS' if summary['clean_micro_wer'] < 0.251 else '⚠️ REVIEW'} |")
-    md.append(f"| **Clean Audio Macro WER** | **{summary['clean_macro_wer'] * 100:.2f}%** | Informational | — |")
-    md.append(f"| **Number Accuracy** | **{summary['number_accuracy_pct']:.1f}%** ({summary['matched_numbers']}/{summary['total_ref_numbers']}) | ≥ 90% | {'✅ PASS' if summary['number_accuracy_pct'] >= 90.0 else '⚠️ REVIEW'} |")
-    md.append(f"| **Topic Classification** | **{summary['topic_accuracy_pct']:.1f}%** | ≥ 80% | {'✅ PASS' if summary['topic_accuracy_pct'] >= 80.0 else '⚠️ REVIEW'} |")
-    md.append(f"| **Claim Agreement** | **{summary['claim_agreement_pct']:.1f}%** | ≥ 75% | {'✅ PASS' if summary['claim_agreement_pct'] >= 75.0 else '⚠️ REVIEW'} |")
-    md.append(f"| **Anger Agreement** | **{summary['anger_agreement_pct']:.1f}%** | Tolerance (mild/high) | {'✅ PASS' if summary['anger_agreement_pct'] >= 70.0 else '⚠️ REVIEW'} |")
-    md.append(f"| **False-Anger Rate** | **{summary['false_anger_rate_pct']:.1f}%** | ≤ 15% | {'✅ PASS' if summary['false_anger_rate_pct'] <= 15.0 else '⚠️ REVIEW'} |")
+
+    # 0-denominator safe metrics rendering
+    if summary["scored_count"] > 0:
+        micro_res = f"**{summary['micro_wer'] * 100:.2f}%**"
+        micro_status = "✅ PASS" if summary["micro_wer"] < 0.308 else "⚠️ REVIEW"
+        macro_res = f"**{summary['macro_wer'] * 100:.2f}%**"
+        macro_status = "—"
+        topic_res = f"**{summary['topic_accuracy_pct']:.1f}%**"
+        topic_status = "✅ PASS" if summary["topic_accuracy_pct"] >= 80.0 else "⚠️ REVIEW"
+        claim_res = f"**{summary['claim_agreement_pct']:.1f}%**"
+        claim_status = "✅ PASS" if summary["claim_agreement_pct"] >= 75.0 else "⚠️ REVIEW"
+        anger_res = f"**{summary['anger_agreement_pct']:.1f}%**"
+        anger_status = "✅ PASS" if summary["anger_agreement_pct"] >= 70.0 else "⚠️ REVIEW"
+    else:
+        micro_res = "n/a (0 samples)"
+        micro_status = "—"
+        macro_res = "n/a (0 samples)"
+        macro_status = "—"
+        topic_res = "n/a (0 samples)"
+        topic_status = "—"
+        claim_res = "n/a (0 samples)"
+        claim_status = "—"
+        anger_res = "n/a (0 samples)"
+        anger_status = "—"
+
+    if summary["clean_count"] > 0:
+        clean_micro_res = f"**{summary['clean_micro_wer'] * 100:.2f}%**"
+        clean_micro_status = "✅ PASS" if summary["clean_micro_wer"] < 0.251 else "⚠️ REVIEW"
+        clean_macro_res = f"**{summary['clean_macro_wer'] * 100:.2f}%**"
+        clean_macro_status = "—"
+    else:
+        clean_micro_res = "n/a (0 samples)"
+        clean_micro_status = "—"
+        clean_macro_res = "n/a (0 samples)"
+        clean_macro_status = "—"
+
+    if summary["total_ref_numbers"] > 0:
+        num_res = f"**{summary['number_accuracy_pct']:.1f}%** ({summary['matched_numbers']}/{summary['total_ref_numbers']})"
+        num_status = "✅ PASS" if summary["number_accuracy_pct"] >= 90.0 else "⚠️ REVIEW"
+    else:
+        num_res = "n/a (0 samples)"
+        num_status = "—"
+
+    if summary["human_none_anger_count"] > 0:
+        fa_res = f"**{summary['false_anger_rate_pct']:.1f}%** ({summary['false_anger_count']}/{summary['human_none_anger_count']})"
+        fa_status = "✅ PASS" if summary["false_anger_rate_pct"] <= 15.0 else "⚠️ REVIEW"
+    else:
+        fa_res = "n/a (0 samples)"
+        fa_status = "—"
+
+    md.append(f"| **Micro WER (Corpus)** | {micro_res} | Beat 30.8% baseline | {micro_status} |")
+    md.append(f"| **Macro WER (Clip Avg)** | {macro_res} | Informational | {macro_status} |")
+    md.append(f"| **Clean Audio Micro WER** | {clean_micro_res} | Beat 25.1% baseline | {clean_micro_status} |")
+    md.append(f"| **Clean Audio Macro WER** | {clean_macro_res} | Informational | {clean_macro_status} |")
+    md.append(f"| **Number Accuracy** | {num_res} | ≥ 90% | {num_status} |")
+    md.append(f"| **Topic Classification** | {topic_res} | ≥ 80% | {topic_status} |")
+    md.append(f"| **Claim Agreement** | {claim_res} | ≥ 75% | {claim_status} |")
+    md.append(f"| **Anger Agreement** | {anger_res} | Tolerance (mild/high) | {anger_status} |")
+    md.append(f"| **False-Anger Rate** | {fa_res} | ≤ 15% | {fa_status} |")
     md.append(f"| **Scored Clips** | **{summary['scored_count']}** | Non-empty reference | ✅ COMPLETE |")
     md.append(f"| **Skipped Clips** | **{summary['skipped_count']}** | Empty reference | ℹ️ EXCLUDED |\n")
 
     # Contradiction Pairs section
+    md.append("## 2. Contradiction Pairs & Referee Gate Triggers\n")
     if summary["referee_checks"]:
-        md.append("## 2. Contradiction Pairs & Referee Gate Triggers\n")
         md.append("| Pair ID | Speaker A | Claim A | Speaker B | Claim B | Referee Triggered? |")
         md.append("|---|---|---|---|---|---|")
         for p in summary["referee_checks"]:
             trig_icon = "⚔️ **YES (Offer Fired)**" if p["referee_fired"] else "🛑 NO (Filtered/Suppressed)"
             md.append(f"| `{p['pair_id']}` | {p['speaker_a']} | {p['claim_a']} | {p['speaker_b']} | {p['claim_b']} | {trig_icon} |")
         md.append("\n")
+    else:
+        md.append("*0 pairs evaluated (no contradiction claim_pair labeled in session).*\n")
 
     # Full Per-Clip Table
     md.append("## 3. Detailed Per-Clip Scoring Table\n")

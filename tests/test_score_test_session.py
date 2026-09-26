@@ -60,8 +60,7 @@ class TestScoreTestSession(unittest.IsolatedAsyncioTestCase):
                 "topic": "sports",
                 "is_claim": "no",
                 "anger": "none",
-                "loud": "normal",
-                "claim_pair": ""
+                "loud": "normal"
             },
             {
                 "clip_id": "clip_002",
@@ -72,8 +71,7 @@ class TestScoreTestSession(unittest.IsolatedAsyncioTestCase):
                 "topic": "other",
                 "is_claim": "no",
                 "anger": "none",
-                "loud": "normal",
-                "claim_pair": ""
+                "loud": "normal"
             },
             {
                 "clip_id": "clip_003",
@@ -84,8 +82,7 @@ class TestScoreTestSession(unittest.IsolatedAsyncioTestCase):
                 "topic": "movies",
                 "is_claim": "no",
                 "anger": "none",
-                "loud": "normal",
-                "claim_pair": ""
+                "loud": "normal"
             },
             {
                 "clip_id": "clip_004",
@@ -96,8 +93,7 @@ class TestScoreTestSession(unittest.IsolatedAsyncioTestCase):
                 "topic": "",
                 "is_claim": "",
                 "anger": "",
-                "loud": "",
-                "claim_pair": ""
+                "loud": ""
             }
         ]
 
@@ -142,6 +138,11 @@ class TestScoreTestSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(post_rows), 4)
         self.assertEqual(post_rows[3]["correct_text"], "")
         self.assertEqual(post_rows[0]["correct_text"], rows[0]["correct_text"])
+
+        # (e) Missing claim_pair column tolerance & 0-denominator metrics check:
+        self.assertEqual(summary["referee_pairs_evaluated"], 0)
+        self.assertIn("0 pairs evaluated", md_text)
+        self.assertIn("Number Accuracy", md_text)
 
         print("\n" + "=" * 65)
         print("=== SCR-01 ACCEPTANCE: STEP 9 SCORER REPORT ===")
