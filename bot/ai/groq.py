@@ -58,13 +58,10 @@ class KeyPool:
 
     def _init_pool(self):
         candidates = [
-            ("key#1", getattr(config, "GROQ_API_KEY", "")),
-            ("key#2", getattr(config, "GROQ_API_KEY_2", "")),
-            ("key#3", getattr(config, "GROQ_API_KEY_3", "")),
-            ("key#4", getattr(config, "GROQ_API_KEY_4", ""))
+            ("key#1", getattr(config, "GROQ_API_KEY", "") or os.getenv("GROQ_API_KEY", "")),
         ]
-        # Dynamically discover any higher keys (e.g. GROQ_API_KEY_5, etc.)
-        i = 5
+        # Dynamically discover all secondary keys: GROQ_API_KEY_2, GROQ_API_KEY_3, ...
+        i = 2
         while True:
             extra_key = getattr(config, f"GROQ_API_KEY_{i}", "") or os.getenv(f"GROQ_API_KEY_{i}", "")
             if not extra_key or not extra_key.strip():
@@ -80,6 +77,13 @@ class KeyPool:
                     "remaining_tokens": 100000,
                     "reset_time": 0.0
                 })
+
+    def remove_key(self, key_id: str, reason: str = "invalid (401)"):
+        """Permanently removes an invalid key from the pool for the remainder of the session."""
+        before_count = len(self.keys)
+        self.keys = [k for k in self.keys if k["id"] != key_id]
+        if len(self.keys) < before_count:
+            logger.warning(f"⚠️ [GroqClient] {key_id} {reason} — removed from pool ({len(self.keys)} keys remaining)")
 
     def select_key(self) -> Optional[Dict[str, Any]]:
         """Selects the key with MORE remaining tokens, respecting cool-down."""
@@ -116,7 +120,10 @@ class KeyPool:
         return min(others, key=lambda k: k["reset_time"])
 
     def update_headers(self, key_entry: Dict[str, Any], headers: httpx.Headers, status_code: int = 200):
-        """Updates remaining tokens and reset time from response headers."""
+        """Updates remaining tokens and reset time from response headers, or removes invalid keys."""
+        if status_code in (401, 403):
+            self.remove_key(key_entry["id"], reason=f"invalid ({status_code})")
+            return
         if status_code == 429:
             key_entry["remaining_tokens"] = 0
             return
@@ -180,18 +187,21 @@ class GroqClient:
                 resp = await client.post(self.url, headers=headers, json=payload)
                 self.pool.update_headers(k, resp.headers, resp.status_code)
 
-                # HTTP 429: Immediately retry with other keys in pool
+                # HTTP 429 / 401 / 403: Immediately retry with other keys in pool
                 attempted_ids = {k["id"]}
-                while resp.status_code == 429:
-                    wait_sec = parse_reset_duration(
-                        resp.headers.get("retry-after") or
-                        resp.headers.get("x-ratelimit-reset-tokens")
-                    )
-                    k["remaining_tokens"] = 0
-                    k["reset_time"] = time.time() + wait_sec
+                while resp.status_code in (401, 403, 429):
+                    if resp.status_code == 429:
+                        wait_sec = parse_reset_duration(
+                            resp.headers.get("retry-after") or
+                            resp.headers.get("x-ratelimit-reset-tokens")
+                        )
+                        k["remaining_tokens"] = 0
+                        k["reset_time"] = time.time() + wait_sec
 
                     k_next = self.pool.get_other_key(k, excluded_ids=attempted_ids)
                     if k_next:
+                        prev_id = k["id"]
+                        prev_status = resp.status_code
                         attempted_ids.add(k_next["id"])
                         headers_next = {
                             "Authorization": f"Bearer {k_next['key']}",
@@ -201,7 +211,7 @@ class GroqClient:
                         self.pool.update_headers(k_next, resp_next.headers, resp_next.status_code)
 
                         if resp_next.status_code == 200:
-                            logger.info(f"🔄 [{k['id']} 429 → {k_next['id']} retry ok]")
+                            logger.info(f"🔄 [{prev_id} {prev_status} → {k_next['id']} retry ok]")
                             resp = resp_next
                             k = k_next
                             break
@@ -226,7 +236,7 @@ class GroqClient:
                         )
                         latency_ms = int((time.perf_counter() - t0) * 1000)
                         return None, {}, latency_ms
-                    elif sleep_wait > 0:
+                    elif sleep_wait > 0 and self.pool.keys:
                         logger.warning(f"⚠️ [GroqClient] {keys_label} hit 429. Waiting {sleep_wait:.2f}s reset...")
                         await asyncio.sleep(sleep_wait)
                         k_best = min(self.pool.keys, key=lambda x: x["reset_time"])
@@ -313,18 +323,21 @@ class GroqClient:
                 resp = client.post(self.url, headers=headers, json=payload)
                 self.pool.update_headers(k, resp.headers, resp.status_code)
 
-                # HTTP 429: Immediately retry with other keys in pool
+                # HTTP 429 / 401 / 403: Immediately retry with other keys in pool
                 attempted_ids = {k["id"]}
-                while resp.status_code == 429:
-                    wait_sec = parse_reset_duration(
-                        resp.headers.get("retry-after") or
-                        resp.headers.get("x-ratelimit-reset-tokens")
-                    )
-                    k["remaining_tokens"] = 0
-                    k["reset_time"] = time.time() + wait_sec
+                while resp.status_code in (401, 403, 429):
+                    if resp.status_code == 429:
+                        wait_sec = parse_reset_duration(
+                            resp.headers.get("retry-after") or
+                            resp.headers.get("x-ratelimit-reset-tokens")
+                        )
+                        k["remaining_tokens"] = 0
+                        k["reset_time"] = time.time() + wait_sec
 
                     k_next = self.pool.get_other_key(k, excluded_ids=attempted_ids)
                     if k_next:
+                        prev_id = k["id"]
+                        prev_status = resp.status_code
                         attempted_ids.add(k_next["id"])
                         headers_next = {
                             "Authorization": f"Bearer {k_next['key']}",
@@ -333,7 +346,7 @@ class GroqClient:
                         resp_next = client.post(self.url, headers=headers_next, json=payload)
                         self.pool.update_headers(k_next, resp_next.headers, resp_next.status_code)
                         if resp_next.status_code == 200:
-                            logger.info(f"🔄 [{k['id']} 429 → {k_next['id']} retry ok]")
+                            logger.info(f"🔄 [{prev_id} {prev_status} → {k_next['id']} retry ok]")
                             resp = resp_next
                             k = k_next
                             break
@@ -358,7 +371,7 @@ class GroqClient:
                         )
                         latency_ms = int((time.perf_counter() - t0) * 1000)
                         return None, {}, latency_ms
-                    elif sleep_wait > 0:
+                    elif sleep_wait > 0 and self.pool.keys:
                         time.sleep(sleep_wait)
                         k_best = min(self.pool.keys, key=lambda x: x["reset_time"])
                         h_best = {"Authorization": f"Bearer {k_best['key']}", "Content-Type": "application/json"}

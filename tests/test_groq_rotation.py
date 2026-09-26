@@ -160,6 +160,114 @@ class TestGroqRotation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tokens.get("key_id"), "key#3", "Tokens must report key#3 as the key that finished the request")
         print("[PROOF VERIFIED] key#1 429 → key#2 429 → key#3 retry ok\n")
 
+    async def test_mocked_401_invalid_key_cascade_and_removal(self):
+        """
+        Part A3: Unit test with 401 Unauthorized on key#1.
+        Proves key#1 is removed permanently from pool and request cascades to key#2.
+        Asserts key#1 removed, call sequence is key#1 -> key#2, key#2 succeeds.
+        """
+        print("\n" + "=" * 70)
+        print("=== PART A3: UNIT TEST - MOCKED 401 INVALID KEY CASCADE & REMOVAL ===")
+        print("=" * 70)
+
+        client = GroqClient()
+        client.pool.keys = [
+            {"id": "key#1", "key": "dummy_bad_key_1", "remaining_tokens": 100000, "reset_time": 0.0},
+            {"id": "key#2", "key": "dummy_good_key_2", "remaining_tokens": 100000, "reset_time": 0.0}
+        ]
+
+        call_log = []
+
+        async def mock_post(url, headers, json):
+            auth_header = headers.get("Authorization", "")
+            if "dummy_bad_key_1" in auth_header:
+                call_log.append("key#1")
+                req = httpx.Request("POST", url)
+                return httpx.Response(401, request=req, text='{"error": {"message": "Invalid API Key"}}')
+            elif "dummy_good_key_2" in auth_header:
+                call_log.append("key#2")
+                req = httpx.Request("POST", url)
+                h = httpx.Headers({"x-ratelimit-remaining-tokens": "98000"})
+                resp_json = {
+                    "choices": [{
+                        "message": {
+                            "content": '{"is_factual_claim": true, "claim": "Cascaded After 401", "entity": "AuthTest", "metric": "1"}'
+                        }
+                    }],
+                    "usage": {"prompt_tokens": 40, "completion_tokens": 15}
+                }
+                import json as json_lib
+                return httpx.Response(200, request=req, headers=h, text=json_lib.dumps(resp_json))
+            raise ValueError(f"Unexpected key in auth header: {auth_header}")
+
+        with patch("httpx.AsyncClient.post", side_effect=mock_post):
+            with self.assertLogs("GroqClient", level="WARNING") as log_cm:
+                messages = [{"role": "user", "content": "Test prompt"}]
+                parsed, tokens, latency_ms = await client.complete_chat(messages)
+
+        print(f"Call sequence: {' -> '.join(call_log)}")
+        print(f"Remaining keys in pool: {[k['id'] for k in client.pool.keys]}")
+
+        self.assertEqual(call_log, ["key#1", "key#2"])
+        self.assertIsNotNone(parsed)
+        self.assertEqual(tokens.get("key_id"), "key#2")
+        # Ensure key#1 is completely removed from pool
+        self.assertEqual([k["id"] for k in client.pool.keys], ["key#2"])
+        # Ensure log message matches requirement: "key#N invalid (401) — removed from pool"
+        self.assertTrue(any("key#1 invalid (401) — removed from pool" in record for record in log_cm.output),
+                        f"Expected log message not found in {log_cm.output}")
+        print("[PROOF VERIFIED] key#1 invalid (401) — removed from pool, cascaded to key#2\n")
+
+    def test_mocked_401_sync_cascade_and_removal(self):
+        """
+        Part A4: Unit test with 401 Unauthorized in sync path.
+        """
+        print("\n" + "=" * 70)
+        print("=== PART A4: UNIT TEST - MOCKED 401 SYNC CASCADE & REMOVAL ===")
+        print("=" * 70)
+
+        client = GroqClient()
+        client.pool.keys = [
+            {"id": "key#1", "key": "dummy_bad_key_1", "remaining_tokens": 100000, "reset_time": 0.0},
+            {"id": "key#2", "key": "dummy_good_key_2", "remaining_tokens": 100000, "reset_time": 0.0}
+        ]
+
+        call_log = []
+
+        def mock_post(url, headers, json):
+            auth_header = headers.get("Authorization", "")
+            if "dummy_bad_key_1" in auth_header:
+                call_log.append("key#1")
+                req = httpx.Request("POST", url)
+                return httpx.Response(401, request=req, text='{"error": {"message": "Invalid API Key"}}')
+            elif "dummy_good_key_2" in auth_header:
+                call_log.append("key#2")
+                req = httpx.Request("POST", url)
+                h = httpx.Headers({"x-ratelimit-remaining-tokens": "98000"})
+                resp_json = {
+                    "choices": [{
+                        "message": {
+                            "content": '{"sync_ok": true}'
+                        }
+                    }],
+                    "usage": {"prompt_tokens": 30, "completion_tokens": 10}
+                }
+                import json as json_lib
+                return httpx.Response(200, request=req, headers=h, text=json_lib.dumps(resp_json))
+            raise ValueError(f"Unexpected key in auth header: {auth_header}")
+
+        with patch("httpx.Client.post", side_effect=mock_post):
+            with self.assertLogs("GroqClient", level="WARNING") as log_cm:
+                messages = [{"role": "user", "content": "Sync test prompt"}]
+                parsed, tokens, latency_ms = client.complete_chat_sync(messages)
+
+        self.assertEqual(call_log, ["key#1", "key#2"])
+        self.assertIsNotNone(parsed)
+        self.assertEqual(tokens.get("key_id"), "key#2")
+        self.assertEqual([k["id"] for k in client.pool.keys], ["key#2"])
+        self.assertTrue(any("key#1 invalid (401) — removed from pool" in record for record in log_cm.output))
+        print("[PROOF VERIFIED] Sync: key#1 invalid (401) — removed from pool, cascaded to key#2\n")
+
     async def test_six_rapid_real_classification_calls(self):
         """
         Part B: Real-run proof: Fire up to 6 rapid real classification calls.
