@@ -68,6 +68,7 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-26 | `b876ee2` | Add third Groq API key (GROQ_API_KEY_3) to rotation pool and dynamic cascade retry | `bot/ai/groq.py`, `tests/test_groq_rotation.py`, full suite 108/108 OK |
 | 2026-09-26 | `d2beac6` | Configure fourth Groq API key (GROQ_API_KEY_4) in rotation pool without live tests | `bot/config.py`, `backend/app/config.py`, `bot/ai/groq.py`, `.env.example` |
 | 2026-09-26 | `audit` | OpenRouter Qwen 3.8 27B emergency fallback evaluation (VERDICT: COMPATIBLE, 5/5 claims, 2/2 twin pairs, 1242ms p50, insurance doc only) | `audit/openrouter_probe.py`, `audit/OPENROUTER_EVALUATION.md`, `.env.example` |
+| 2026-09-26 | `32d934d` | Add 401/403 invalid key cascade and permanent removal from pool, dynamic discovery from i=2, 4-way rotation test | `tests/test_groq_rotation.py`, full suite 110/110 OK |
 
 
 
