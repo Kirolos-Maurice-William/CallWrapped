@@ -65,7 +65,7 @@ logging.getLogger("discord.ext.voice_recv").addFilter(_rtcp_filter)
 for _h in logging.root.handlers:
     _h.addFilter(_rtcp_filter)
 
-logger = logging.getLogger("VoiceArbitratorBot")
+logger = logging.getLogger("CallWrappedBot")
 
 # Bot Setup
 intents = discord.Intents.default()
@@ -162,7 +162,7 @@ def build_privacy_notice_text() -> str:
 def build_join_embed(channel_name: str, mode: str) -> discord.Embed:
     """Builds the join announcement embed including the mandatory privacy notice."""
     embed = discord.Embed(
-        title="🎙️ Voice Arbitrator ● LIVE (AssemblyAI Hackathon)",
+        title="🎙️ CallWrapped ● LIVE (AssemblyAI Hackathon)",
         description=(
             f"Connected to **{channel_name}**!\n\n"
             f"🛡️ **Current Mode:** `{mode.upper()}`\n"
@@ -436,7 +436,7 @@ async def recap_command(ctx: commands.Context):
 async def show_help(ctx: commands.Context):
     """Displays comprehensive help and hackathon judging instructions."""
     embed = discord.Embed(
-        title="⚖️ Voice Arbitrator — AssemblyAI Voice Agent Hackathon",
+        title="⚖️ CallWrapped — AssemblyAI Voice Agent Hackathon",
         description=(
             "An autonomous multi-speaker referee that monitors Discord voice channels silently, "
             "catches objective factual contradictions in real time, verifies them via authoritative web sources, "
@@ -483,7 +483,7 @@ def build_status_embed(guild_ctx: Any, session: Any, ping_ms: int = 0) -> discor
     mode_str = getattr(guild_ctx, "mode", "referee").upper()
 
     embed = discord.Embed(
-        title="⚙️ Voice Arbitrator — Operational Status",
+        title="⚙️ CallWrapped — Operational Status",
         color=0x57F287 if in_voice else config.EMBED_COLOR_INFO
     )
     embed.add_field(name="🎙️ Voice Status", value=f"Connected to: **{channel_name}**" if in_voice else "❌ Disconnected (`!join` to start)", inline=True)
@@ -540,7 +540,7 @@ def build_dashboard_embed() -> discord.Embed:
         ),
         inline=False
     )
-    embed.set_footer(text="AssemblyAI Hackathon • Real-Time Voice Arbitrator")
+    embed.set_footer(text="AssemblyAI Hackathon • Real-Time CallWrapped")
     return embed
 
 
@@ -575,7 +575,7 @@ def build_privacy_embed() -> discord.Embed:
         ),
         inline=False
     )
-    embed.set_footer(text="AssemblyAI Hackathon • Real-Time Voice Arbitrator • Privacy First")
+    embed.set_footer(text="AssemblyAI Hackathon • Real-Time CallWrapped • Privacy First")
     return embed
 
 
@@ -969,7 +969,7 @@ async def leave_channel(ctx: commands.Context):
 async def on_ready():
     logger.info(f"✅ Logged in as {bot.user.name} ({bot.user.id})")
     print("\n" + "=" * 55)
-    print(f"  Voice Arbitrator Bot is ONLINE! (AssemblyAI Hackathon)")
+    print(f"  CallWrapped Bot is ONLINE! (AssemblyAI Hackathon)")
     print(f"  Logged in as: {bot.user.name}")
     print(f"  Mode: Silent Referee (Intervention Only)")
     print(f"  Ears: AssemblyAI {config.speech_model_display} Code-Switching")

@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api", tags=["routes"])
 # Active WebSockets pool for real-time dashboard updates
 active_connections: List[WebSocket] = []
 
-# Live Analytics State for Voice Arbitrator
+# Live Analytics State for CallWrapped
 ANALYTICS_STATE: Dict[str, Any] = {
     "topic_totals": {},
     "speakers": {},
@@ -26,7 +26,7 @@ ANALYTICS_STATE: Dict[str, Any] = {
     }
 }
 
-# Live State for Voice Arbitrator
+# Live State for CallWrapped
 LIVE_STATE: Dict[str, Any] = {
     "is_call_active": True,
     "last_updated": 0.0,

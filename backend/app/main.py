@@ -20,7 +20,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-logger = logging.getLogger("voice_arbitrator")
+logger = logging.getLogger("callwrapped")
 
 
 @asynccontextmanager
@@ -29,11 +29,11 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized successfully.")
     yield
-    logger.info("Shutting down Voice Arbitrator backend.")
+    logger.info("Shutting down CallWrapped backend.")
 
 
 app = FastAPI(
-    title="Voice Arbitrator API",
+    title="CallWrapped API",
     version=settings.VERSION,
     lifespan=lifespan
 )
@@ -60,7 +60,7 @@ app.include_router(api_router)
 async def health_check():
     return {
         "status": "online",
-        "service": "Voice Arbitrator",
+        "service": "CallWrapped",
         "version": settings.VERSION,
         "assemblyai_model": settings.ASSEMBLYAI_MODEL
     }

@@ -1,5 +1,5 @@
 """
-AI Third Participant - Discord Voice Arbitrator
+AI Third Participant - Discord CallWrapped
 Built for AssemblyAI Voice Agent Hackathon 2026.
 """
 

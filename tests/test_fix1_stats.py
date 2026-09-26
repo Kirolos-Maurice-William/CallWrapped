@@ -62,7 +62,7 @@ class TestStatsAndStatusRendering(unittest.TestCase):
         guild_ctx = GuildContext(guild_id=999890)
         guild_ctx.mode = "referee"
         embed = build_status_embed(guild_ctx, session, ping_ms=42)
-        self.assertEqual(embed.title, "⚙️ Voice Arbitrator — Operational Status")
+        self.assertEqual(embed.title, "⚙️ CallWrapped — Operational Status")
         fields_dict = {f.name: f.value for f in embed.fields}
         self.assertIn("⚡ Bot Ping", fields_dict)
         self.assertEqual(fields_dict["⚡ Bot Ping"], "`42ms`")
