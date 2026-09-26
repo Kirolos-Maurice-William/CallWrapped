@@ -1,8 +1,8 @@
 # Step 9: Captured Test Session Scoring Report
 
-**Session Folder:** `test_score_session_7xz30djq`  
+**Session Folder:** `test_score_session_vz224c0e`  
 **Source Labels File:** `labels_DRAFT.csv`  
-**Evaluation Date:** 2026-09-26 15:46:37  
+**Evaluation Date:** 2026-09-26 15:50:19  
 **STT Engine:** AssemblyAI Universal-3.5 Pro (Native Code-Switching)  
 **Epistemic Engine:** Groq LPU (`qwen/qwen3.8-27b`)  
 

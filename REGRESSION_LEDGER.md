@@ -60,7 +60,8 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-26 | `2b5df7f` | Document TEST_CAPTURE_MODE in .env.example, update !help with per-session folders, verify !privacy (Phase 3) | `tests/test_p1_privacy.py`, full suite 104/104 OK |
 | 2026-09-26 | `3416d10` | Auto-finalize active capture on !leave and !clear, report CSV path to Discord (Phase 1 / CAP-02) | `tests/test_capture_mode.py`, full suite 105/105 OK |
 | 2026-09-26 | `f0b16cc` | Graceful OSError degradation with capture_failed status in capture save, synchronize ledger (Phase 2 / CAP-01 + REG-01) | `tests/test_capture_mode.py`, full suite 105/105 OK |
-| 2026-09-26 | `e2e481d` | Build Step 9 captured test session scoring tool with refusal path (Phase 3 / SCR-01) | `tests/test_score_test_session.py`, full suite 105/105 OK |
+| 2026-09-26 | `2fa65f1` | Build Step 9 captured test session scoring tool with refusal path (Phase 3 / SCR-01) | `tests/test_score_test_session.py`, full suite 105/105 OK |
+| 2026-09-26 | `956ff8e` | Rehearse Step 9 scoring tool against smoke-labeled session and generate score_results.md (Phase 4) | `audit/score_results.md`, full suite 107/107 OK |
 
 
 
