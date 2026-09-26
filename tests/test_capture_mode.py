@@ -14,6 +14,9 @@ from bot.audio.capture import (
     save_captured_utterance_sync,
     save_captured_utterance_async,
     generate_labels_draft_csv,
+    start_capture_session,
+    stop_capture_session,
+    get_active_session_dir,
     DEFAULT_RECORDINGS_DIR
 )
 from bot.main import stop_capture_command, start_capture_command
@@ -204,6 +207,120 @@ class TestCaptureMode(unittest.IsolatedAsyncioTestCase):
         self.assertIn("loud", sent_message)
         self.assertIn("العربية", sent_message)
         self.assertIn("English", sent_message)
+        self.assertIn("Session Folder", sent_message)
+
+    async def test_d_two_consecutive_isolated_capture_sessions(self):
+        """
+        Acceptance test for Phase 1:
+        Session A (2 utterances) -> stop -> Session B (1 utterance) -> stop
+        -> Verify two DISTINCT timestamped folders
+        -> Each contains ONLY its own WAVs, its own session_log.jsonl, and its own labels_DRAFT.csv
+        -> Zero files in parent folder
+        """
+        dummy_wav_1 = b"RIFF" + b"\x00" * 36 + b"data" + b"\x01\x02" * 50
+        dummy_wav_2 = b"RIFF" + b"\x00" * 36 + b"data" + b"\x03\x04" * 50
+        dummy_wav_3 = b"RIFF" + b"\x00" * 36 + b"data" + b"\x05\x06" * 50
+
+        # === SESSION A ===
+        session_a_dir = start_capture_session(base_dir=self.test_dir)
+        self.assertTrue(session_a_dir.exists())
+
+        # Utterance 1
+        entry_a1 = await save_captured_utterance_async(
+            speaker_name="Omar",
+            wav_bytes=dummy_wav_1,
+            asr_text="الجملة الأولى في جلسة أ",
+            stt_latency_ms=105.0,
+            ended_by="silence"
+        )
+        self.assertIsNotNone(entry_a1)
+
+        # Utterance 2
+        entry_a2 = await save_captured_utterance_async(
+            speaker_name="Ziad",
+            wav_bytes=dummy_wav_2,
+            asr_text="الجملة الثانية في جلسة أ",
+            stt_latency_ms=115.0,
+            ended_by="silence"
+        )
+        self.assertIsNotNone(entry_a2)
+
+        # Stop Session A
+        csv_a, dir_a = stop_capture_session()
+        self.assertEqual(dir_a, session_a_dir)
+        self.assertTrue(csv_a.exists())
+        self.assertEqual(config.TEST_CAPTURE_MODE, 0)
+
+        # === SESSION B ===
+        session_b_dir = start_capture_session(base_dir=self.test_dir)
+        self.assertTrue(session_b_dir.exists())
+        self.assertNotEqual(session_a_dir, session_b_dir, "Session B must have a distinct timestamped folder")
+
+        # Utterance 3
+        entry_b1 = await save_captured_utterance_async(
+            speaker_name="Mostafa",
+            wav_bytes=dummy_wav_3,
+            asr_text="الجملة الوحيدة في جلسة ب",
+            stt_latency_ms=95.0,
+            ended_by="silence"
+        )
+        self.assertIsNotNone(entry_b1)
+
+        # Stop Session B
+        csv_b, dir_b = stop_capture_session()
+        self.assertEqual(dir_b, session_b_dir)
+        self.assertTrue(csv_b.exists())
+        self.assertEqual(config.TEST_CAPTURE_MODE, 0)
+
+        # === VERIFICATION ===
+        # 1. Distinct folders exist
+        session_folders = sorted([d for d in self.test_dir.iterdir() if d.is_dir()])
+        self.assertEqual(len(session_folders), 2, "Must have exactly 2 distinct session folders")
+        self.assertEqual(session_folders[0], session_a_dir)
+        self.assertEqual(session_folders[1], session_b_dir)
+
+        # 2. Session A contents: exactly 2 WAVs + 1 session_log.jsonl + 1 labels_DRAFT.csv
+        wavs_a = sorted(list(session_a_dir.glob("*.wav")))
+        self.assertEqual(len(wavs_a), 2, "Session A must contain exactly 2 WAVs")
+        log_a = session_a_dir / "session_log.jsonl"
+        self.assertTrue(log_a.exists())
+        with open(log_a, "r", encoding="utf-8") as f:
+            lines_a = [json.loads(l.strip()) for l in f if l.strip()]
+        self.assertEqual(len(lines_a), 2)
+        with open(csv_a, "r", encoding="utf-8-sig") as f:
+            rows_a = list(csv.DictReader(f))
+        self.assertEqual(len(rows_a), 2)
+
+        # 3. Session B contents: exactly 1 WAV + 1 session_log.jsonl + 1 labels_DRAFT.csv
+        wavs_b = sorted(list(session_b_dir.glob("*.wav")))
+        self.assertEqual(len(wavs_b), 1, "Session B must contain exactly 1 WAV")
+        log_b = session_b_dir / "session_log.jsonl"
+        self.assertTrue(log_b.exists())
+        with open(log_b, "r", encoding="utf-8") as f:
+            lines_b = [json.loads(l.strip()) for l in f if l.strip()]
+        self.assertEqual(len(lines_b), 1)
+        with open(csv_b, "r", encoding="utf-8-sig") as f:
+            rows_b = list(csv.DictReader(f))
+        self.assertEqual(len(rows_b), 1)
+
+        # 4. Parent directory contains ZERO direct WAVs or JSONL/CSV files
+        parent_wavs = list(self.test_dir.glob("*.wav"))
+        parent_logs = list(self.test_dir.glob("*.jsonl"))
+        parent_csvs = list(self.test_dir.glob("*.csv"))
+        self.assertEqual(len(parent_wavs), 0, "No WAV files should exist at root of recordings/")
+        self.assertEqual(len(parent_logs), 0, "No jsonl files should exist at root of recordings/")
+        self.assertEqual(len(parent_csvs), 0, "No csv files should exist at root of recordings/")
+
+        # 5. Print the full folder tree
+        print("\n" + "=" * 65)
+        print("=== PHASE 1 ACCEPTANCE: TWO CONSECUTIVE ISOLATED SESSIONS ===")
+        print("=" * 65)
+        print(f"Root: {self.test_dir}")
+        for folder in session_folders:
+            print(f"\n📁 {folder.name}/")
+            for item in sorted(folder.iterdir()):
+                print(f"   └── 📄 {item.name} ({item.stat().st_size} bytes)")
+        print("=" * 65 + "\n")
 
 
 if __name__ == "__main__":

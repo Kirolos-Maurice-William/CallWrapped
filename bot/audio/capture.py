@@ -5,14 +5,75 @@ import json
 import time
 import asyncio
 import logging
+from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 from bot.config import config, PROJECT_ROOT
 
 logger = logging.getLogger("CaptureMode")
 
-DEFAULT_RECORDINGS_DIR = PROJECT_ROOT / "recordings" / "test_session"
+DEFAULT_RECORDINGS_ROOT = PROJECT_ROOT / "recordings" / "test_session"
+DEFAULT_RECORDINGS_DIR = DEFAULT_RECORDINGS_ROOT
+
+_active_session_dir: Optional[Path] = None
+
+
+def get_active_session_dir() -> Optional[Path]:
+    """Returns the current in-memory active session directory, if any."""
+    return _active_session_dir
+
+
+def create_session_dir(base_dir: Optional[Path] = None, timestamp: Optional[float] = None) -> Path:
+    """
+    Creates a new timestamped session directory: recordings/test_session/<YYYY-MM-DD_HHMM>/
+    Disambiguates if a directory with the same minute already exists (_1, _2, etc.).
+    """
+    root = Path(base_dir) if base_dir else DEFAULT_RECORDINGS_ROOT
+    root.mkdir(parents=True, exist_ok=True)
+    dt = datetime.fromtimestamp(timestamp) if timestamp is not None else datetime.now()
+    folder_name = dt.strftime("%Y-%m-%d_%H%M")
+    session_dir = root / folder_name
+
+    counter = 1
+    while session_dir.exists():
+        session_dir = root / f"{folder_name}_{counter}"
+        counter += 1
+
+    session_dir.mkdir(parents=True, exist_ok=True)
+    return session_dir
+
+
+def start_capture_session(base_dir: Optional[Path] = None, timestamp: Optional[float] = None) -> Path:
+    """
+    Starts an isolated capture session:
+    - Creates a new timestamped folder recordings/test_session/<YYYY-MM-DD_HHMM>/
+    - Sets _active_session_dir to that folder
+    - Toggles config.TEST_CAPTURE_MODE = 1
+    """
+    global _active_session_dir
+    session_dir = create_session_dir(base_dir=base_dir, timestamp=timestamp)
+    _active_session_dir = session_dir
+    config.TEST_CAPTURE_MODE = 1
+    logger.info(f"🎙️ [Capture] Started new capture session in: {session_dir}")
+    return session_dir
+
+
+def stop_capture_session(recordings_dir: Optional[Path] = None) -> Tuple[Path, Path]:
+    """
+    Stops the active capture session:
+    - Sets config.TEST_CAPTURE_MODE = 0
+    - Generates labels_DRAFT.csv inside the session folder
+    - Clears _active_session_dir
+    - Returns (csv_path, session_dir)
+    """
+    global _active_session_dir
+    session_dir = Path(recordings_dir) if recordings_dir else (_active_session_dir or DEFAULT_RECORDINGS_ROOT)
+    config.TEST_CAPTURE_MODE = 0
+    csv_file = generate_labels_draft_csv(recordings_dir=session_dir)
+    _active_session_dir = None
+    logger.info(f"🛑 [Capture] Stopped capture session: {session_dir}")
+    return csv_file, session_dir
 
 
 def _clean_speaker_name(speaker_name: str) -> str:
@@ -32,14 +93,21 @@ def save_captured_utterance_sync(
 ) -> Optional[Dict[str, Any]]:
     """
     Synchronous filesystem save for a finalized utterance:
-    - Writes 16kHz mono WAV to recordings/test_session/<timestamp>_<speaker>.wav
-    - Appends metadata JSON line to recordings/test_session/session_log.jsonl
+    - Writes 16kHz mono WAV to <session_dir>/<timestamp>_<speaker>.wav
+    - Appends metadata JSON line to <session_dir>/session_log.jsonl
     Returns metadata dict if saved, None if TEST_CAPTURE_MODE is off.
     """
     if not getattr(config, "TEST_CAPTURE_MODE", 0):
         return None
 
-    target_dir = Path(recordings_dir) if recordings_dir else DEFAULT_RECORDINGS_DIR
+    # Priority: explicit recordings_dir > active session dir > auto-created session dir
+    if recordings_dir:
+        target_dir = Path(recordings_dir)
+    elif _active_session_dir:
+        target_dir = _active_session_dir
+    else:
+        target_dir = start_capture_session()
+
     target_dir.mkdir(parents=True, exist_ok=True)
 
     ts = timestamp if timestamp is not None else time.time()
@@ -66,12 +134,12 @@ def save_captured_utterance_sync(
         "ended_by": ended_by
     }
 
-    # Append JSONL log
+    # Append JSONL log in the session directory ONLY
     log_file = target_dir / "session_log.jsonl"
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
-    logger.info(f"🎙️ [Capture] Saved utterance clip: {base_filename} ({ended_by})")
+    logger.info(f"🎙️ [Capture] Saved utterance clip: {base_filename} ({ended_by}) in {target_dir.name}")
     return log_entry
 
 
@@ -105,11 +173,12 @@ async def save_captured_utterance_async(
 
 def generate_labels_draft_csv(recordings_dir: Optional[Path] = None) -> Path:
     """
-    Generates recordings/test_session/labels_DRAFT.csv pre-filled from session_log.jsonl:
+    Generates labels_DRAFT.csv pre-filled from session_log.jsonl INSIDE the session folder:
     Columns: clip_id, wav_filename, speaker, asr_text, correct_text, topic, is_claim, anger, loud
-    Pre-fills clip_id, wav_filename, speaker, asr_text from log; human columns remain empty.
+    Pre-fills clip_id, wav_filename, speaker, asr_text from log;
+    Preserves existing human annotations if row was already filled.
     """
-    target_dir = Path(recordings_dir) if recordings_dir else DEFAULT_RECORDINGS_DIR
+    target_dir = Path(recordings_dir) if recordings_dir else (_active_session_dir or DEFAULT_RECORDINGS_ROOT)
     target_dir.mkdir(parents=True, exist_ok=True)
 
     log_file = target_dir / "session_log.jsonl"
@@ -127,6 +196,25 @@ def generate_labels_draft_csv(recordings_dir: Optional[Path] = None) -> Path:
         "loud"
     ]
 
+    # Check for existing human labels to preserve
+    existing_human_labels: Dict[str, Dict[str, str]] = {}
+    if csv_file.exists():
+        try:
+            with open(csv_file, "r", encoding="utf-8-sig") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    fname = row.get("wav_filename", "")
+                    if fname:
+                        existing_human_labels[fname] = {
+                            "correct_text": row.get("correct_text", ""),
+                            "topic": row.get("topic", ""),
+                            "is_claim": row.get("is_claim", ""),
+                            "anger": row.get("anger", ""),
+                            "loud": row.get("loud", "")
+                        }
+        except Exception as e:
+            logger.warning(f"Failed to read existing labels_DRAFT.csv for preservation: {e}")
+
     rows = []
     if log_file.exists():
         with open(log_file, "r", encoding="utf-8") as f:
@@ -136,16 +224,18 @@ def generate_labels_draft_csv(recordings_dir: Optional[Path] = None) -> Path:
                     continue
                 try:
                     data = json.loads(line)
+                    wav_fname = data.get("wav_filename", "")
+                    preserved = existing_human_labels.get(wav_fname, {})
                     rows.append({
                         "clip_id": f"clip_{idx:03d}",
-                        "wav_filename": data.get("wav_filename", ""),
+                        "wav_filename": wav_fname,
                         "speaker": data.get("speaker_name", ""),
                         "asr_text": data.get("asr_text", ""),
-                        "correct_text": "",
-                        "topic": "",
-                        "is_claim": "",
-                        "anger": "",
-                        "loud": ""
+                        "correct_text": preserved.get("correct_text", ""),
+                        "topic": preserved.get("topic", ""),
+                        "is_claim": preserved.get("is_claim", ""),
+                        "anger": preserved.get("anger", ""),
+                        "loud": preserved.get("loud", "")
                     })
                 except json.JSONDecodeError:
                     continue

@@ -5,6 +5,10 @@ from .capture import (
     save_captured_utterance_sync,
     save_captured_utterance_async,
     generate_labels_draft_csv,
+    start_capture_session,
+    stop_capture_session,
+    get_active_session_dir,
+    create_session_dir,
 )
 
 __all__ = [
@@ -15,4 +19,8 @@ __all__ = [
     "save_captured_utterance_sync",
     "save_captured_utterance_async",
     "generate_labels_draft_csv",
+    "start_capture_session",
+    "stop_capture_session",
+    "get_active_session_dir",
+    "create_session_dir",
 ]

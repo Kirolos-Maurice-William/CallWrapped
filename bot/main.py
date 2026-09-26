@@ -670,21 +670,26 @@ async def check_dispute(ctx: commands.Context):
 
 @bot.command(name="start-capture")
 async def start_capture_command(ctx: commands.Context):
-    """Enables test-mode capture for finalized utterances."""
-    config.TEST_CAPTURE_MODE = 1
-    await ctx.send("🎙️ **Test Capture Mode: ON** — saving finalized utterances to `recordings/test_session/`.")
+    """Enables test-mode capture for finalized utterances into a new isolated session folder."""
+    from bot.audio.capture import start_capture_session
+    session_dir = start_capture_session()
+    await ctx.send(
+        f"🎙️ **Test Capture Mode: ON | تم تفعيل التسجيل**\n"
+        f"📁 **Session Folder / مجلد الجلسة:** `{session_dir}`\n"
+        f"Saving finalized 16kHz WAVs and `session_log.jsonl` to this isolated folder."
+    )
 
 
 @bot.command(name="stop-capture")
 async def stop_capture_command(ctx: commands.Context):
-    """Stops test-mode capture and generates recordings/test_session/labels_DRAFT.csv."""
-    from bot.audio.capture import generate_labels_draft_csv
-    config.TEST_CAPTURE_MODE = 0
-    csv_path = await asyncio.to_thread(generate_labels_draft_csv)
+    """Stops test-mode capture and generates labels_DRAFT.csv inside the session folder."""
+    from bot.audio.capture import stop_capture_session
+    csv_path, session_dir = await asyncio.to_thread(stop_capture_session)
 
     msg = (
         "🛑 **Test Capture Stopped | تم إيقاف التسجيل**\n\n"
-        f"📁 Generated: `{csv_path}`\n\n"
+        f"📁 **Session Folder / مجلد الجلسة:** `{session_dir}`\n"
+        f"📄 **Generated / الملف المستخرج:** `{csv_path}`\n\n"
         "**Instructions / التعليمات:**\n"
         "• **العربية:** استمع لكل ملف WAV، واكتب النص المصري الصحيح في خانة `correct_text`، ثم املأ التصنيفات:\n"
         "  - `topic`: (football / politics / music / movies / gaming / tech / personal_life / other)\n"
