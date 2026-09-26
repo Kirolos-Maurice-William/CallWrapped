@@ -66,6 +66,7 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-26 | `5ee2d46` | Add __main__ guard in check_numbers, remove unused imports and unreferenced finalize_capture_if_active (Phase 3 / TRACE-02 + TRACE-04) | `audit/check_numbers.py`, full suite 107/107 OK |
 | 2026-09-26 | `3ec4d59` | Implement topic/anger parity with batched classifier, 0-denominator protection, and missing column tolerance (Phase 4) | `tests/test_score_test_session.py`, full suite 107/107 OK |
 | 2026-09-26 | `b876ee2` | Add third Groq API key (GROQ_API_KEY_3) to rotation pool and dynamic cascade retry | `bot/ai/groq.py`, `tests/test_groq_rotation.py`, full suite 108/108 OK |
+| 2026-09-26 | `d2beac6` | Configure fourth Groq API key (GROQ_API_KEY_4) in rotation pool without live tests | `bot/config.py`, `backend/app/config.py`, `bot/ai/groq.py`, `.env.example` |
 
 
 
