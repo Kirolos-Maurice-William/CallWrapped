@@ -2,7 +2,7 @@
 
 **Session Folder:** `2026-09-26_smoke_rehearsal`  
 **Source Labels File:** `labels_DRAFT.csv`  
-**Evaluation Date:** 2026-09-26 16:35:13  
+**Evaluation Date:** 2026-09-26 16:42:32  
 **STT Engine:** AssemblyAI Universal-3.5 Pro (Native Code-Switching)  
 **Epistemic Engine:** Groq LPU (`qwen/qwen3.8-27b`)  
 
@@ -10,8 +10,10 @@
 
 | Metric | Result | Target Benchmark | Status |
 |---|---|---|---|
-| **Overall WER** | **8.91%** | Beat 30.8% baseline | ✅ PASS |
-| **Clean Audio WER** | **8.91%** | Beat 25.1% baseline | ✅ PASS |
+| **Micro WER (Corpus)** | **10.53%** | Beat 30.8% baseline | ✅ PASS |
+| **Macro WER (Clip Avg)** | **8.91%** | Informational | — |
+| **Clean Audio Micro WER** | **10.53%** | Beat 25.1% baseline | ✅ PASS |
+| **Clean Audio Macro WER** | **8.91%** | Informational | — |
 | **Number Accuracy** | **100.0%** (0/0) | ≥ 90% | ✅ PASS |
 | **Topic Classification** | **33.3%** | ≥ 80% | ⚠️ REVIEW |
 | **Claim Agreement** | **100.0%** | ≥ 75% | ✅ PASS |

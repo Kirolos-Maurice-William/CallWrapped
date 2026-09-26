@@ -207,12 +207,17 @@ async def score_session(
 
     # Aggregate Metrics
     n_scored = len(scored_records)
-    avg_wer = (sum(r["wer"] for r in scored_records) / n_scored) if n_scored > 0 else 0.0
+    macro_wer = (sum(r["wer"] for r in scored_records) / n_scored) if n_scored > 0 else 0.0
+    all_refs = [r["ref_clean"] for r in scored_records]
+    all_hyps = [r["hyp_clean"] for r in scored_records]
+    micro_wer = float(jiwer.wer(all_refs, all_hyps)) if n_scored > 0 else 0.0
 
     clean_records = [r for r in scored_records if r["loud"] != "loud"]
     loud_records = [r for r in scored_records if r["loud"] == "loud"]
-    clean_wer = (sum(r["wer"] for r in clean_records) / len(clean_records)) if clean_records else avg_wer
-    loud_wer = (sum(r["wer"] for r in loud_records) / len(loud_records)) if loud_records else 0.0
+    clean_macro_wer = (sum(r["wer"] for r in clean_records) / len(clean_records)) if clean_records else 0.0
+    clean_micro_wer = float(jiwer.wer([r["ref_clean"] for r in clean_records], [r["hyp_clean"] for r in clean_records])) if clean_records else 0.0
+    loud_macro_wer = (sum(r["wer"] for r in loud_records) / len(loud_records)) if loud_records else 0.0
+    loud_micro_wer = float(jiwer.wer([r["ref_clean"] for r in loud_records], [r["hyp_clean"] for r in loud_records])) if loud_records else 0.0
 
     total_ref_nums = sum(r["ref_num_count"] for r in scored_records)
     total_matched_nums = sum(r["num_matches"] for r in scored_records)
@@ -237,9 +242,15 @@ async def score_session(
         "total_rows": len(rows),
         "scored_count": n_scored,
         "skipped_count": len(skipped_records),
-        "overall_wer": avg_wer,
-        "clean_wer": clean_wer,
-        "loud_wer": loud_wer,
+        "overall_wer": micro_wer,
+        "micro_wer": micro_wer,
+        "macro_wer": macro_wer,
+        "clean_wer": clean_micro_wer,
+        "clean_micro_wer": clean_micro_wer,
+        "clean_macro_wer": clean_macro_wer,
+        "loud_wer": loud_micro_wer,
+        "loud_micro_wer": loud_micro_wer,
+        "loud_macro_wer": loud_macro_wer,
         "total_ref_numbers": total_ref_nums,
         "matched_numbers": total_matched_nums,
         "number_accuracy_pct": num_accuracy,
@@ -277,8 +288,10 @@ def render_markdown_report(summary: Dict[str, Any]) -> str:
     md.append("## 1. Executive Metric Summary\n")
     md.append("| Metric | Result | Target Benchmark | Status |")
     md.append("|---|---|---|---|")
-    md.append(f"| **Overall WER** | **{summary['overall_wer'] * 100:.2f}%** | Beat 30.8% baseline | {'✅ PASS' if summary['overall_wer'] < 0.308 else '⚠️ REVIEW'} |")
-    md.append(f"| **Clean Audio WER** | **{summary['clean_wer'] * 100:.2f}%** | Beat 25.1% baseline | {'✅ PASS' if summary['clean_wer'] < 0.251 else '⚠️ REVIEW'} |")
+    md.append(f"| **Micro WER (Corpus)** | **{summary['micro_wer'] * 100:.2f}%** | Beat 30.8% baseline | {'✅ PASS' if summary['micro_wer'] < 0.308 else '⚠️ REVIEW'} |")
+    md.append(f"| **Macro WER (Clip Avg)** | **{summary['macro_wer'] * 100:.2f}%** | Informational | — |")
+    md.append(f"| **Clean Audio Micro WER** | **{summary['clean_micro_wer'] * 100:.2f}%** | Beat 25.1% baseline | {'✅ PASS' if summary['clean_micro_wer'] < 0.251 else '⚠️ REVIEW'} |")
+    md.append(f"| **Clean Audio Macro WER** | **{summary['clean_macro_wer'] * 100:.2f}%** | Informational | — |")
     md.append(f"| **Number Accuracy** | **{summary['number_accuracy_pct']:.1f}%** ({summary['matched_numbers']}/{summary['total_ref_numbers']}) | ≥ 90% | {'✅ PASS' if summary['number_accuracy_pct'] >= 90.0 else '⚠️ REVIEW'} |")
     md.append(f"| **Topic Classification** | **{summary['topic_accuracy_pct']:.1f}%** | ≥ 80% | {'✅ PASS' if summary['topic_accuracy_pct'] >= 80.0 else '⚠️ REVIEW'} |")
     md.append(f"| **Claim Agreement** | **{summary['claim_agreement_pct']:.1f}%** | ≥ 75% | {'✅ PASS' if summary['claim_agreement_pct'] >= 75.0 else '⚠️ REVIEW'} |")
