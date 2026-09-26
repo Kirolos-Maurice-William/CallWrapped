@@ -47,8 +47,13 @@ class TestScoreTestSession(unittest.IsolatedAsyncioTestCase):
         unlabeled_wav = self.session_path / "unlabeled_clip.wav"
         shutil.copy(self.clips_dir / clip_names[0], unlabeled_wav)
 
+        # Also add a 5th WAV for unannotated topic test (Phase 4 / TRACE4-04)
+        unannotated_topic_wav = self.session_path / "unannotated_topic_clip.wav"
+        shutil.copy(self.clips_dir / clip_names[0], unannotated_topic_wav)
+
         # 2. Create labels_DRAFT.csv in the session folder
-        # 3 rows with correct_text, 1 row with empty correct_text (refusal path)
+        # 3 rows with correct_text & topic, 1 row with empty correct_text (refusal path),
+        # 1 row with correct_text and empty topic (unannotated path)
         csv_path = self.session_path / "labels_DRAFT.csv"
         rows = [
             {
@@ -94,6 +99,17 @@ class TestScoreTestSession(unittest.IsolatedAsyncioTestCase):
                 "is_claim": "",
                 "anger": "",
                 "loud": ""
+            },
+            {
+                "clip_id": "clip_005",
+                "wav_filename": "unannotated_topic_clip.wav",
+                "speaker": "Hossam",
+                "asr_text": "لكن تميزت في الفترة الأخيرة هي رياضة السباحة بالزعانف",
+                "correct_text": "لكن تميزت في الفترة الأخيرة هي رياضة السباحة بالزعانف",
+                "topic": "",  # EMPTY topic while correct_text is non-empty -> unannotated!
+                "is_claim": "no",
+                "anger": "none",
+                "loud": "normal"
             }
         ]
 
@@ -112,18 +128,24 @@ class TestScoreTestSession(unittest.IsolatedAsyncioTestCase):
 
         # 4. Invariant Assertions
         # (a) Refusal Path Check:
-        self.assertEqual(summary["total_rows"], 4)
-        self.assertEqual(summary["scored_count"], 3, "Exactly 3 labeled rows should be scored")
+        self.assertEqual(summary["total_rows"], 5)
+        self.assertEqual(summary["scored_count"], 4, "Exactly 4 non-empty rows should be scored")
         self.assertEqual(summary["skipped_count"], 1, "Exactly 1 empty row should be skipped")
         self.assertEqual(summary["skipped_records"][0]["clip_id"], "clip_004")
         self.assertIn("Empty correct_text", summary["skipped_records"][0]["reason"])
 
-        # (b) WER and Accuracy Metrics:
+        # (b) Phase 4 (TRACE4-04): Unannotated Topic Denominator Exclusion Check:
+        self.assertEqual(summary["topical_count"], 3, "Only the 3 explicitly topical rows in topical denominator")
+        self.assertEqual(summary["null_count"], 0, "0 rows in null denominator (unannotated row must NOT be counted as null)")
+        self.assertEqual(summary["unannotated_topic_count"], 1, "Exactly 1 unannotated topic row recorded")
+        self.assertEqual(summary["unannotated_topic_records"][0]["clip_id"], "clip_005")
+
+        # (c) WER and Accuracy Metrics:
         self.assertGreater(len(summary["scored_records"]), 0)
         self.assertIsInstance(summary["overall_wer"], float)
         self.assertLess(summary["overall_wer"], 0.40, "WER should be reasonably low on real audio")
 
-        # (c) Report File Generated:
+        # (d) Report File Generated:
         self.assertTrue(self.output_md.exists())
         md_text = self.output_md.read_text(encoding="utf-8")
         self.assertIn("# Step 9: Captured Test Session Scoring Report", md_text)
@@ -131,15 +153,18 @@ class TestScoreTestSession(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Detailed Per-Clip Scoring Table", md_text)
         self.assertIn("Skipped Clips", md_text)
         self.assertIn("clip_004", md_text)
+        self.assertIn("Unannotated Topic Rows", md_text)
+        self.assertIn("[unannotated]", md_text)
 
-        # (d) Human CSV Unmodified Check:
+        # (e) Human CSV Unmodified Check:
         with open(csv_path, "r", encoding="utf-8-sig") as f:
             post_rows = list(csv.DictReader(f))
-        self.assertEqual(len(post_rows), 4)
+        self.assertEqual(len(post_rows), 5)
         self.assertEqual(post_rows[3]["correct_text"], "")
+        self.assertEqual(post_rows[4]["topic"], "")
         self.assertEqual(post_rows[0]["correct_text"], rows[0]["correct_text"])
 
-        # (e) Missing claim_pair column tolerance & 0-denominator metrics check:
+        # (f) Missing claim_pair column tolerance & 0-denominator metrics check:
         self.assertEqual(summary["referee_pairs_evaluated"], 0)
         self.assertIn("0 pairs evaluated", md_text)
         self.assertIn("Number Accuracy", md_text)

@@ -137,18 +137,21 @@ async def score_session(
         human_anger = (row.get("anger") or "none").strip().lower()
         human_loud = (row.get("loud") or "normal").strip().lower()
 
-        # Topic evaluation (Taxonomy v2: Topical vs Null)
-        human_is_null = human_topic in ("null_topic", "null", "none", "بدون موضوع", "")
-        model_is_null = model_topic in ("null_topic", "null", "none", "بدون موضوع", "")
+        # Topic evaluation (Taxonomy v2: Topical vs Null vs Unannotated)
+        human_is_unannotated = (human_topic == "")
+        human_is_null = (not human_is_unannotated) and (human_topic in ("null_topic", "null", "none", "بدون موضوع"))
+        human_is_topical = (not human_is_unannotated) and (not human_is_null)
+
+        model_is_null = model_topic in ("null_topic", "null", "none", "بدون موضوع")
         null_match = bool(human_is_null and model_is_null)
         topical_match = bool(
-            (not human_is_null) and (not model_is_null) and (
+            human_is_topical and (not model_is_null) and (
                 human_topic == model_topic
                 or (human_topic in ("sports", "football") and model_topic in ("sports", "football"))
                 or (human_topic in ("personal", "personal_life") and model_topic in ("personal", "personal_life"))
             )
         )
-        topic_match = null_match if human_is_null else topical_match
+        topic_match = null_match if human_is_null else (topical_match if human_is_topical else False)
 
         # Claim match
         claim_match = (is_claim_detected == human_is_claim)
@@ -180,7 +183,9 @@ async def score_session(
             "claim_match": claim_match,
             "model_topic": model_topic,
             "human_topic": human_topic,
+            "human_is_unannotated": human_is_unannotated,
             "human_is_null": human_is_null,
+            "human_is_topical": human_is_topical,
             "model_is_null": model_is_null,
             "null_match": null_match,
             "topical_match": topical_match,
@@ -217,12 +222,19 @@ async def score_session(
                 r["anger_evidence"] = b_res.get("anger_evidence", "")
                 # Update matches with production predictions
                 h_top = r["human_topic"]
-                h_null = r["human_is_null"]
-                m_null = b_topic in ("null_topic", "null", "none", "بدون موضوع", "")
+                h_unannotated = (h_top == "")
+                h_null = (not h_unannotated) and (h_top in ("null_topic", "null", "none", "بدون موضوع"))
+                h_topical = (not h_unannotated) and (not h_null)
+
+                m_null = b_topic in ("null_topic", "null", "none", "بدون موضوع")
+                r["human_is_unannotated"] = h_unannotated
+                r["human_is_null"] = h_null
+                r["human_is_topical"] = h_topical
                 r["model_is_null"] = m_null
+
                 null_match = bool(h_null and m_null)
                 topical_match = bool(
-                    (not h_null) and (not m_null) and (
+                    h_topical and (not m_null) and (
                         h_top == b_topic
                         or (h_top in ("sports", "football") and b_topic in ("sports", "football"))
                         or (h_top in ("personal", "personal_life") and b_topic in ("personal", "personal_life"))
@@ -230,7 +242,7 @@ async def score_session(
                 )
                 r["null_match"] = null_match
                 r["topical_match"] = topical_match
-                r["topic_match"] = null_match if h_null else topical_match
+                r["topic_match"] = null_match if h_null else (topical_match if h_topical else False)
 
                 exact_anger = (b_anger == r["human_anger"])
                 both_angry = (b_anger in ("mild", "high") and r["human_anger"] in ("mild", "high"))
@@ -286,9 +298,10 @@ async def score_session(
     topic_matches = sum(1 for r in scored_records if r["topic_match"])
     topic_acc = (topic_matches / n_scored * 100.0) if n_scored > 0 else 0.0
 
-    # Phase 2 metrics: Topical Accuracy vs Null Detection Accuracy
-    topical_records = [r for r in scored_records if not r["human_is_null"]]
-    null_records = [r for r in scored_records if r["human_is_null"]]
+    # Phase 2 & 4 metrics: Topical Accuracy vs Null Detection Accuracy vs Unannotated
+    topical_records = [r for r in scored_records if r.get("human_is_topical")]
+    null_records = [r for r in scored_records if r.get("human_is_null")]
+    unannotated_topic_records = [r for r in scored_records if r.get("human_is_unannotated")]
 
     topical_matches = sum(1 for r in topical_records if r["topical_match"])
     topical_acc = (topical_matches / len(topical_records) * 100.0) if topical_records else 0.0
@@ -341,6 +354,8 @@ async def score_session(
         "null_count": len(null_records),
         "null_matches": null_matches,
         "null_accuracy_pct": null_acc,
+        "unannotated_topic_count": len(unannotated_topic_records),
+        "unannotated_topic_records": unannotated_topic_records,
         "topic_accuracy_pct": topic_acc,
         "total_audio_sec": total_audio_sec,
         "human_topical_coverage_pct": human_topical_coverage_pct,
@@ -459,7 +474,10 @@ def render_markdown_report(summary: Dict[str, Any]) -> str:
     md.append(f"| **Anger Agreement** | {anger_res} | Tolerance (mild/high) | {anger_status} |")
     md.append(f"| **False-Anger Rate** | {fa_res} | ≤ 15% | {fa_status} |")
     md.append(f"| **Scored Clips** | **{summary['scored_count']}** | Non-empty reference | ✅ COMPLETE |")
-    md.append(f"| **Skipped Clips** | **{summary['skipped_count']}** | Empty reference | ℹ️ EXCLUDED |\n")
+    md.append(f"| **Skipped Clips** | **{summary['skipped_count']}** | Empty reference | ℹ️ EXCLUDED |")
+    if summary.get("unannotated_topic_count", 0) > 0:
+        md.append(f"| **Unannotated Topic Rows** | **{summary['unannotated_topic_count']}** | Excluded from topic denominators | ℹ️ EXCLUDED |")
+    md.append("\n")
 
     # Contradiction Pairs section
     md.append("## 2. Contradiction Pairs & Referee Gate Triggers\n")
@@ -478,7 +496,8 @@ def render_markdown_report(summary: Dict[str, Any]) -> str:
     md.append("| Clip ID | Speaker | Loud | WER | Human Reference (`correct_text`) | AssemblyAI Raw (`asr_text`) | Topic (Pred/True) | Claim (Pred/True) | Anger (Pred/True) |")
     md.append("|---|---|---|---|---|---|---|---|---|")
     for r in summary["scored_records"]:
-        topic_str = f"{r['model_topic']} / {r['human_topic'] or '-'}"
+        human_top_str = "[unannotated]" if r.get("human_is_unannotated") else (r["human_topic"] or "-")
+        topic_str = f"{r['model_topic']} / {human_top_str}"
         claim_str = f"{'Yes' if r['is_claim_detected'] else 'No'} / {'Yes' if r['human_is_claim'] else 'No'}"
         anger_str = f"{r['model_anger']} / {r['human_anger'] or '-'}"
         md.append(
