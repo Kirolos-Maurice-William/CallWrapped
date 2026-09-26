@@ -99,29 +99,6 @@ class SpeakerStats:
         }
 
 
-def compute_topic_percentages(topic_durations: Dict[str, float]) -> Dict[str, float]:
-    """
-    Computes topic share over TOPICAL rows only:
-    topic share = topical time in class k / total topical time.
-    null_topic is excluded from denominator.
-    """
-    topical = {
-        t: d for t, d in topic_durations.items()
-        if t not in ("null_topic", "null", "none", "بدون موضوع", "")
-    }
-    total_topical = sum(topical.values())
-    if total_topical <= 0:
-        return {}
-    return {t: (d / total_topical) * 100.0 for t, d in topical.items()}
-
-
-def compute_topical_coverage(topical_time: float, total_talk_time: float) -> float:
-    """Computes topical coverage metric: topical_time / total_talk_time."""
-    if total_talk_time <= 0:
-        return 0.0
-    return topical_time / total_talk_time
-
-
 class SessionStatsTracker:
     """
     Tracks per-speaker real-time speech statistics, monologue streaks, and topic streaks.
