@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 > nul
-title Voice Arbitrator - FastAPI Event Hub & Dashboard Server
+title CallWrapped - FastAPI Event Hub & Dashboard Server
 
 echo ===================================================
-echo   Voice Arbitrator - FastAPI Server & Dashboard
+echo   CallWrapped - FastAPI Server & Dashboard
 echo   Listening on http://localhost:8000
 echo ===================================================
 echo.

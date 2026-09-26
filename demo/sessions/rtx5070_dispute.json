@@ -1,7 +1,7 @@
 {
   "session_id": "demo_session_rtx5070",
   "title": "NVIDIA RTX 5070 VRAM Disagreement",
-  "description": "Benchmark demonstration of Voice Arbitrator detecting, verifying, and resolving a factual hardware dispute.",
+  "description": "Benchmark demonstration of CallWrapped detecting, verifying, and resolving a factual hardware dispute.",
   "events": [
     {
       "delay_seconds": 1.0,
@@ -74,7 +74,7 @@
         "event_id": "demo_intervention_1",
         "session_id": "demo_session_rtx5070",
         "type": "intervention",
-        "speaker_name": "Voice Arbitrator",
+        "speaker_name": "CallWrapped",
         "text": "Correction: the RTX 5070 has 12GB of GDDR7 memory. The RTX 5070 Ti has 16GB. Source is on the dashboard.",
         "latency": {
           "stt_ms": 265,

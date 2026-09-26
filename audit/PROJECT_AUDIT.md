@@ -1,4 +1,4 @@
-# Voice Arbitrator — Comprehensive Project Audit & Live API Fact Verification
+# CallWrapped — Comprehensive Project Audit & Live API Fact Verification
 
 **Date of Audit:** September 20, 2026  
 **Auditor:** Antigravity Autonomous Diagnostic Engine (Google DeepMind)  
@@ -791,4 +791,4 @@ x-ratelimit-reset-tokens: 134ms
 
 ## 6. AUDIT SUMMARY CONCLUSION
 
-The Voice Arbitrator architecture achieves a functional, completely cloud-native real-time fact-checking pipeline. The core claim-detection and conflict-analysis components running on Groq's `qwen/qwen3.8-27b` achieve **276ms p50** with **100% structured JSON compliance**. However, total intervention latency is primarily gated by Tavily web search (**~2,300ms p50**) and VAD silence windowing (**1,500ms**), yielding a real-world end-to-end intervention latency between **3.8s and 5.5s**, rather than the sub-1.2s mock values shown on the web dashboard.
+The CallWrapped architecture achieves a functional, completely cloud-native real-time fact-checking pipeline. The core claim-detection and conflict-analysis components running on Groq's `qwen/qwen3.8-27b` achieve **276ms p50** with **100% structured JSON compliance**. However, total intervention latency is primarily gated by Tavily web search (**~2,300ms p50**) and VAD silence windowing (**1,500ms**), yielding a real-world end-to-end intervention latency between **3.8s and 5.5s**, rather than the sub-1.2s mock values shown on the web dashboard.

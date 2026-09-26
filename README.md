@@ -1,10 +1,10 @@
 <div align="center">
 
-# ⚖️ Voice Arbitrator — Autonomous Real-Time Factual Referee
+# ⚖️ CallWrapped — Autonomous Real-Time Factual Referee
 ### Built for the [AssemblyAI Voice Agent Hackathon](https://lablab.ai/ai-hackathons/assemblyai-voice-agent-hackathon) (Sept 1–30, 2026)
 ### Developed by Team **Aang & Bumi**
 
-![Voice Arbitrator Banner](./assets/banner.jpg)
+![CallWrapped Banner](./assets/banner.jpg)
 
 [![AssemblyAI](https://img.shields.io/badge/AssemblyAI-Universal--3.5_Pro-blue?style=for-the-badge&logo=assemblyai&logoColor=white)](https://www.assemblyai.com/)
 [![Groq LPU](https://img.shields.io/badge/Groq-LPU_Inference-f55036?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com/)
@@ -25,7 +25,7 @@ In voice calls, podcasts, gaming lobbies, and team meetings, participants freque
 
 Conversations stall into endless debate, or false information spreads unchecked. Traditional voice assistants are useless here—they require explicit hotwords (`"Hey Siri"`), disrupt casual banter, and don't listen to multi-speaker group dialogues.
 
-**Voice Arbitrator** is a **Silent Referee**:
+**CallWrapped** is a **Silent Referee**:
 - It listens autonomously to multi-party Discord voice channels.
 - It stays **100% silent** during jokes, gaming banter, and normal conversation.
 - When two speakers make mutually exclusive objective factual claims, it **detects the contradiction**, retrieves verified ground truth from authoritative web sources in milliseconds, and **intervenes verbally with the definitive correction and citation**.
@@ -87,7 +87,7 @@ Discord enforces End-to-End Encryption (DAVE protocol / MLS) in voice channels. 
 Middle Eastern tech and gaming communities communicate via fluid code-switching (Egyptian Arabic infused with English hardware and gaming terminology). Rather than mutating transcripts with external dialect paraphrasers, we harness AssemblyAI Universal-3.5 Pro natively with contextual `keyterms_prompt` (`RTX`, `5070`, `VRAM`, `ping`, `lag`, `Discord`). The raw transcript is preserved verbatim as **immutable evidence**.
 
 ### 3. Silent Referee Paradigm (Intervention Only)
-Nobody wants a bot that interrupts every joke or casual comment. Voice Arbitrator uses a multi-stage epistemic filter:
+Nobody wants a bot that interrupts every joke or casual comment. CallWrapped uses a multi-stage epistemic filter:
 1. **Claim Detector (Groq LPU, ~150ms):** Filters out casual chat, banter, and opinions without external API costs.
 2. **Conflict Detector (Groq LPU, ~200ms):** Checks whether opposing speaker claims logically contradict each other.
 3. **Ground Truth Verification (Tavily, ~500ms):** Queries authoritative documentation.
@@ -198,7 +198,7 @@ We empirically probed AssemblyAI's newest streaming endpoints and real-time mode
 
 ## 👥 The Team: Aang & Bumi
 
-Voice Arbitrator was engineered from the ground up for the **AssemblyAI Voice Agent Hackathon** by **Team Aang & Bumi**:
+CallWrapped was engineered from the ground up for the **AssemblyAI Voice Agent Hackathon** by **Team Aang & Bumi**:
 
 | Team Member | Role & Education | Connect & Profiles | Focus Areas |
 | :--- | :--- | :--- | :--- |

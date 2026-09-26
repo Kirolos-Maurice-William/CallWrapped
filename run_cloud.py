@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 def main():
     print("=" * 60)
-    print("  VOICE ARBITRATOR — CLOUD RUNNER")
+    print("  CALLWRAPPED — CLOUD RUNNER")
     print("  AssemblyAI Voice Agent Hackathon (lablab.ai)")
     print("=" * 60)
 
@@ -32,8 +32,8 @@ def main():
     # Wait 2 seconds for backend to initialize
     time.sleep(2)
 
-    # 2. Start Discord Voice Arbitrator Bot
-    print("[2/2] Starting Discord Voice Arbitrator Bot...")
+    # 2. Start Discord CallWrapped Bot
+    print("[2/2] Starting Discord CallWrapped Bot...")
     bot_cmd = [sys.executable, "bot/main.py"]
     bot_proc = subprocess.Popen(bot_cmd, env=env)
 
