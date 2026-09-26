@@ -70,6 +70,9 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-26 | `audit` | OpenRouter Qwen 3.8 27B emergency fallback evaluation (VERDICT: COMPATIBLE, 5/5 claims, 2/2 twin pairs, 1242ms p50, insurance doc only) | `audit/openrouter_probe.py`, `audit/OPENROUTER_EVALUATION.md`, `.env.example` |
 | 2026-09-26 | `32d934d` | Add 401/403 invalid key cascade and permanent removal from pool, dynamic discovery from i=2, 4-way rotation test | `tests/test_groq_rotation.py`, full suite 110/110 OK |
 | 2026-09-26 | `24db55c` | Score Batch 1 captured session (39.59% micro WER, 100% num acc, 0 false anger, 92% claim agreement, 0 false referee triggers) | `audit/score_results_batch1.md`, full suite 110/110 OK |
+| 2026-09-26 | `b946f65` | Taxonomy v2 Phase 1: adopt null_topic and personal in BATCH_ANALYTICS_PROMPT with Egyptian dialogue-act rules | `bot/arbitration/claim_detector.py`, live 17-sample battery 100% verified, full suite 110/110 OK |
+| 2026-09-26 | `d821245` | Taxonomy v2 Phase 2 & 3: Topical-only share, coverage metric, null/topical split accuracy, and SwDA/Schegloff streak bridging | `bot/arbitration/stats.py`, `audit/score_test_session.py`, `bot/main.py`, `frontend/components/AnalyticsWidgets.tsx`, `tests/test_stats.py`, full suite 115/115 OK |
+| 2026-09-26 | `6dbbfbb` | Taxonomy v2 Phase 4: Relabel Batch 1 and re-score (Topical Acc 85.7%, Null Det Acc 77.8%, Claim 96.0%, Anger 100%, 0 false anger, 0 false referee triggers) | `recordings/test_session/2026-09-26_1817/labels_DRAFT.csv`, `audit/score_results_batch1.md`, full suite 115/115 OK |
 
 
 
