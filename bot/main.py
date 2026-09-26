@@ -156,6 +156,7 @@ def build_privacy_notice_text() -> str:
         "يقوم البوت بتحليل المكالمة لحظياً (وقت التحدث، المواضيع، نوبات الإحباط، "
         "والتحقق من الحقائق عبر البحث المباشر على الويب). "
         "يتم معالجة الصوت داخل الذاكرة فقط إلا في حال تفعيل وضع الالتقاط صراحةً من قبل المشرفين (!start-capture). "
+        "وعند التفعيل، تُحفظ المقاطع في مجلد جلسة معزول ومؤرخ داخل recordings/test_session/. "
         "لا يتم حفظ أو تخزين أي تسجيلات صوتية أو نصوص بعد انتهاء الجلسة."
     )
 
@@ -471,8 +472,8 @@ async def show_help(ctx: commands.Context):
             "• `!dashboard`: Link to the live Next.js Judge Dashboard.\n"
             "• `!privacy`: Privacy policy, data retention details, and in-memory processing info.\n"
             "• `!clear`: Clears session turns and dispute history for a fresh demo.\n"
-            "• `!start-capture`: Enables test-mode audio capture to `recordings/test_session/`.\n"
-            "• `!stop-capture`: Stops capture and generates draft labeling CSV."
+            "• `!start-capture`: Enables test-mode audio capture into a new isolated folder `recordings/test_session/<YYYY-MM-DD_HHMM>/`.\n"
+            "• `!stop-capture`: Stops capture, finalizes session, and generates `labels_DRAFT.csv` in the session folder."
         ),
         inline=False
     )
@@ -565,7 +566,8 @@ def build_privacy_embed() -> discord.Embed:
             "**كيف يتعامل البوت مع بياناتك الصوتية؟**\n\n"
             "• 🎙️ **تحليل لحظي فقط:** يتم تحليل الصوت في الذاكرة الحية المؤقتة فقط (RAM) "
             "لحساب وقت التحدث، تصنيف المواضيع، رصد نوبات الإحباط، والتحقق الفوري من المعلومات المتناقضة عبر الويب. "
-            "يتم معالجة الصوت داخل الذاكرة المؤقتة فقط (in-memory) إلا في حال تفعيل وضع الالتقاط صراحةً بواسطة المشرفين (`!start-capture`).\n\n"
+            "يتم معالجة الصوت داخل الذاكرة المؤقتة فقط (in-memory) إلا في حال تفعيل وضع الالتقاط صراحةً بواسطة المشرفين (`!start-capture`). "
+            "وعند التفعيل، تُحفظ المقاطع في مجلد جلسة معزول ومؤرخ (`recordings/test_session/<timestamp>/`).\n\n"
             "• 🗑️ **انعدام التخزين الدائم:** لا يتم حفظ أو تخزين أي تسجيلات صوتية أو نصوص محادثات بعد انتهاء الجلسة. "
             "بمجرد مغادرة القناة الصوتية (`!leave`) أو إعادة التعيين (`!clear`)، تُحذف جميع بيانات الجلسة فوراً.\n\n"
             "• ⚠️ **تنويه نوبات الإحباط:** استنتاج المشاعر ونوبات الإحباط هو تقدير آلي (Automated AI Inference) "
@@ -578,7 +580,8 @@ def build_privacy_embed() -> discord.Embed:
         value=(
             "• **Live Analysis Only**: Real-time processing of talk time, topics, frustration signals, and web fact-checking.\n"
             "• **In-Memory Processing**: Audio is processed strictly in-memory unless capture mode is explicitly enabled by admins (!start-capture).\n"
-            "• **Zero Retention**: All recordings and transcripts are permanently cleared when the session ends (`!leave` or `!clear`).\n"
+            "• **Isolated Test Folders**: When capture is enabled, audio is saved into isolated session folders (`recordings/test_session/<timestamp>/`).\n"
+            "• **Zero Retention**: All session turns and transcripts are permanently cleared when the session ends (`!leave` or `!clear`).\n"
             "• **Emotion Disclaimer**: Frustration/anger detection is an automated AI inference that may be mistaken or imprecise."
         ),
         inline=False

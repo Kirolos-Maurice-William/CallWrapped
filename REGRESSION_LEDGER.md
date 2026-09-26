@@ -54,8 +54,8 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-26 | `8f20bfd` | WebSocket origin check on `/api/ws` closing unauthorized origins with code 1008 (Phase 1 / SEC-01) | `tests/test_verify_dashboard_websocket_alive.py`, full suite 99/99 OK |
 | 2026-09-26 | `e9afbde` | Enforce 180s cooldown check in `!arbitrate` with remaining-time reply (Phase 2 / INV-01) | `tests/test_arbitrate_cooldown.py`, full suite 100/100 OK |
 | 2026-09-26 | `44f5d52` | Complete repo-wide branding sweep to CallWrapped and synchronize `.env.example` with active configuration (Phase 3 / BRD-01 + CFG-01) | `git grep -in "voice arbitrator"` -> 0 hits, full suite 100/100 OK |
-| 2026-09-26 | `dac9b02` | Session-isolated test capture with per-session timestamped folders and draft labels CSV (Phase 1) | `tests/test_capture_mode.py`, `tests/test_barge_in.py`, full suite 101/101 OK |
-| 2026-09-26 | `114dc0b` | Safe recordings migration clustering stacked clips by >10-minute gap, preserving human labels (Phase 2) | `tests/test_migrate_recordings.py`, full suite 104/104 OK |
+| 2026-09-26 | `ca7fa7e` | Safe recordings migration clustering stacked clips by >10-minute gap, preserving human labels (Phase 2) | `tests/test_migrate_recordings.py`, full suite 104/104 OK |
+| 2026-09-26 | `f8a5cdc` | Document TEST_CAPTURE_MODE in .env.example, update !help with per-session folders, verify !privacy (Phase 3) | `tests/test_p1_privacy.py`, full suite 104/104 OK |
 
 
 
