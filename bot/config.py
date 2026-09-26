@@ -34,6 +34,7 @@ class BotConfig:
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     GROQ_API_KEY_2: str = os.getenv("GROQ_API_KEY_2", "")
     GROQ_API_KEY_3: str = os.getenv("GROQ_API_KEY_3", "")
+    GROQ_API_KEY_4: str = os.getenv("GROQ_API_KEY_4", "")
     GROQ_MODEL: str = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
     GROQ_INSTANT_MODEL: str = os.getenv("GROQ_INSTANT_MODEL", os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"))
     GROQ_BATCH_MODEL: str = os.getenv("GROQ_BATCH_MODEL", "qwen/qwen3.8-27b")

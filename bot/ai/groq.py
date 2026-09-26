@@ -60,10 +60,11 @@ class KeyPool:
         candidates = [
             ("key#1", getattr(config, "GROQ_API_KEY", "")),
             ("key#2", getattr(config, "GROQ_API_KEY_2", "")),
-            ("key#3", getattr(config, "GROQ_API_KEY_3", ""))
+            ("key#3", getattr(config, "GROQ_API_KEY_3", "")),
+            ("key#4", getattr(config, "GROQ_API_KEY_4", ""))
         ]
-        # Dynamically discover any higher keys (e.g. GROQ_API_KEY_4, etc.)
-        i = 4
+        # Dynamically discover any higher keys (e.g. GROQ_API_KEY_5, etc.)
+        i = 5
         while True:
             extra_key = getattr(config, f"GROQ_API_KEY_{i}", "") or os.getenv(f"GROQ_API_KEY_{i}", "")
             if not extra_key or not extra_key.strip():
