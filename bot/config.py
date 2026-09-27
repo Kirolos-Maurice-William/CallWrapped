@@ -43,6 +43,9 @@ class BotConfig:
     default_window = "0" if any("test_fanout" in a for a in sys.argv) else "75"
     ANALYTICS_WINDOW_SEC: float = float(os.getenv("ANALYTICS_WINDOW_SEC", default_window))
 
+    # Acoustic Loudness & Emotion Fusion (0 = disabled in prod, 1 = experimental re-enable)
+    ACOUSTIC_FUSION_ENABLED: int = int(os.getenv("ACOUSTIC_FUSION_ENABLED", "0"))
+
     # Test-Mode Capture Flag (clip factory)
     TEST_CAPTURE_MODE: int = int(os.getenv("TEST_CAPTURE_MODE", "0"))
 

@@ -194,6 +194,117 @@ class TestFusion(unittest.TestCase):
         self.assertEqual(res_dict.final_anger, "mild")
         self.assertEqual(res_dict.gate_reason, "boost_applied")
 
+    def test_default_config_flag_is_disabled(self):
+        """Verify default ACOUSTIC_FUSION_ENABLED is 0 (disabled in production)."""
+        from bot.config import config
+        self.assertEqual(config.ACOUSTIC_FUSION_ENABLED, 0)
+
+    def test_engine_fusion_disabled_by_default(self):
+        """When ACOUSTIC_FUSION_ENABLED=0, raw classifier anger is passed through unchanged."""
+        from bot.config import config
+        from bot.arbitration.engine import arbitration_engine, SessionState
+
+        session = SessionState(guild_id=999)
+        # Mock active dispute
+        session.pending_offer = type("OfferMock", (), {"is_resolved": False})()
+
+        buffer_items = [
+            {
+                "line_number": 1,
+                "user_id": 2001,
+                "speaker_name": "Speaker1",
+                "text": "لا هي أستراليا",
+                "timestamp": 1000.0,
+                "talk_delta_seconds": 1.0,
+                "streak_seconds": 2.0,
+                "correlation_id": "corr_flag_0",
+                "audio_features": {
+                    "calibrated": True,
+                    "was_loud": True,
+                    "peak_robust_z": 5.0,
+                    "clip_ratio": 0.01
+                }
+            }
+        ]
+        batch_results = [
+            {
+                "line_number": 1,
+                "topic": "football",
+                "anger": "none",
+                "anger_evidence": None
+            }
+        ]
+
+        old_val = getattr(config, "ACOUSTIC_FUSION_ENABLED", 0)
+        try:
+            config.ACOUSTIC_FUSION_ENABLED = 0
+            arbitration_engine._apply_batch_results(
+                session=session,
+                guild_id=999,
+                buffer_to_process=buffer_items,
+                results=batch_results,
+                tokens={},
+                reason="test_disabled"
+            )
+            # Speaker should have 0 angry episodes because raw anger was "none" and fusion was bypassed
+            stats = session._stats_tracker.get_speaker("2001")
+            self.assertEqual(stats.angry_episodes, 0)
+        finally:
+            config.ACOUSTIC_FUSION_ENABLED = old_val
+
+    def test_engine_fusion_enabled_when_flag_set(self):
+        """When ACOUSTIC_FUSION_ENABLED=1, acoustic boost elevates raw 'none' to 'mild'."""
+        from bot.config import config
+        from bot.arbitration.engine import arbitration_engine, SessionState
+
+        session = SessionState(guild_id=999)
+        # Mock active dispute
+        session.pending_offer = type("OfferMock", (), {"is_resolved": False})()
+
+        buffer_items = [
+            {
+                "line_number": 1,
+                "user_id": 2002,
+                "speaker_name": "Speaker2",
+                "text": "لا هي أستراليا",
+                "timestamp": 1000.0,
+                "talk_delta_seconds": 1.0,
+                "streak_seconds": 2.0,
+                "correlation_id": "corr_flag_1",
+                "audio_features": {
+                    "calibrated": True,
+                    "was_loud": True,
+                    "peak_robust_z": 5.0,
+                    "clip_ratio": 0.01
+                }
+            }
+        ]
+        batch_results = [
+            {
+                "line_number": 1,
+                "topic": "football",
+                "anger": "none",
+                "anger_evidence": None
+            }
+        ]
+
+        old_val = getattr(config, "ACOUSTIC_FUSION_ENABLED", 0)
+        try:
+            config.ACOUSTIC_FUSION_ENABLED = 1
+            arbitration_engine._apply_batch_results(
+                session=session,
+                guild_id=999,
+                buffer_to_process=buffer_items,
+                results=batch_results,
+                tokens={},
+                reason="test_enabled"
+            )
+            # Speaker should have 1 angry episode because fusion boosted "none" to "mild"
+            stats = session._stats_tracker.get_speaker("2002")
+            self.assertEqual(stats.angry_episodes, 1)
+        finally:
+            config.ACOUSTIC_FUSION_ENABLED = old_val
+
 
 if __name__ == "__main__":
     unittest.main()

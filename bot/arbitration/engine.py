@@ -298,15 +298,22 @@ class ArbitrationEngine:
             raw_anger = res.get("anger", "none")
             anger_evidence = res.get("anger_evidence") or ""
 
-            # Deterministic late fusion
+            # Deterministic late fusion (guarded by ACOUSTIC_FUSION_ENABLED)
             audio_feat = item.get("audio_features")
-            fusion = fuse_anger(
-                raw_anger=raw_anger,
-                audio_features=audio_feat,
-                has_active_dispute=has_active_dispute,
-                text=item["text"]
-            )
-            anger = fusion.final_anger
+            if getattr(config, "ACOUSTIC_FUSION_ENABLED", 0):
+                fusion = fuse_anger(
+                    raw_anger=raw_anger,
+                    audio_features=audio_feat,
+                    has_active_dispute=has_active_dispute,
+                    text=item["text"]
+                )
+                anger = fusion.final_anger
+                boost_val = fusion.acoustic_boost
+                gate_reason = fusion.gate_reason
+            else:
+                anger = raw_anger
+                boost_val = 0.0
+                gate_reason = "disabled_by_config"
 
             # 1. Update topic stats (avoid duplicate increment if publisher is hooked by main.py)
             if getattr(publisher.publish_sync_task, "__name__", "") != "_on_event_published":
@@ -326,7 +333,7 @@ class ArbitrationEngine:
                 stats = session._stats_tracker.get_or_create_speaker(spk_key, item["speaker_name"])
 
             logger.info(
-                f"📈 [Batched Analytics Line] {item['speaker_name']}: topic={topic} | anger={anger} (raw={raw_anger}, boost={fusion.acoustic_boost:.2f}, gate={fusion.gate_reason}) | "
+                f"📈 [Batched Analytics Line] {item['speaker_name']}: topic={topic} | anger={anger} (raw={raw_anger}, boost={boost_val:.2f}, gate={gate_reason}) | "
                 f"episodes={stats.angry_episodes} | quote='{anger_evidence}'"
             )
 
