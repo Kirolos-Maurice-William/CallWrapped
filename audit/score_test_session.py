@@ -55,7 +55,8 @@ async def score_session(
     with open(csv_file, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         for r in reader:
-            rows.append(r)
+            if any(val.strip() for val in r.values() if val):
+                rows.append(r)
 
     scored_records: List[Dict[str, Any]] = []
     skipped_records: List[Dict[str, Any]] = []
@@ -69,6 +70,10 @@ async def score_session(
         speaker = row.get("speaker", "unknown")
         correct_text = (row.get("correct_text") or "").strip()
 
+        # Ignore completely empty trailing rows (e.g. from spreadsheet trailing commas)
+        if not clip_id and not wav_fname and not correct_text:
+            continue
+
         # Rule 2: Refuse to score rows with EMPTY correct_text
         if not correct_text:
             skipped_records.append({
@@ -76,6 +81,42 @@ async def score_session(
                 "wav_filename": wav_fname,
                 "speaker": speaker,
                 "reason": "Empty correct_text (unlabeled by human)"
+            })
+            continue
+
+        # Rule 3: Enum vocabulary integrity
+        VALID_TOPICS = {"football", "sports", "politics", "music", "movies", "gaming", "tech", "personal", "personal_life", "other", "null_topic", "null", "none"}
+        VALID_ANGER = {"none", "mild", "high"}
+        VALID_LOUD = {"normal", "loud", "screaming"}
+
+        human_topic_val = (row.get("topic") or "").strip().lower()
+        human_anger_val = (row.get("anger") or "").strip().lower()
+        human_loud_val = (row.get("loud") or "normal").strip().lower()
+
+        if human_topic_val and human_topic_val not in VALID_TOPICS:
+            skipped_records.append({
+                "clip_id": clip_id,
+                "wav_filename": wav_fname,
+                "speaker": speaker,
+                "reason": f"Out-of-vocabulary topic enum: '{human_topic_val}'"
+            })
+            continue
+
+        if human_anger_val and human_anger_val not in VALID_ANGER:
+            skipped_records.append({
+                "clip_id": clip_id,
+                "wav_filename": wav_fname,
+                "speaker": speaker,
+                "reason": f"Out-of-vocabulary anger enum: '{human_anger_val}'"
+            })
+            continue
+
+        if human_loud_val and human_loud_val not in VALID_LOUD:
+            skipped_records.append({
+                "clip_id": clip_id,
+                "wav_filename": wav_fname,
+                "speaker": speaker,
+                "reason": f"Out-of-vocabulary loud enum: '{human_loud_val}'"
             })
             continue
 
