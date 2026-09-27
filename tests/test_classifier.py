@@ -13,7 +13,6 @@ Verifies:
 
 import os
 import sys
-import io
 import json
 import time
 import asyncio
@@ -54,6 +53,7 @@ class TestEveryUtteranceClassifier(unittest.IsolatedAsyncioTestCase):
 
             is_claim, data, latency_ms = await claim_detector.check_claim(text)
 
+            # Documented quota guard: skip assertion evaluation if Groq rate-limits / TPD is exhausted
             if data is None or not data.get("_tokens"):
                 print(f"[{idx}/12] {label}")
                 print(f"  ⚠️  Groq TPD exhausted — skipping")

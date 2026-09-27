@@ -1,3 +1,4 @@
+import os
 import sys
 import csv
 import json
@@ -271,10 +272,12 @@ def generate_labels_draft_csv(recordings_dir: Optional[Path] = None) -> Path:
                 except json.JSONDecodeError:
                     continue
 
-    with open(csv_file, "w", newline="", encoding="utf-8-sig") as f:
+    tmp_csv = csv_file.with_suffix(".csv.tmp")
+    with open(tmp_csv, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+    os.replace(tmp_csv, csv_file)
 
     logger.info(f"📋 [Capture] Generated draft labels CSV with {len(rows)} clips: {csv_file}")
     return csv_file

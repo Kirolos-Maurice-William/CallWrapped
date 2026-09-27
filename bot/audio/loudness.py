@@ -110,6 +110,8 @@ class SpeakerLoudnessBaseline:
         self._cached_median: Optional[float] = None
         self._cached_mad: Optional[float] = None
         self._dirty: bool = True
+        self.recompute_interval: int = 50
+        self._frames_since_recompute: int = 0
 
     @property
     def state(self) -> CalibrationState:
@@ -131,8 +133,8 @@ class SpeakerLoudnessBaseline:
         """Alias for baseline_ready."""
         return self.baseline_ready
 
-    def _recompute_stats_if_dirty(self) -> None:
-        if self._dirty or self._cached_median is None:
+    def _recompute_stats_if_dirty(self, force: bool = False) -> None:
+        if self._cached_median is None or force or (self._dirty and self._frames_since_recompute >= self.recompute_interval):
             n = len(self.history)
             if n < 1:
                 self._cached_median = None
@@ -144,15 +146,16 @@ class SpeakerLoudnessBaseline:
                 mad = float(statistics.median([abs(x - med) for x in hist_list]))
                 self._cached_mad = mad
             self._dirty = False
+            self._frames_since_recompute = 0
 
     @property
     def median(self) -> Optional[float]:
-        self._recompute_stats_if_dirty()
+        self._recompute_stats_if_dirty(force=True)
         return self._cached_median
 
     @property
     def mad(self) -> Optional[float]:
-        self._recompute_stats_if_dirty()
+        self._recompute_stats_if_dirty(force=True)
         return self._cached_mad
 
     def score(self, log_rms_db: float) -> Optional[float]:
@@ -205,6 +208,7 @@ class SpeakerLoudnessBaseline:
 
         self.history.append(float(log_rms_db))
         self._dirty = True
+        self._frames_since_recompute += 1
         return True
 
     def reset(self) -> None:
@@ -213,6 +217,7 @@ class SpeakerLoudnessBaseline:
         self._cached_median = None
         self._cached_mad = None
         self._dirty = True
+        self._frames_since_recompute = 0
 
 
 @dataclass(frozen=True)

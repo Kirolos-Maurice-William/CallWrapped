@@ -15,7 +15,7 @@ else:
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "AI Third Participant"
+    PROJECT_NAME: str = "CallWrapped"
     VERSION: str = "0.1.0"
     
     # AssemblyAI
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     TTS_VOICE_EN: str = "en-US-JennyNeural"
     
     # Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./call_intelligence.db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./data/app.db"
     
     # Network & CORS
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"

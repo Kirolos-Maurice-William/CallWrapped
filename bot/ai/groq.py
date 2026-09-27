@@ -282,7 +282,8 @@ class GroqClient:
             parsed = json.loads(content)
             return parsed, tokens_dict, latency_ms
         except Exception as e:
-            logger.warning(f"⚠️ [GroqClient] Failed to parse JSON from {k['id']}: {e}")
+            raw_excerpt = str(content)[:100] if "content" in locals() else str(data)[:100]
+            logger.warning(f"⚠️ [GroqClient] Failed to parse JSON from {k['id']}: {e} | Excerpt: {raw_excerpt!r}")
             return None, tokens_dict, latency_ms
 
     def complete_chat_sync(
@@ -407,7 +408,9 @@ class GroqClient:
             content = data["choices"][0]["message"]["content"]
             parsed = json.loads(content)
             return parsed, tokens_dict, latency_ms
-        except Exception:
+        except Exception as e:
+            raw_excerpt = str(content)[:100] if "content" in locals() else str(data)[:100]
+            logger.warning(f"Failed to parse JSON response from Groq: {e} | Excerpt: {raw_excerpt!r}")
             return None, tokens_dict, latency_ms
 
     async def complete_json(

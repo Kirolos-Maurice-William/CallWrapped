@@ -2,13 +2,11 @@ import csv
 import json
 import logging
 from pathlib import Path
-from typing import Callable, Optional, Dict, List, Any, Tuple
+from typing import Optional, Dict, List, Any, Tuple
 
 from bot.arbitration.dispute_models import (
-    ThreadState,
     PropositionFamily,
     ClaimEvent,
-    DisputeThread,
     TrackerDecision,
 )
 from bot.arbitration.dispute_tracker import DisputeTracker
@@ -137,6 +135,7 @@ def load_session_events(session_folder: str | Path) -> List[ClaimEvent]:
 
     events: List[ClaimEvent] = []
     current_time = 0.0
+    last_time: Optional[float] = None
 
     with open(labels_path, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
@@ -153,9 +152,18 @@ def load_session_events(session_folder: str | Path) -> List[ClaimEvent]:
 
             # Determine timestamp
             if wname in timestamps:
-                current_time = timestamps[wname]
+                raw_ts = timestamps[wname]
+                if last_time is not None and (raw_ts - last_time > 60.0):
+                    logger.warning(
+                        f"Clamping large replay clock jump from {last_time:.1f}s to {raw_ts:.1f}s "
+                        f"(jump of {raw_ts - last_time:.1f}s > 60s) for {wname}"
+                    )
+                    current_time = last_time + 1.0
+                else:
+                    current_time = raw_ts
             else:
-                current_time += 1.0
+                current_time = (last_time + 1.0) if last_time is not None else 1.0
+            last_time = current_time
 
             text = correct_text or asr_text
             prop_key, val_key, conf, features = extract_claim_from_row(row)

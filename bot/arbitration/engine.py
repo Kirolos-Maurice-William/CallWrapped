@@ -2,6 +2,7 @@ import re
 import time
 import uuid
 import logging
+from collections import OrderedDict
 from typing import Dict, Any, List, Optional, Tuple
 
 import discord
@@ -19,6 +20,31 @@ from bot.audio.fusion import fuse_anger
 import asyncio
 
 logger = logging.getLogger("ArbitrationEngine")
+
+
+class FifoSet:
+    """Ordered set with strict FIFO eviction when capacity is reached."""
+
+    def __init__(self, maxlen: int = 500):
+        self._data: OrderedDict = OrderedDict()
+        self.maxlen = maxlen
+
+    def add(self, item: Any) -> None:
+        if item in self._data:
+            return
+        if len(self._data) >= self.maxlen:
+            evicted, _ = self._data.popitem(last=False)
+            logger.debug(f"FifoSet capacity reached ({self.maxlen}); evicted oldest entry: {evicted}")
+        self._data[item] = None
+
+    def __contains__(self, item: Any) -> bool:
+        return item in self._data
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def clear(self) -> None:
+        self._data.clear()
 
 
 class PendingOffer:
@@ -129,7 +155,7 @@ class SessionState:
         self.pending_utterances: List[Dict[str, Any]] = []
         self.is_draining: bool = False
         self._stats_tracker = SessionStatsTracker(session_id=str(guild_id))
-        self.analyzed_utterances: set = set()
+        self.analyzed_utterances: FifoSet = FifoSet(maxlen=500)
         self.analytics_buffer: List[Dict[str, Any]] = []
         self.last_analytics_flush: float = time.time()
         self._topic_counts: Dict[str, int] = {}
