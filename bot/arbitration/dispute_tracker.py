@@ -152,7 +152,7 @@ class DisputeTracker:
                 # >=2 distinct speakers per side
                 spk_score = 1.0
             elif total_speakers >= 3:
-                spk_score = 0.45
+                spk_score = 0.65
             else:
                 # 1 speaker vs 1 speaker
                 spk_score = 0.35
@@ -187,8 +187,18 @@ class DisputeTracker:
         Routes by proposition_key. Updates FSM states and evaluates offer eligibility.
         """
         now = self.clock()
-        prop_key = event.proposition_key
+        prop_key = (event.proposition_key or "").strip()
         val_key = (event.value_key or "").strip().lower()
+
+        if not prop_key or not val_key:
+            return TrackerDecision(
+                action="none",
+                thread_id=None,
+                state=None,
+                confidence=0.0,
+                reason="non_claim_event",
+                thread=None,
+            )
 
         thread = self.threads.get(prop_key)
 
