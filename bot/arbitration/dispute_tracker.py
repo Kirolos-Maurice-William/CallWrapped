@@ -1,5 +1,5 @@
 import time
-from typing import Callable, Optional, Dict, List, Any, Set
+from typing import Callable, Optional, Dict, List, Any
 from bot.arbitration.dispute_models import (
     ThreadState,
     ClaimEvent,
@@ -263,7 +263,8 @@ class DisputeTracker:
 
         if is_repeated or is_multi_speaker:
             # Offer eligibility criteria met -> transition to TRACKING and compute confidence
-            thread.state = ThreadState.TRACKING
+            if not thread.offered:
+                thread.state = ThreadState.TRACKING
             c_score = self.compute_confidence(thread, event)
             thread.peak_score = max(thread.peak_score, c_score)
 
@@ -290,13 +291,14 @@ class DisputeTracker:
                 )
         else:
             # First incompatible pair: watching, not yet repeated and not yet multi-speaker
-            thread.state = ThreadState.WATCHING
+            if not thread.offered:
+                thread.state = ThreadState.WATCHING
             return TrackerDecision(
-                action="watching",
+                action="watching" if not thread.offered else "tracking",
                 thread_id=thread.thread_id,
                 state=thread.state,
                 confidence=0.0,
-                reason="first_incompatible_pair_watching",
+                reason="first_incompatible_pair_watching" if not thread.offered else "already_offered",
                 thread=thread,
             )
 

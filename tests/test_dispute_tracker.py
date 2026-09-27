@@ -393,6 +393,42 @@ class TestDisputeTracker(unittest.TestCase):
         # Denominator: 0.32 + 0.25 = 0.57. Numerator: 0.32 + 0.25 = 0.57. Result = 1.0
         self.assertAlmostEqual(alias_score, 1.0, places=5)
 
+    def test_f3_04_offered_state_not_demoted_and_not_evicted_on_decay(self):
+        """
+        F3-04: When a thread reaches OFFERED state, subsequent claims on the same thread
+        must NOT demote thread.state to TRACKING or WATCHING.
+        When tick() sweeps, the offered thread must remain OFFERED and never enter DECAY,
+        preserving the Rule 4 invariant: 'Never evict OFFERED'.
+        """
+        prop_key = "rtx_vram|gpu||categorical"
+        # Side A: Omar, Side B: Ziad, Side A: Mostafa, Side B: Tamer (2 vs 2 multi-speaker dispute)
+        self.tracker.ingest(ClaimEvent("e1", self.clock(), "Omar", prop_key, "16GB", 0.95, "كارت 16 جيجا"))
+        self.clock.advance(1.0)
+        self.tracker.ingest(ClaimEvent("e2", self.clock(), "Ziad", prop_key, "12GB", 0.95, "لا هو 12 بس"))
+        self.clock.advance(1.0)
+        self.tracker.ingest(ClaimEvent("e3", self.clock(), "Mostafa", prop_key, "16GB", 0.95, "أنا متأكد 16"))
+        self.clock.advance(1.0)
+        d4 = self.tracker.ingest(ClaimEvent("e4", self.clock(), "Tamer", prop_key, "12GB", 0.95, "لا 12 جيجا بايت"))
+
+        thread = self.tracker.get_thread(prop_key)
+        self.assertTrue(thread.offered, "Thread should be marked offered")
+        self.assertEqual(thread.state, ThreadState.OFFERED, "Thread state should be OFFERED")
+        self.assertEqual(d4.action, "request_offer")
+
+        # Subsequent claim on the SAME proposition after OFFERED
+        self.clock.advance(2.0)
+        d5 = self.tracker.ingest(ClaimEvent("e5", self.clock(), "Kareem", prop_key, "12GB", 0.95, "أنا مع تامر 12"))
+        self.assertEqual(d5.state, ThreadState.OFFERED, "Subsequent claim must NOT demote state to TRACKING")
+        self.assertEqual(thread.state, ThreadState.OFFERED, "Thread state must remain OFFERED")
+
+        # Advance past 60% decay window (> 90s)
+        self.clock.advance(100.0)
+        decisions = self.tracker.tick()
+        # Verify tick() did NOT demote to DECAY
+        decay_for_thread = [d for d in decisions if d.thread_id == thread.thread_id and d.action == "decay"]
+        self.assertEqual(len(decay_for_thread), 0, "OFFERED thread must never enter DECAY on tick()")
+        self.assertEqual(thread.state, ThreadState.OFFERED, "Thread state must remain OFFERED after tick()")
+
 
 if __name__ == "__main__":
     unittest.main()

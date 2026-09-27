@@ -710,7 +710,52 @@ class TestTwoStageReferee(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(len(abstain_logs) > 0)
             self.assertEqual(self.session.unverifiable_count, 1)
 
+    async def test_l_check_command_atomic_and_exception_safe_f3_05(self):
+        """
+        F3-05: !check marks pending offer resolved immediately to prevent race conditions,
+        safely catches channel send exceptions, and rejects subsequent duplicate !check callers.
+        """
+        search_task = asyncio.create_task(asyncio.sleep(0.01))
+        offer = PendingOffer(
+            offer_id="off_atomic_check",
+            guild_id=self.guild_id,
+            speaker_a="Omar",
+            claim_a="16GB",
+            speaker_b="Ziad",
+            claim_b="12GB",
+            entity="RTX 5070",
+            search_query="RTX 5070 specs",
+            target_domains=[],
+            prefetch_task=search_task,
+            created_at=time.time(),
+            expires_at=time.time() + 30.0
+        )
+        self.session.pending_offer = offer
+
+        mock_ctx = AsyncMock(spec=commands.Context)
+        mock_ctx.guild.id = self.guild_id
+        mock_ctx.author.display_name = "TextUser"
+        mock_ctx.channel = AsyncMock(spec=discord.TextChannel)
+        # Simulate Discord API exception on first send
+        mock_ctx.send.side_effect = [discord.DiscordException("Network glitch"), None]
+
+        with patch("bot.arbitration.engine.arbitration_engine.confirm_dispute_offer", new_callable=AsyncMock) as mock_confirm:
+            # First caller: despite ctx.send failing, arbitration confirmation proceeds!
+            await check_dispute(mock_ctx)
+            self.assertTrue(offer.is_resolved, "Offer must be marked resolved immediately")
+            mock_confirm.assert_called_once()
+
+            # Second caller: offer is already resolved, so it rejects with info message
+            mock_ctx.send.side_effect = None
+            mock_ctx.send.reset_mock()
+            mock_confirm.reset_mock()
+
+            await check_dispute(mock_ctx)
+            mock_confirm.assert_not_called()
+            mock_ctx.send.assert_called_once_with("ℹ️ لا يوجد طلب تحقق معلق حالياً.")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

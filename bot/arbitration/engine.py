@@ -429,9 +429,13 @@ class ArbitrationEngine:
         # Check for confirmation utterance if an offer is currently pending
         if session.pending_offer and not session.pending_offer.is_resolved:
             if is_confirmation_utterance(raw_text):
+                offer = session.pending_offer
+                offer.is_resolved = True
+                if offer.expiry_task and not offer.expiry_task.done():
+                    offer.expiry_task.cancel()
                 logger.info(
                     f"🎯 [Voice Confirmation] Detected confirmation keyword from {speaker_name}: '{raw_text}'. "
-                    f"Confirming offer {session.pending_offer.offer_id}."
+                    f"Confirming offer {offer.offer_id}."
                 )
                 asyncio.create_task(
                     self.confirm_dispute_offer(
@@ -439,7 +443,8 @@ class ArbitrationEngine:
                         confirmation_end_time=speech_end if speech_end > 0 else time.time(),
                         confirmed_by=speaker_name,
                         voice_client=voice_client,
-                        text_channel=text_channel
+                        text_channel=text_channel,
+                        target_offer=offer
                     )
                 )
 
@@ -892,7 +897,8 @@ class ArbitrationEngine:
         confirmation_end_time: float,
         confirmed_by: str,
         voice_client: Optional[discord.VoiceClient] = None,
-        text_channel: Optional[discord.TextChannel] = None
+        text_channel: Optional[discord.TextChannel] = None,
+        target_offer: Optional[PendingOffer] = None
     ):
         """
         Executes confirmation of a pending dispute offer:
@@ -903,8 +909,8 @@ class ArbitrationEngine:
         5. Publishes dispute_check_completed VoiceEvent and sends Discord embed
         """
         session = self.get_session(guild_id)
-        offer = session.pending_offer
-        if not offer or offer.is_resolved:
+        offer = target_offer or session.pending_offer
+        if not offer or (target_offer is None and offer.is_resolved):
             logger.debug(f"[DisputeConfirm] No active pending offer for guild {guild_id}")
             return
 

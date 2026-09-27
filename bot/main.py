@@ -1,4 +1,3 @@
-import os
 import sys
 import time
 import asyncio
@@ -669,17 +668,31 @@ async def check_dispute(ctx: commands.Context):
     guild_ctx = get_guild_context(ctx.guild.id)
     session = arbitration_engine.get_session(ctx.guild.id)
 
-    if not session.pending_offer or session.pending_offer.is_resolved:
-        await ctx.send("ℹ️ لا يوجد طلب تحقق معلق حالياً.")
+    offer = session.pending_offer
+    if not offer or offer.is_resolved:
+        try:
+            await ctx.send("ℹ️ لا يوجد طلب تحقق معلق حالياً.")
+        except Exception as e:
+            logger.debug(f"Could not send check notice to text channel: {e}")
         return
 
-    await ctx.send("🔍 جاري التحقق من المعلومة عبر المصادر الموثوقة...")
+    # Atomic win: mark offer resolved immediately before any network I/O
+    offer.is_resolved = True
+    if offer.expiry_task and not offer.expiry_task.done():
+        offer.expiry_task.cancel()
+
+    try:
+        await ctx.send("🔍 جاري التحقق من المعلومة عبر المصادر الموثوقة...")
+    except Exception as e:
+        logger.debug(f"Could not send check confirmation notice to text channel: {e}")
+
     await arbitration_engine.confirm_dispute_offer(
         guild_id=ctx.guild.id,
         confirmation_end_time=time.time(),
         confirmed_by=ctx.author.display_name,
         voice_client=guild_ctx.voice_client,
-        text_channel=ctx.channel
+        text_channel=ctx.channel,
+        target_offer=offer
     )
 
 
