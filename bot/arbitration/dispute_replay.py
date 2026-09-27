@@ -131,7 +131,8 @@ def load_session_events(session_folder: str | Path) -> List[ClaimEvent]:
                     ts = data.get("timestamp")
                     if wname and ts is not None:
                         timestamps[wname] = float(ts)
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Skipping malformed session_log.jsonl line: {e}")
                     continue
 
     events: List[ClaimEvent] = []

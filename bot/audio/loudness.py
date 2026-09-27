@@ -73,7 +73,8 @@ class PCM16Adapter:
             thresh = cls.CLIPPING_SAMPLE_THRESHOLD
             clipped = sum(1 for s in samples if s >= thresh or s <= -thresh)
             return clipped, total
-        except Exception:
+        except Exception as e:
+            logger.warning(f"count_clipped_samples failed on input type {type(samples).__name__}: {e}")
             return 0, 0
 
     @classmethod
