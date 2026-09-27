@@ -78,3 +78,4 @@ Format: Date | Commit Hash | What Changed | Proving Acceptance Test
 | 2026-09-26 | `699224c` | Fix TRACE4-03: move import wave to top-level module imports | `audit/score_test_session.py`, full suite 116/116 OK |
 | 2026-09-26 | `011fdc7` | Fix TRACE4-04: treat blank topic cell as unannotated, exclude from topical and null denominators | `audit/score_test_session.py`, `tests/test_score_test_session.py`, full suite 116/116 OK |
 | 2026-09-27 | `6c1d209` | Score Batch 2 captured session (movies dispute) and integrate real referee resolution | `audit/score_results_batch2.md`, `audit/score_test_session.py`, full suite 116/116 OK |
+| 2026-09-27 | `a340ec6` | Score Batch 3 captured session (World Cup dispute) and add enum vocabulary integrity check | `audit/score_results_batch3.md`, `audit/score_test_session.py`, full suite 116/116 OK |
