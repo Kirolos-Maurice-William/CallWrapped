@@ -137,7 +137,7 @@ def load_session_events(session_folder: str | Path) -> List[ClaimEvent]:
     events: List[ClaimEvent] = []
     current_time = 0.0
 
-    with open(labels_path, "r", encoding="utf-8") as f:
+    with open(labels_path, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         for idx, row in enumerate(reader, start=1):
             clip_id = row.get("clip_id") or f"clip_{idx:03d}"
