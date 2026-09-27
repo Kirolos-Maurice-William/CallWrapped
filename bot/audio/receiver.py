@@ -1,5 +1,6 @@
 import time
 import asyncio
+import threading
 import logging
 from typing import Dict, Optional, Callable, Awaitable
 import numpy as np
@@ -38,6 +39,7 @@ class AudioReceiver(voice_recv.AudioSink):
         self.loop = loop
         self.on_utterance = on_utterance
         self._voice_client = voice_client
+        self._lock = threading.Lock()
         self._checker_task: Optional[asyncio.Task] = None
         self.buffers: Dict[int, UserSpeechBuffer] = {}
         self.speaker_baselines: Dict[int, SpeakerLoudnessBaseline] = {}
@@ -123,21 +125,40 @@ class AudioReceiver(voice_recv.AudioSink):
             speaker.stop(vc, user_label)
 
         now = time.time()
-        buf.add_frame(pcm_bytes, rms, now)
+        should_forcesplit = False
 
-        # 3b. Feature B: Acoustic loudness tracking (O(1), no I/O, no awaits)
-        log_rms_db = rms_to_db(rms)
-        clipped_count, total_samples = PCM16Adapter.count_clipped_samples(pcm_bytes)
-        is_frame_clipped = (clipped_count / total_samples >= PCM16Adapter.FRAME_CLIP_RATIO_THRESHOLD) if total_samples > 0 else False
-        baseline.observe_eligible_frame(log_rms_db, is_frame_clipped)
+        with self._lock:
+            # 2. Get or create isolated user buffer
+            if user_id not in self.buffers:
+                self.buffers[user_id] = UserSpeechBuffer(user_id, display_name)
+            if user_id not in self.speaker_baselines:
+                self.speaker_baselines[user_id] = SpeakerLoudnessBaseline()
+            if user_id not in self.utterance_accumulators:
+                self.utterance_accumulators[user_id] = UtteranceLoudnessAccumulator()
 
-        if buf.is_speaking:
-            if not acc.is_active:
-                acc.begin(utterance_id=f"utt_{user_id}_{int(now * 1000)}", speaker_id=str(user_id))
-            acc.observe_frame_raw(rms=rms, log_rms_db=log_rms_db, clipped_samples=clipped_count, total_samples=total_samples)
+            buf = self.buffers[user_id]
+            buf.user_name = display_name
+            baseline = self.speaker_baselines[user_id]
+            acc = self.utterance_accumulators[user_id]
 
-        # 4. Force utterance finalization if max speech duration exceeded
-        if buf.is_speaking and (now - buf.speech_start_time >= config.MAX_SPEECH_DURATION_SEC):
+            buf.add_frame(pcm_bytes, rms, now)
+
+            # 3b. Feature B: Acoustic loudness tracking (O(1), no I/O, no awaits)
+            log_rms_db = rms_to_db(rms)
+            clipped_count, total_samples = PCM16Adapter.count_clipped_samples(pcm_bytes)
+            is_frame_clipped = (clipped_count / total_samples >= PCM16Adapter.FRAME_CLIP_RATIO_THRESHOLD) if total_samples > 0 else False
+            baseline.observe_eligible_frame(log_rms_db, is_frame_clipped)
+
+            if buf.is_speaking:
+                if not acc.is_active:
+                    acc.begin(utterance_id=f"utt_{user_id}_{int(now * 1000)}", speaker_id=str(user_id))
+                acc.observe_frame_raw(rms=rms, log_rms_db=log_rms_db, clipped_samples=clipped_count, total_samples=total_samples)
+
+            # 4. Force utterance finalization if max speech duration exceeded
+            if buf.is_speaking and (now - buf.speech_start_time >= config.MAX_SPEECH_DURATION_SEC):
+                should_forcesplit = True
+
+        if should_forcesplit:
             self._finalize_utterance(buf, ended_by="forcesplit")
 
     async def _silence_checker_loop(self):
@@ -145,25 +166,35 @@ class AudioReceiver(voice_recv.AudioSink):
         while self._is_active:
             await asyncio.sleep(0.1)
             now = time.time()
-            for buf in list(self.buffers.values()):
-                if buf.is_speaking and buf.pcm_chunks:
-                    silence_gap = now - buf.last_speech_time
-                    if silence_gap >= config.SILENCE_DURATION_SEC:
-                        self._finalize_utterance(buf, ended_by="silence")
+            with self._lock:
+                active_buffers = list(self.buffers.values())
+
+            for buf in active_buffers:
+                should_finalize = False
+                with self._lock:
+                    if buf.is_speaking and buf.pcm_chunks:
+                        silence_gap = now - buf.last_speech_time
+                        if silence_gap >= config.SILENCE_DURATION_SEC:
+                            should_finalize = True
+                if should_finalize:
+                    self._finalize_utterance(buf, ended_by="silence")
 
     def _finalize_utterance(self, buf: UserSpeechBuffer, ended_by: str = "silence"):
         """Dispatches completed audio for speech-to-text transcription concurrently."""
-        chunks = buf.pcm_chunks
-        user_id = buf.user_id
-        user_name = buf.user_name
-        speech_start = buf.speech_start_time
-        speech_end = buf.last_speech_time
-        duration = buf.duration()
-        buf.reset()
+        with self._lock:
+            if not buf.is_speaking and not buf.pcm_chunks:
+                return
+            chunks = buf.pcm_chunks
+            user_id = buf.user_id
+            user_name = buf.user_name
+            speech_start = buf.speech_start_time
+            speech_end = buf.last_speech_time
+            duration = buf.duration()
+            buf.reset()
 
-        baseline = self.speaker_baselines.get(user_id)
-        acc = self.utterance_accumulators.get(user_id)
-        audio_features: Optional[UtteranceAudioFeatures] = acc.finalize(baseline) if acc else None
+            baseline = self.speaker_baselines.get(user_id)
+            acc = self.utterance_accumulators.get(user_id)
+            audio_features: Optional[UtteranceAudioFeatures] = acc.finalize(baseline) if acc else None
 
         if duration >= config.MIN_SPEECH_DURATION_SEC and len(chunks) > 5:
             logger.info(f"🎙️ [Speech Finished] {user_name} ({duration:.1f}s, {len(chunks)} frames, window={speech_start:.2f}-{speech_end:.2f}, ended_by={ended_by}). Processing...")
@@ -181,10 +212,25 @@ class AudioReceiver(voice_recv.AudioSink):
                         coro = self.on_utterance(user_id, user_name, wav_bytes, speech_start, speech_end, ended_by)
                     except TypeError:
                         coro = self.on_utterance(user_id, user_name, wav_bytes, speech_start, speech_end)
-                asyncio.run_coroutine_threadsafe(
+
+                fut = asyncio.run_coroutine_threadsafe(
                     coro,
                     self.loop
                 )
+
+                def _log_future_exception(f):
+                    try:
+                        exc = f.exception()
+                        if exc:
+                            logger.error(
+                                f"❌ [AudioReceiver] Unhandled exception in utterance pipeline for {user_name} ({user_id}): {exc}",
+                                exc_info=exc
+                            )
+                    except (asyncio.CancelledError, Exception) as cb_err:
+                        if not isinstance(cb_err, asyncio.CancelledError):
+                            logger.error(f"❌ [AudioReceiver] Failed retrieving future result: {cb_err}")
+
+                fut.add_done_callback(_log_future_exception)
 
     def cleanup(self):
         self._is_active = False
@@ -193,10 +239,11 @@ class AudioReceiver(voice_recv.AudioSink):
                 self._checker_task.cancel()
             except Exception:
                 pass
-        if hasattr(self, "buffers"):
-            self.buffers.clear()
-        if hasattr(self, "speaker_baselines"):
-            self.speaker_baselines.clear()
-        if hasattr(self, "utterance_accumulators"):
-            self.utterance_accumulators.clear()
+        with self._lock:
+            if hasattr(self, "buffers"):
+                self.buffers.clear()
+            if hasattr(self, "speaker_baselines"):
+                self.speaker_baselines.clear()
+            if hasattr(self, "utterance_accumulators"):
+                self.utterance_accumulators.clear()
         logger.info("[AudioReceiver] Cleaned up receiver resources.")

@@ -13,6 +13,7 @@ import io
 import time
 import asyncio
 import unittest
+import threading
 import logging
 from unittest.mock import MagicMock, patch, AsyncMock
 import numpy as np
@@ -283,6 +284,100 @@ class TestBargeIn(unittest.IsolatedAsyncioTestCase):
         print("[PROOF VERIFIED] Silent audio does not trigger barge-in.\n")
         receiver.cleanup()
 
+    async def test_5_concurrent_finalize_no_duplicate_dispatch_f3_02(self):
+        """
+        F3-02: Simultaneous finalize calls (forcesplit + silence race) must NOT dispatch
+        duplicate utterances or corrupt the speech accumulator. Exactly 1 dispatch must occur.
+        """
+        dispatched_utterances = []
+
+        async def tracking_on_utterance(*args):
+            dispatched_utterances.append(args)
+
+        receiver = AudioReceiver(
+            loop=asyncio.get_running_loop(),
+            on_utterance=tracking_on_utterance,
+            voice_client=None
+        )
+
+        user_id = 44444
+        user_name = "RaceSpeaker"
+        # Seed buffer and accumulators
+        receiver.write(
+            MagicMock(id=user_id, display_name=user_name, bot=False),
+            MagicMock(spec=voice_recv.VoiceData, pcm=create_pcm_frame(amplitude=2000), source=None)
+        )
+
+        buf = receiver.buffers[user_id]
+        # Add enough frames to pass duration / frame count gates
+        now = time.time()
+        buf.speech_start_time = now - 1.0
+        buf.last_speech_time = now
+        buf.is_speaking = True
+        frame = create_pcm_frame(amplitude=2000)
+        for _ in range(30):
+            buf.pcm_chunks.append(frame)
+
+        # Concurrently trigger finalize from two threads
+        t1 = threading.Thread(target=receiver._finalize_utterance, args=(buf, "forcesplit"))
+        t2 = threading.Thread(target=receiver._finalize_utterance, args=(buf, "silence"))
+
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        # Allow coroutines to schedule on loop
+        await asyncio.sleep(0.1)
+
+        self.assertEqual(len(dispatched_utterances), 1, "Exactly one utterance must be dispatched despite concurrent finalize calls")
+        self.assertEqual(len(buf.pcm_chunks), 0, "Buffer must be empty after finalize")
+        self.assertFalse(buf.is_speaking, "Buffer is_speaking must be False")
+        receiver.cleanup()
+
+    async def test_6_unhandled_future_exception_logged_f3_03(self):
+        """
+        F3-03: Any unhandled exception raised during on_utterance pipeline execution
+        must be caught by the Future callback and logged as an ERROR with exc_info.
+        """
+        async def failing_on_utterance(*args):
+            raise RuntimeError("Pipeline failed during transcription!")
+
+        receiver = AudioReceiver(
+            loop=asyncio.get_running_loop(),
+            on_utterance=failing_on_utterance,
+            voice_client=None
+        )
+
+        user_id = 55555
+        user_name = "FaultySpeaker"
+        receiver.write(
+            MagicMock(id=user_id, display_name=user_name, bot=False),
+            MagicMock(spec=voice_recv.VoiceData, pcm=create_pcm_frame(amplitude=2000), source=None)
+        )
+
+        buf = receiver.buffers[user_id]
+        now = time.time()
+        buf.speech_start_time = now - 1.0
+        buf.last_speech_time = now
+        buf.is_speaking = True
+        frame = create_pcm_frame(amplitude=2000)
+        for _ in range(30):
+            buf.pcm_chunks.append(frame)
+
+        with self.assertLogs("AudioReceiver", level="ERROR") as cm:
+            receiver._finalize_utterance(buf, ended_by="silence")
+            # Wait for threadsafe coroutine to run on event loop and fail
+            await asyncio.sleep(0.15)
+
+        self.assertTrue(
+            any("Unhandled exception in utterance pipeline for FaultySpeaker (55555): Pipeline failed during transcription!" in log
+                for log in cm.output),
+            f"Expected error log with exception details, got: {cm.output}"
+        )
+        receiver.cleanup()
+
 
 if __name__ == "__main__":
     unittest.main()
+
