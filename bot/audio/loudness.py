@@ -1,6 +1,6 @@
 import array
 import collections
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from enum import Enum
 import json
 import logging
@@ -8,7 +8,7 @@ import math
 from pathlib import Path
 import statistics
 import time
-from typing import Optional, List, Union, Sequence, Tuple, Any, Dict
+from typing import Optional, List, Union, Tuple, Any, Dict
 
 logger = logging.getLogger("LoudnessTracker")
 

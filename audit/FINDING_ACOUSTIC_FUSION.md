@@ -122,3 +122,19 @@ To make multi-modal emotion detection effective in Discord voice calls, future w
 1. **Prosodic Pitch & F0 Contour Tracking:** Fundamental frequency ($F_0$) trajectory and vocal strain/jitter provide significantly higher discriminative power between laugh-shouting and angry shouting than raw RMS volume alone.
 2. **Global Session / Room-Relative Baselines:** Measuring a speaker's volume relative to the ambient channel energy and cross-speaker dynamics, rather than solely their own historical median.
 3. **Conversational Turn Context:** Feeding acoustic metadata into an acoustic-aware classification prompt or a lightweight trained fusion model rather than fixed-threshold heuristic mathematical formulas.
+
+---
+
+### Parked Design Note: Intra-Utterance Baseline Adaptation
+
+> **Status:** Known limitation, parked until acoustic feature returns with pitch.
+>
+> The per-speaker `SpeakerLoudnessBaseline` updates in real-time during `receiver.py:write()`.
+> For long utterances that start quiet and escalate to a shout, sub-threshold frames
+> ($z < 2.5$) are absorbed into the running baseline *during* the same utterance,
+> before `UtteranceLoudnessAccumulator.finalize()` scores the utterance's peak $z$-score.
+> This slightly depresses the computed peak $z$ for gradually escalating speech.
+>
+> **Revisit when:** acoustic feature returns with pitch/F0 contour extraction — at that
+> point, consider freezing the baseline snapshot at utterance-begin and scoring the
+> entire utterance against the frozen snapshot rather than the live-updating window.

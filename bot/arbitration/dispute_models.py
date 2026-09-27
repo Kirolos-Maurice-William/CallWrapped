@@ -2,7 +2,7 @@ import re
 from enum import StrEnum
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Set, List, Any
-from bot.arbitration.claim_memory import canonicalize_entity, _STRIP_PREFIXES_AR
+from bot.arbitration.claim_memory import _STRIP_PREFIXES_AR
 
 
 def normalize_family_entity(raw: Optional[str]) -> str:
