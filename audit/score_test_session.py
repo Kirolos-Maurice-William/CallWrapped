@@ -20,6 +20,7 @@ from audit.check_numbers import get_numbers
 from bot.ai.assemblyai import assemblyai_client
 from bot.arbitration.claim_detector import claim_detector
 from bot.arbitration.conflict_detector import conflict_detector
+from bot.arbitration.verifier import arbitration_verifier
 from bot.config import config
 
 logger = logging.getLogger("ScoreTestSession")
@@ -253,28 +254,69 @@ async def score_session(
         except Exception as e:
             logger.warning(f"⚠️ [Batch Analytics] Batched classifier unavailable ({e}), using instant/heuristic.")
 
-    # Step 1d: Contradiction pair referee gate firing check
+    # Step 1d: Contradiction pair referee gate firing check & real resolution
     referee_checks: List[Dict[str, Any]] = []
     for cp_id, pair_records in claim_pairs.items():
         if len(pair_records) >= 2:
-            r_a, r_b = pair_records[0], pair_records[1]
-            c_a = r_a["claim_text"] or r_a["asr_text"]
-            c_b = r_b["claim_text"] or r_b["asr_text"]
+            # Group records by speaker to ensure distinct opposing speakers
+            speakers = list(dict.fromkeys(r["speaker"] for r in pair_records))
+            if len(speakers) >= 2:
+                spk_a = speakers[0]
+                spk_b = speakers[1]
+                recs_a = [r for r in pair_records if r["speaker"] == spk_a]
+                recs_b = [r for r in pair_records if r["speaker"] == spk_b]
+                c_a = " ".join((r["claim_text"] or r["asr_text"]) for r in recs_a)
+                c_b = " ".join((r["claim_text"] or r["asr_text"]) for r in recs_b)
+            else:
+                r_a, r_b = pair_records[0], pair_records[1]
+                spk_a, spk_b = r_a["speaker"], r_b["speaker"]
+                c_a = r_a["claim_text"] or r_a["asr_text"]
+                c_b = r_b["claim_text"] or r_b["asr_text"]
 
             has_conflict, c_data, gate_ms = await conflict_detector.detect_conflict(
-                speaker_a=r_a["speaker"],
+                speaker_a=spk_a,
                 claim_a=c_a,
-                speaker_b=r_b["speaker"],
+                speaker_b=spk_b,
                 claim_b=c_b
             )
+
+            # Step 1d-ii: If referee gates approve public conflict, execute real Tavily search & Groq verifier
+            verdict = None
+            sources = []
+            search_ms = 0
+            synth_ms = 0
+            search_query = (c_data or {}).get("search_query", "")
+            target_domains = (c_data or {}).get("target_domains", [])
+
+            if has_conflict and search_query:
+                if pace_delay_sec > 0:
+                    await asyncio.sleep(pace_delay_sec)
+                try:
+                    verdict, search_ms, synth_ms, sources = await arbitration_verifier.verify_dispute(
+                        speaker_a=spk_a,
+                        claim_a=c_a,
+                        speaker_b=spk_b,
+                        claim_b=c_b,
+                        search_query=search_query,
+                        target_domains=target_domains
+                    )
+                except Exception as e:
+                    logger.warning(f"⚠️ [Referee Verifier Error] {e}")
+
             referee_checks.append({
                 "pair_id": cp_id,
-                "speaker_a": r_a["speaker"],
+                "speaker_a": spk_a,
                 "claim_a": c_a,
-                "speaker_b": r_b["speaker"],
+                "speaker_b": spk_b,
                 "claim_b": c_b,
                 "referee_fired": has_conflict,
-                "conflict_data": c_data or {}
+                "conflict_data": c_data or {},
+                "search_query": search_query,
+                "verdict": verdict,
+                "sources": sources,
+                "search_ms": search_ms,
+                "synth_ms": synth_ms,
+                "gate_latency_ms": gate_ms
             })
 
     # Aggregate Metrics
@@ -482,12 +524,59 @@ def render_markdown_report(summary: Dict[str, Any]) -> str:
     # Contradiction Pairs section
     md.append("## 2. Contradiction Pairs & Referee Gate Triggers\n")
     if summary["referee_checks"]:
-        md.append("| Pair ID | Speaker A | Claim A | Speaker B | Claim B | Referee Triggered? |")
-        md.append("|---|---|---|---|---|---|")
+        md.append("| Pair ID | Speaker A | Claim A | Speaker B | Claim B | Referee Triggered? | Search Query | Verdict Stance |")
+        md.append("|---|---|---|---|---|---|---|---|")
         for p in summary["referee_checks"]:
             trig_icon = "⚔️ **YES (Offer Fired)**" if p["referee_fired"] else "🛑 NO (Filtered/Suppressed)"
-            md.append(f"| `{p['pair_id']}` | {p['speaker_a']} | {p['claim_a']} | {p['speaker_b']} | {p['claim_b']} | {trig_icon} |")
+            sq = f"`{p['search_query']}`" if p.get("search_query") else "—"
+            v = p.get("verdict") or {}
+            if v:
+                a_st = v.get("speaker_a_status", "UNVERIFIABLE")
+                b_st = v.get("speaker_b_status", "UNVERIFIABLE")
+                if a_st == "SUPPORTED" and b_st != "SUPPORTED":
+                    stance = f"Sided with {p['speaker_a']} ({a_st})"
+                elif b_st == "SUPPORTED" and a_st != "SUPPORTED":
+                    stance = f"Sided with {p['speaker_b']} ({b_st})"
+                elif a_st == "CONTRADICTED" and b_st == "CONTRADICTED":
+                    stance = "Both Contradicted (Abstained)"
+                elif a_st == "SUPPORTED" and b_st == "SUPPORTED":
+                    stance = "Both Supported (Nuanced/Tie)"
+                else:
+                    stance = f"Unresolved / {v.get('status', 'UNVERIFIABLE')}"
+            elif p["referee_fired"]:
+                stance = "Pending / No verdict"
+            else:
+                rejection = (p.get("conflict_data") or {}).get("rejection_reason", "none")
+                stance = f"Suppressed ({rejection})"
+            md.append(f"| `{p['pair_id']}` | {p['speaker_a']} | {p['claim_a']} | {p['speaker_b']} | {p['claim_b']} | {trig_icon} | {sq} | {stance} |")
         md.append("\n")
+
+        # Detailed breakdown per pair
+        for p in summary["referee_checks"]:
+            md.append(f"### Dispute Detail: `{p['pair_id']}`\n")
+            md.append(f"- **Speaker A ({p['speaker_a']}):** \"{p['claim_a']}\"")
+            md.append(f"- **Speaker B ({p['speaker_b']}):** \"{p['claim_b']}\"")
+            c_data = p.get("conflict_data") or {}
+            conf = c_data.get("confidence", 0)
+            ename = c_data.get("entity_name", "unknown")
+            trig_desc = f"⚔️ **Triggered** (Confidence: {conf}%, Entity: '{ename}')" if p["referee_fired"] else f"🛑 **Suppressed** ({c_data.get('rejection_reason', 'none')}, Confidence: {conf}%)"
+            md.append(f"- **Referee Gate Decision:** {trig_desc}")
+            if p.get("search_query"):
+                md.append(f"- **Generated Search Query:** `{p['search_query']}`")
+            v = p.get("verdict")
+            if v:
+                md.append(f"- **Web Sources Retrieved (Tavily):** {len(p.get('sources', []))} sources ({p.get('search_ms', 0)}ms)")
+                for s in p.get("sources", [])[:3]:
+                    md.append(f"  - [{s.get('title', 'Source')}]({s.get('url', '')}) (Tier {s.get('source_tier', 3)})")
+                md.append(f"- **Speaker A Status ({p['speaker_a']}):** `{v.get('speaker_a_status')}`")
+                md.append(f"- **Speaker B Status ({p['speaker_b']}):** `{v.get('speaker_b_status')}`")
+                md.append(f"- **Evidence Strength:** `{v.get('evidence_strength')}` (Confidence: {v.get('confidence', 0)}%)")
+                md.append(f"- **Ground Truth Fact:** {v.get('correct_fact')}")
+                if v.get("spoken_intervention"):
+                    md.append(f"- **Spoken Intervention:** \"{v.get('spoken_intervention')}\"")
+                if v.get("selected_source_url"):
+                    md.append(f"- **Primary Citation:** [{v.get('selected_source_title', 'Source')}]({v.get('selected_source_url')})")
+            md.append("\n")
     else:
         md.append("*0 pairs evaluated (no contradiction claim_pair labeled in session).*\n")
 
