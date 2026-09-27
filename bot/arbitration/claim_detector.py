@@ -87,6 +87,10 @@ Twin-pair examples:
 "زهقت من السيرفر ده بجد" -> mild
 "زهقت منك يا وحوش هههه" -> none
 banter: "يا نوب ضيعتنا" -> personal, anger: none; "بطل هبد وروح نام" -> other, anger: none
+
+ACOUSTIC CONTEXT (advisory only):
+Lines may include an advisory acoustic field: [acoustic: was_loud=true, z_peak=3.2].
+acoustic loudness is evidence of arousal, not proof of anger — weigh it with the text.
 """
 
 BATCH_ANALYTICS_SCHEMA = {
@@ -270,7 +274,21 @@ class ClaimDetector:
         for idx, u in enumerate(utterances, 1):
             spk = u.get("speaker_name") or u.get("speaker_id") or "Speaker"
             txt = u.get("text") or u.get("raw_text") or ""
-            lines.append(f"{idx}. {spk}: {txt}")
+            af = u.get("audio_features")
+            acoustic_str = ""
+            if af:
+                if hasattr(af, "was_loud"):
+                    w_loud = bool(af.was_loud)
+                    z_pk = float(getattr(af, "peak_robust_z", 0.0))
+                elif isinstance(af, dict):
+                    w_loud = bool(af.get("was_loud", False))
+                    z_pk = float(af.get("peak_robust_z", 0.0))
+                else:
+                    w_loud = False
+                    z_pk = 0.0
+                if w_loud:
+                    acoustic_str = f" [acoustic: was_loud=true, z_peak={z_pk:.1f}]"
+            lines.append(f"{idx}. {spk}: {txt}{acoustic_str}")
 
         formatted_input = "\n".join(lines)
         user_prompt = f"Classify each of these {len(lines)} lines:\n{formatted_input}"
@@ -317,7 +335,21 @@ class ClaimDetector:
         for idx, u in enumerate(utterances, 1):
             spk = u.get("speaker_name") or u.get("speaker_id") or "Speaker"
             txt = u.get("text") or u.get("raw_text") or ""
-            lines.append(f"{idx}. {spk}: {txt}")
+            af = u.get("audio_features")
+            acoustic_str = ""
+            if af:
+                if hasattr(af, "was_loud"):
+                    w_loud = bool(af.was_loud)
+                    z_pk = float(getattr(af, "peak_robust_z", 0.0))
+                elif isinstance(af, dict):
+                    w_loud = bool(af.get("was_loud", False))
+                    z_pk = float(af.get("peak_robust_z", 0.0))
+                else:
+                    w_loud = False
+                    z_pk = 0.0
+                if w_loud:
+                    acoustic_str = f" [acoustic: was_loud=true, z_peak={z_pk:.1f}]"
+            lines.append(f"{idx}. {spk}: {txt}{acoustic_str}")
 
         formatted_input = "\n".join(lines)
         user_prompt = f"Classify each of these {len(lines)} lines:\n{formatted_input}"

@@ -34,6 +34,9 @@ __all__ = [
     "rms_to_db",
     "CalibrationState",
     "log_loudness_shadow",
+    "fuse_anger",
+    "FusedAngerResult",
+    "has_frustration_cues",
 ]
 from .loudness import (
     SpeakerLoudnessBaseline,
@@ -43,4 +46,9 @@ from .loudness import (
     rms_to_db,
     CalibrationState,
     log_loudness_shadow,
+)
+from .fusion import (
+    fuse_anger,
+    FusedAngerResult,
+    has_frustration_cues,
 )

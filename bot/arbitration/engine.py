@@ -15,6 +15,7 @@ from bot.arbitration.fast_gate import fast_gate
 from bot.events.models import VoiceEvent, LatencyBreakdown
 from bot.events.publisher import publisher
 from bot.config import config
+from bot.audio.fusion import fuse_anger
 import asyncio
 
 logger = logging.getLogger("ArbitrationEngine")
@@ -289,12 +290,23 @@ class ArbitrationEngine:
         reason: str
     ):
         results_by_line = {r.get("line_number", i + 1): r for i, r in enumerate(results)}
+        has_active_dispute = bool(session.pending_offer and not session.pending_offer.is_resolved)
 
         for idx, item in enumerate(buffer_to_process, 1):
             res = results_by_line.get(idx, {})
             topic = res.get("topic", "other")
-            anger = res.get("anger", "none")
+            raw_anger = res.get("anger", "none")
             anger_evidence = res.get("anger_evidence") or ""
+
+            # Deterministic late fusion
+            audio_feat = item.get("audio_features")
+            fusion = fuse_anger(
+                raw_anger=raw_anger,
+                audio_features=audio_feat,
+                has_active_dispute=has_active_dispute,
+                text=item["text"]
+            )
+            anger = fusion.final_anger
 
             # 1. Update topic stats (avoid duplicate increment if publisher is hooked by main.py)
             if getattr(publisher.publish_sync_task, "__name__", "") != "_on_event_published":
@@ -314,7 +326,7 @@ class ArbitrationEngine:
                 stats = session._stats_tracker.get_or_create_speaker(spk_key, item["speaker_name"])
 
             logger.info(
-                f"📈 [Batched Analytics Line] {item['speaker_name']}: topic={topic} | anger={anger} | "
+                f"📈 [Batched Analytics Line] {item['speaker_name']}: topic={topic} | anger={anger} (raw={raw_anger}, boost={fusion.acoustic_boost:.2f}, gate={fusion.gate_reason}) | "
                 f"episodes={stats.angry_episodes} | quote='{anger_evidence}'"
             )
 
@@ -458,7 +470,8 @@ class ArbitrationEngine:
                 "text": raw_text,
                 "talk_delta_seconds": talk_delta_seconds,
                 "streak_seconds": streak_seconds,
-                "correlation_id": correlation_id
+                "correlation_id": correlation_id,
+                "audio_features": audio_features
             })
 
             # Check if buffer overflow, analytics window expired, or schedule timer flush
