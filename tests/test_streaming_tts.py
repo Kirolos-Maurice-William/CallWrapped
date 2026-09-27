@@ -160,8 +160,11 @@ class TestStreamingTTS(unittest.IsolatedAsyncioTestCase):
                 speaker.speak(vc, "هذه جملة تجريبية طويلة لاختبار المقاطعة أثناء البث الصوتي المباشر")
             )
 
-            # Wait until playing starts
-            await asyncio.sleep(0.1)
+            # Wait until playing starts (up to 0.5s)
+            for _ in range(25):
+                if vc.is_playing():
+                    break
+                await asyncio.sleep(0.02)
             self.assertTrue(vc.is_playing(), "VoiceClient should be actively playing")
 
             # Fire barge-in stop
