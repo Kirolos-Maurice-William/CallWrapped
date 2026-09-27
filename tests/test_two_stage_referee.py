@@ -572,6 +572,145 @@ class TestTwoStageReferee(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(old_offer.is_resolved)
             self.assertNotEqual(self.session.pending_offer.offer_id, "off_older_unconfirmed")
 
+    async def test_j_unverifiable_dispute_zero_sources_speaks_fallback_and_emits_event(self):
+        """
+        Test j (F3-01): When pre-fetched search yields 0 sources, confirmation must NOT
+        silently return. It must speak the fallback clause, publish dispute_check_completed
+        with status="UNVERIFIABLE", and log the abstention.
+        """
+        async def _empty_search():
+            return [], 0
+        prefetch_task = asyncio.create_task(_empty_search())
+
+        offer = PendingOffer(
+            offer_id="off_unverifiable_0_sources",
+            guild_id=self.guild_id,
+            speaker_a="Omar",
+            claim_a="القطط بتطير في الفضاء",
+            speaker_b="Ziad",
+            claim_b="لا القطط مش بتطير",
+            entity="القطط",
+            search_query="cats flying space",
+            target_domains=[],
+            prefetch_task=prefetch_task,
+            created_at=time.time(),
+            expires_at=time.time() + 30.0
+        )
+        self.session.pending_offer = offer
+
+        published_events = []
+        def mock_publish(evt):
+            published_events.append(evt)
+
+        mock_vc = MagicMock(spec=discord.VoiceClient)
+        mock_vc.is_connected.return_value = True
+        mock_tc = AsyncMock(spec=discord.TextChannel)
+
+        with patch("bot.arbitration.engine.speaker.speak", new_callable=AsyncMock, return_value=500) as mock_speak, \
+             patch("bot.arbitration.engine.publisher.publish_sync_task", side_effect=mock_publish), \
+             self.assertLogs("ArbitrationEngine", level="INFO") as cm:
+
+            await arbitration_engine.confirm_dispute_offer(
+                guild_id=self.guild_id,
+                confirmation_end_time=time.time(),
+                confirmed_by="Ziad",
+                voice_client=mock_vc,
+                text_channel=mock_tc
+            )
+
+            # 1. Assert speaker was called with fallback text
+            fallback_text = "تعذر التحقق من المعلومة من مصادر موثوقة."
+            mock_speak.assert_called_once_with(mock_vc, fallback_text)
+
+            # 2. Assert VoiceEvent(dispute_check_completed) published with status="UNVERIFIABLE"
+            completed = [e for e in published_events if e.type == "dispute_check_completed"]
+            self.assertEqual(len(completed), 1)
+            self.assertEqual(completed[0].payload["status"], "UNVERIFIABLE")
+            self.assertEqual(completed[0].payload["offer_id"], "off_unverifiable_0_sources")
+            self.assertEqual(completed[0].payload["correct_fact"], fallback_text)
+            self.assertEqual(completed[0].payload["spoken_intervention"], fallback_text)
+            self.assertIsNone(completed[0].payload["winner"])
+            self.assertIsNone(completed[0].payload["loser"])
+
+            # 3. Assert abstention log
+            abstain_logs = [line for line in cm.output if "ABSTAIN: unverifiable_dispute" in line]
+            self.assertTrue(len(abstain_logs) > 0, "Must log ABSTAIN: unverifiable_dispute")
+
+            # 4. Assert text channel received notification embed
+            mock_tc.send.assert_called_once()
+            embed_sent = mock_tc.send.call_args[1].get("embed")
+            self.assertIsNotNone(embed_sent)
+            self.assertIn("تعذر التحقق", embed_sent.description)
+
+            # 5. Assert session state cleaned up
+            self.assertIsNone(self.session.pending_offer)
+            self.assertFalse(self.session.is_arbitrating)
+            self.assertEqual(self.session.unverifiable_count, 1)
+
+    async def test_k_unverifiable_dispute_status_unverifiable_speaks_fallback(self):
+        """
+        Test k (F3-01): When verifier returns status="UNVERIFIABLE", confirmation must speak
+        the fallback clause and publish completed event with status="UNVERIFIABLE".
+        """
+        async def _search_with_sources():
+            return [{"title": "Some Blog", "url": "https://blog.example.com", "snippet": "Unclear info"}], 45
+        prefetch_task = asyncio.create_task(_search_with_sources())
+
+        offer = PendingOffer(
+            offer_id="off_unverifiable_status",
+            guild_id=self.guild_id,
+            speaker_a="Omar",
+            claim_a="القطط بتطير في الفضاء",
+            speaker_b="Ziad",
+            claim_b="لا القطط مش بتطير",
+            entity="القطط",
+            search_query="cats flying space",
+            target_domains=[],
+            prefetch_task=prefetch_task,
+            created_at=time.time(),
+            expires_at=time.time() + 30.0
+        )
+        self.session.pending_offer = offer
+
+        published_events = []
+        def mock_publish(evt):
+            published_events.append(evt)
+
+        mock_vc = MagicMock(spec=discord.VoiceClient)
+        mock_vc.is_connected.return_value = True
+        mock_tc = AsyncMock(spec=discord.TextChannel)
+
+        unverifiable_assessment = {
+            "status": "UNVERIFIABLE",
+            "reason": "Insufficient evidence"
+        }
+
+        with patch("bot.arbitration.engine.arbitration_verifier.synthesize_verdict", new_callable=AsyncMock, return_value=(unverifiable_assessment, 45, 120, [])) as mock_synth, \
+             patch("bot.arbitration.engine.speaker.speak", new_callable=AsyncMock, return_value=500) as mock_speak, \
+             patch("bot.arbitration.engine.publisher.publish_sync_task", side_effect=mock_publish), \
+             self.assertLogs("ArbitrationEngine", level="INFO") as cm:
+
+            await arbitration_engine.confirm_dispute_offer(
+                guild_id=self.guild_id,
+                confirmation_end_time=time.time(),
+                confirmed_by="Omar",
+                voice_client=mock_vc,
+                text_channel=mock_tc
+            )
+
+            fallback_text = "تعذر التحقق من المعلومة من مصادر موثوقة."
+            mock_speak.assert_called_once_with(mock_vc, fallback_text)
+
+            completed = [e for e in published_events if e.type == "dispute_check_completed"]
+            self.assertEqual(len(completed), 1)
+            self.assertEqual(completed[0].payload["status"], "UNVERIFIABLE")
+            self.assertEqual(completed[0].payload["offer_id"], "off_unverifiable_status")
+
+            abstain_logs = [line for line in cm.output if "ABSTAIN: unverifiable_dispute" in line]
+            self.assertTrue(len(abstain_logs) > 0)
+            self.assertEqual(self.session.unverifiable_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()
+

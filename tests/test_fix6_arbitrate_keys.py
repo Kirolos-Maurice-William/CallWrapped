@@ -101,8 +101,11 @@ class TestFix6ArbitrateKeys(unittest.IsolatedAsyncioTestCase):
 
             session = arbitration_engine.get_session(ctx.guild.id)
             self.assertEqual(session.unverifiable_count, 1)
-            ctx.channel.send.assert_not_called()
-            print("\n--- FIX 6 ACCEPTANCE 2: Case-insensitive UNVERIFIABLE early returns ---")
+            ctx.channel.send.assert_called_once()
+            embed = ctx.channel.send.call_args.kwargs.get("embed")
+            self.assertIsNotNone(embed)
+            self.assertIn("تعذر التحقق", embed.description)
+            print("\n--- FIX 6 ACCEPTANCE 2: Case-insensitive UNVERIFIABLE delivers fallback notice ---")
 
 
 if __name__ == "__main__":

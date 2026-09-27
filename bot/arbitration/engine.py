@@ -811,6 +811,81 @@ class ArbitrationEngine:
         )
         publisher.publish_sync_task(expired_event)
 
+    async def _handle_unverifiable_dispute(
+        self,
+        guild_id: int,
+        session: SessionState,
+        offer: PendingOffer,
+        confirmed_by: str,
+        vc: Any,
+        tc: Any,
+        t_confirm_start: float,
+        search_ms: int = 0,
+        synth_ms: int = 0
+    ) -> None:
+        session.unverifiable_count += 1
+        logger.info(f"ABSTAIN: unverifiable_dispute (offer_id: {offer.offer_id})")
+        fallback_text = "تعذر التحقق من المعلومة من مصادر موثوقة."
+
+        t_tts_start = time.monotonic()
+        tts_ms = await speaker.speak(vc, fallback_text)
+        t_tts_end = time.monotonic()
+
+        if tc:
+            try:
+                embed = discord.Embed(
+                    title="⚖️ Verified Factual Arbitration",
+                    description=f"⚠️ **{fallback_text}**\n\n• **{offer.speaker_a}:** {offer.claim_a}\n• **{offer.speaker_b}:** {offer.claim_b}",
+                    color=config.EMBED_COLOR_VERDICT
+                )
+                embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
+                await tc.send(embed=embed)
+            except Exception as e:
+                logger.debug(f"Could not send unverifiable embed to text channel: {e}")
+
+        completed_event = VoiceEvent(
+            session_id=str(guild_id),
+            correlation_id=offer.correlation_id,
+            type="dispute_check_completed",
+            speaker_id=str(offer.user_id or 0),
+            speaker_name=confirmed_by,
+            text=fallback_text,
+            timings={
+                "search_done_at": round(t_confirm_start, 3),
+                "synth_done_at": round(time.monotonic(), 3),
+                "tts_done_at": round(t_tts_end, 3)
+            },
+            latency=LatencyBreakdown(
+                stt_ms=offer.stt_ms,
+                llm_ms=synth_ms,
+                search_ms=search_ms,
+                tts_ms=tts_ms,
+                total_ms=int((t_tts_end - t_confirm_start) * 1000)
+            ),
+            payload={
+                "offer_id": offer.offer_id,
+                "status": "UNVERIFIABLE",
+                "confirmed_by": confirmed_by,
+                "correct_fact": fallback_text,
+                "speaker_a": offer.speaker_a,
+                "claim_a": offer.claim_a,
+                "speaker_b": offer.speaker_b,
+                "claim_b": offer.claim_b,
+                "winner": None,
+                "loser": None,
+                "source_url": None,
+                "source_title": None,
+                "spoken_intervention": fallback_text,
+                "why_i_spoke": [
+                    "Factual dispute detected and offer issued",
+                    f"Explicit confirmation received from '{confirmed_by}'",
+                    "Authoritative sources insufficient or claim unverifiable",
+                    "Polite abstention fallback delivered"
+                ]
+            }
+        )
+        publisher.publish_sync_task(completed_event)
+
     async def confirm_dispute_offer(
         self,
         guild_id: int,
@@ -855,7 +930,17 @@ class ArbitrationEngine:
 
             if not sources:
                 logger.warning(f"⚠️ [DisputeConfirm] No search sources found for query: '{offer.search_query}'")
-                session.unverifiable_count += 1
+                await self._handle_unverifiable_dispute(
+                    guild_id=guild_id,
+                    session=session,
+                    offer=offer,
+                    confirmed_by=confirmed_by,
+                    vc=vc,
+                    tc=tc,
+                    t_confirm_start=t_confirm_start,
+                    search_ms=search_ms,
+                    synth_ms=0
+                )
                 return
 
             # Step B: Synthesize via Groq verifier
@@ -871,7 +956,17 @@ class ArbitrationEngine:
             t_synth_end = time.monotonic()
 
             if not assessment or assessment.get("status") == "UNVERIFIABLE":
-                session.unverifiable_count += 1
+                await self._handle_unverifiable_dispute(
+                    guild_id=guild_id,
+                    session=session,
+                    offer=offer,
+                    confirmed_by=confirmed_by,
+                    vc=vc,
+                    tc=tc,
+                    t_confirm_start=t_confirm_start,
+                    search_ms=search_ms,
+                    synth_ms=synth_ms
+                )
                 return
 
             confidence = assessment.get("confidence", 95)
