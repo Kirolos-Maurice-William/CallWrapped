@@ -365,13 +365,23 @@ class ArbitrationEngine:
         mode: str = "referee",
         speech_start: float = 0.0,
         speech_end: float = 0.0,
-        is_drained: bool = False
+        is_drained: bool = False,
+        audio_features: Optional[Any] = None
     ):
         t_start = time.monotonic()
         correlation_id = f"arb_{uuid.uuid4().hex[:8]}"
 
         session = self.get_session(guild_id)
         session.add_turn(speaker_name, raw_text, user_id)
+
+        features_dict = None
+        if audio_features:
+            from dataclasses import is_dataclass, asdict
+            features_dict = asdict(audio_features) if is_dataclass(audio_features) else (audio_features if isinstance(audio_features, dict) else None)
+
+        payload_dict = {"mode": mode}
+        if features_dict:
+            payload_dict["audio_features"] = features_dict
 
         # 1. Publish Transcript VoiceEvent
         turn_event = VoiceEvent(
@@ -385,7 +395,8 @@ class ArbitrationEngine:
                 "stt_final_at": round(t_start, 3)
             },
             latency=LatencyBreakdown(stt_ms=stt_ms),
-            payload={"mode": mode}
+            payload=payload_dict,
+            audio_features=features_dict
         )
         publisher.publish_sync_task(turn_event)
 

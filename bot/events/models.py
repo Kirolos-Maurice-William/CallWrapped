@@ -50,3 +50,4 @@ class VoiceEvent(BaseModel):
     talk_delta_seconds: Optional[float] = None
     streak_seconds: Optional[float] = None
     angry_episodes: Optional[int] = None
+    audio_features: Optional[Dict[str, Any]] = None

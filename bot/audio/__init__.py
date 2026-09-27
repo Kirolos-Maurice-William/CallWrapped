@@ -27,4 +27,20 @@ __all__ = [
     "create_session_dir",
     "is_capture_active",
     "finalize_capture_if_active_async",
+    "SpeakerLoudnessBaseline",
+    "UtteranceLoudnessAccumulator",
+    "UtteranceAudioFeatures",
+    "PCM16Adapter",
+    "rms_to_db",
+    "CalibrationState",
+    "log_loudness_shadow",
 ]
+from .loudness import (
+    SpeakerLoudnessBaseline,
+    UtteranceLoudnessAccumulator,
+    UtteranceAudioFeatures,
+    PCM16Adapter,
+    rms_to_db,
+    CalibrationState,
+    log_loudness_shadow,
+)

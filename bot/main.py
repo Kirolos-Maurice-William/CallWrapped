@@ -102,7 +102,8 @@ async def on_user_utterance(
     wav_bytes: bytes,
     speech_start: float = 0.0,
     speech_end: float = 0.0,
-    ended_by: str = "silence"
+    ended_by: str = "silence",
+    audio_features: Optional[Any] = None
 ):
     """
     Asynchronous per-speaker utterance callback.
@@ -127,7 +128,8 @@ async def on_user_utterance(
                 asr_text=raw_text,
                 stt_latency_ms=stt_ms,
                 ended_by=ended_by,
-                timestamp=time.time()
+                timestamp=time.time(),
+                audio_features=audio_features
             )
         )
 
@@ -142,7 +144,8 @@ async def on_user_utterance(
         text_channel=ctx.text_channel,
         mode=ctx.mode,
         speech_start=speech_start,
-        speech_end=speech_end
+        speech_end=speech_end,
+        audio_features=audio_features
     )
 
 
@@ -206,8 +209,8 @@ async def join_channel(ctx: commands.Context):
             guild_ctx.voice_client = await voice_channel.connect(cls=voice_recv.VoiceRecvClient)
 
         def make_handler(g_id: int):
-            async def handler(u_id: int, u_name: str, wav: bytes, speech_start: float = 0.0, speech_end: float = 0.0, ended_by: str = "silence"):
-                await on_user_utterance(g_id, u_id, u_name, wav, speech_start, speech_end, ended_by)
+            async def handler(u_id: int, u_name: str, wav: bytes, speech_start: float = 0.0, speech_end: float = 0.0, ended_by: str = "silence", audio_features: Optional[Any] = None):
+                await on_user_utterance(g_id, u_id, u_name, wav, speech_start, speech_end, ended_by, audio_features)
             return handler
 
         sink = AudioReceiver(

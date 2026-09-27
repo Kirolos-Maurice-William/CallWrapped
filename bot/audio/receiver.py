@@ -7,6 +7,14 @@ import discord
 from discord.ext import voice_recv
 from bot.config import config
 from bot.audio.pcm import UserSpeechBuffer, convert_discord_pcm_to_wav
+from bot.audio.loudness import (
+    SpeakerLoudnessBaseline,
+    UtteranceLoudnessAccumulator,
+    UtteranceAudioFeatures,
+    PCM16Adapter,
+    rms_to_db,
+    log_loudness_shadow,
+)
 from bot.ai.tts import speaker
 
 logger = logging.getLogger("AudioReceiver")
@@ -32,6 +40,8 @@ class AudioReceiver(voice_recv.AudioSink):
         self._voice_client = voice_client
         self._checker_task: Optional[asyncio.Task] = None
         self.buffers: Dict[int, UserSpeechBuffer] = {}
+        self.speaker_baselines: Dict[int, SpeakerLoudnessBaseline] = {}
+        self.utterance_accumulators: Dict[int, UtteranceLoudnessAccumulator] = {}
         self._is_active = True
         self._checker_task = self.loop.create_task(self._silence_checker_loop())
 
@@ -88,9 +98,15 @@ class AudioReceiver(voice_recv.AudioSink):
         # 2. Get or create isolated user buffer
         if user_id not in self.buffers:
             self.buffers[user_id] = UserSpeechBuffer(user_id, display_name)
+        if user_id not in self.speaker_baselines:
+            self.speaker_baselines[user_id] = SpeakerLoudnessBaseline()
+        if user_id not in self.utterance_accumulators:
+            self.utterance_accumulators[user_id] = UtteranceLoudnessAccumulator()
 
         buf = self.buffers[user_id]
         buf.user_name = display_name
+        baseline = self.speaker_baselines[user_id]
+        acc = self.utterance_accumulators[user_id]
 
         # 3. Calculate RMS energy
         try:
@@ -108,6 +124,17 @@ class AudioReceiver(voice_recv.AudioSink):
 
         now = time.time()
         buf.add_frame(pcm_bytes, rms, now)
+
+        # 3b. Feature B: Acoustic loudness tracking (O(1), no I/O, no awaits)
+        log_rms_db = rms_to_db(rms)
+        clipped_count, total_samples = PCM16Adapter.count_clipped_samples(pcm_bytes)
+        is_frame_clipped = (clipped_count / total_samples >= PCM16Adapter.FRAME_CLIP_RATIO_THRESHOLD) if total_samples > 0 else False
+        baseline.observe_eligible_frame(log_rms_db, is_frame_clipped)
+
+        if buf.is_speaking:
+            if not acc.is_active:
+                acc.begin(utterance_id=f"utt_{user_id}_{int(now * 1000)}", speaker_id=str(user_id))
+            acc.observe_frame_raw(rms=rms, log_rms_db=log_rms_db, clipped_samples=clipped_count, total_samples=total_samples)
 
         # 4. Force utterance finalization if max speech duration exceeded
         if buf.is_speaking and (now - buf.speech_start_time >= config.MAX_SPEECH_DURATION_SEC):
@@ -134,14 +161,26 @@ class AudioReceiver(voice_recv.AudioSink):
         duration = buf.duration()
         buf.reset()
 
+        baseline = self.speaker_baselines.get(user_id)
+        acc = self.utterance_accumulators.get(user_id)
+        audio_features: Optional[UtteranceAudioFeatures] = acc.finalize(baseline) if acc else None
+
         if duration >= config.MIN_SPEECH_DURATION_SEC and len(chunks) > 5:
             logger.info(f"🎙️ [Speech Finished] {user_name} ({duration:.1f}s, {len(chunks)} frames, window={speech_start:.2f}-{speech_end:.2f}, ended_by={ended_by}). Processing...")
+
+            # Shadow logging: log was_loud events
+            if audio_features and audio_features.was_loud:
+                log_loudness_shadow(user_name, audio_features)
+
             wav_bytes = convert_discord_pcm_to_wav(chunks)
             if wav_bytes:
                 try:
-                    coro = self.on_utterance(user_id, user_name, wav_bytes, speech_start, speech_end, ended_by)
+                    coro = self.on_utterance(user_id, user_name, wav_bytes, speech_start, speech_end, ended_by, audio_features)
                 except TypeError:
-                    coro = self.on_utterance(user_id, user_name, wav_bytes, speech_start, speech_end)
+                    try:
+                        coro = self.on_utterance(user_id, user_name, wav_bytes, speech_start, speech_end, ended_by)
+                    except TypeError:
+                        coro = self.on_utterance(user_id, user_name, wav_bytes, speech_start, speech_end)
                 asyncio.run_coroutine_threadsafe(
                     coro,
                     self.loop
@@ -156,4 +195,8 @@ class AudioReceiver(voice_recv.AudioSink):
                 pass
         if hasattr(self, "buffers"):
             self.buffers.clear()
+        if hasattr(self, "speaker_baselines"):
+            self.speaker_baselines.clear()
+        if hasattr(self, "utterance_accumulators"):
+            self.utterance_accumulators.clear()
         logger.info("[AudioReceiver] Cleaned up receiver resources.")

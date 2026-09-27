@@ -100,7 +100,8 @@ def save_captured_utterance_sync(
     stt_latency_ms: float,
     ended_by: str = "silence",
     timestamp: Optional[float] = None,
-    recordings_dir: Optional[Path] = None
+    recordings_dir: Optional[Path] = None,
+    audio_features: Optional[Any] = None
 ) -> Optional[Dict[str, Any]]:
     """
     Synchronous filesystem save for a finalized utterance:
@@ -145,6 +146,9 @@ def save_captured_utterance_sync(
             "stt_latency_ms": stt_latency_ms,
             "ended_by": ended_by
         }
+        if audio_features:
+            from dataclasses import is_dataclass, asdict
+            log_entry["audio_features"] = asdict(audio_features) if is_dataclass(audio_features) else audio_features
 
         # Append JSONL log in the session directory ONLY
         log_file = target_dir / "session_log.jsonl"
@@ -175,7 +179,8 @@ async def save_captured_utterance_async(
     stt_latency_ms: float,
     ended_by: str = "silence",
     timestamp: Optional[float] = None,
-    recordings_dir: Optional[Path] = None
+    recordings_dir: Optional[Path] = None,
+    audio_features: Optional[Any] = None
 ) -> Optional[Dict[str, Any]]:
     """
     Non-blocking async wrapper that delegates disk writes to a worker thread
@@ -192,7 +197,8 @@ async def save_captured_utterance_async(
         stt_latency_ms=stt_latency_ms,
         ended_by=ended_by,
         timestamp=timestamp,
-        recordings_dir=recordings_dir
+        recordings_dir=recordings_dir,
+        audio_features=audio_features
     )
 
 
