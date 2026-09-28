@@ -43,29 +43,42 @@ INSTANT_CLAIM_SCHEMA = {
     }
 }
 
-# Batched Topic & Anger Prompt (Reuses proven ANGER RULE + twin-pair examples + Taxonomy v2 null_topic)
+# Batched Topic & Anger Prompt (Reuses proven ANGER RULE + twin-pair examples + Taxonomy v3 13-topic expansion)
 BATCH_ANALYTICS_PROMPT = """Analyze a window of voice chat utterances (Egyptian Arabic/English).
 For each numbered line "Speaker: Text", classify topic, anger level, and anger evidence.
 
 JSON schema: return an object with "results": array of items for EVERY line in order:
 - line_number: integer (1-based)
-- topic: football|politics|music|movies|gaming|tech|personal|other|null_topic
+- topic: football|politics|music|movies|gaming|tech|food|travel|study_work|health|cars|money|personal|other|null_topic
 - anger: none|mild|high
 - anger_evidence: verbatim quote of frustration/anger or ""
 Write anger_evidence in the SAME language as the input utterance.
 
 TOPIC RULES:
-1. Public topic examples (1 per topic):
+1. Topic examples:
 - football: "الأهلي كسب كأس السوبر"
 - politics: "مجلس النواب وافق على القانون"
 - music: "عمرو دياب نزل ألبوم جديد"
 - movies: "فيلم ولاد رزق في السينما"
 - gaming: "كول أوف ديوتي والرانك بيعصب"
 - tech: "كارت الـ RTX 5070 نازل بـ 12 جيجا"
+- food: "المطعم ده البيتزا بتاعته تحفة" / "طلبت برجر امبارح كان جامد"
+- travel: "بنسافر شرم الشيخ الجمعة" / "الحجز في الفندق 500 جنيه الليلة"
+- study_work: "بكرا عندي امتحان" / "الشغل عاملني زهقت من الصبح"
+- health: "باعض في ضهري من امبارح" / "بمشي النهارده نص ساعة في الجيم"
+- cars: "العربية دي بـ مليون جنيه" / "البنزين زاد تاني"
+- money: "الدولار علا تاني" / "المرتب مبقاش بيصنع حاجة"
 - personal: "هنزل أقابل أصحابي بالليل"
 - other: "الجو حر أوي النهارده"
 
-2. null_topic rule:
+2. Boundary hints:
+- food vs health: the CONSEQUENCE is the subject -> health ("الاكل ده بيخلي الوزن يزيد" = health); the FOOD itself is the subject -> food ("البيتزا دي تحفة" = food)
+- cars vs money: the CAR is the subject -> cars; the MONEY/price/economy is the subject -> money ("البنزين زاد تاني" = money)
+- travel vs money: the TRIP is the subject -> travel ("الحجز في الفندق 500 جنيه" = travel); the COST/price is the subject -> money
+- study_work vs money: the JOB/STUDY event is the subject -> study_work; the SALARY as money news -> money
+- gaming: video game matches, gaming terms, and game rants ("للسط", "الدبيل", "الجيم ده") -> gaming
+
+3. null_topic rule:
 null_topic = the line has NO semantic subject: backchannels/acknowledgments ('تمام', 'أيوة', 'ماشي', 'شايف'), greetings ('ازيك', 'سلام عليكم'), call logistics ('بتسجل صوتنا', 'هات الصوت', 'استنى دقيقة'), isolated reactions ('زي الفل', 'جامد' as bare reaction), isolated laughter.
 Personal content (family, plans, feelings, daily events) = 'personal', NOT null_topic.
 When unsure between personal and null: does the line convey information about the speaker's life? personal. Is it pure conversational glue? null_topic.
@@ -107,7 +120,11 @@ BATCH_ANALYTICS_SCHEMA = {
                         "line_number": {"type": "integer"},
                         "topic": {
                             "type": "string",
-                            "enum": ["football", "politics", "music", "movies", "gaming", "tech", "personal", "other", "null_topic"]
+                            "enum": [
+                                "football", "politics", "music", "movies", "gaming", "tech",
+                                "food", "travel", "study_work", "health", "cars", "money",
+                                "personal", "other", "null_topic"
+                            ]
                         },
                         "anger": {
                             "type": "string",
@@ -156,7 +173,7 @@ def infer_topic(text: str) -> str:
         return "tech"
     if any(w in t for w in ["أهلي", "أهلى", "زمالك", "صلاح", "سوبر", "كأس", "دوري", "بطولة", "جون", "كرة", "football"]):
         return "football"
-    if any(w in t for w in ["gta", "لعبة", "جيم", "رانك", "كول أوف ديوتي", "call of duty", "بلايستيشن", "كونسول"]):
+    if any(w in t for w in ["gta", "لعبة", "جيم", "رانك", "كول أوف ديوتي", "call of duty", "بلايستيشن", "كونسول", "للسط", "الدبيل"]):
         return "gaming"
     if any(w in t for w in ["ألبوم", "عمرو دياب", "تراك", "أغنية", "ويجز", "مكانك"]):
         return "music"
@@ -164,6 +181,18 @@ def infer_topic(text: str) -> str:
         return "movies"
     if any(w in t for w in ["نواب", "قانون", "إيجار", "وزير", "حكومة", "انتخابات", "رئيس"]):
         return "politics"
+    if any(w in t for w in ["وزن", "دكتور", "صحة", "وجع", "ضهري", "تعبان", "مريض", "علاج", "مستشفى", "باعض"]):
+        return "health"
+    if any(w in t for w in ["بيتزا", "برجر", "مطعم", "أكل", "اكل", "وجبة", "ساندوتش", "شاورما"]):
+        return "food"
+    if any(w in t for w in ["عربية", "عربيات", "سواقة", "موتور", "كاوتش", "فرامل"]):
+        return "cars"
+    if any(w in t for w in ["سفر", "بنسافر", "فندق", "حجز", "رحلة", "شرم", "طيران", "تذكرة", "مصيف"]):
+        return "travel"
+    if any(w in t for w in ["امتحان", "مذاكرة", "دراسة", "ترم", "جامعة", "شغل", "وظيفة"]):
+        return "study_work"
+    if any(w in t for w in ["دولار", "جنيه", "فلوس", "بنزين", "سعر", "غلاء", "اقتصاد", "تضخم", "مرتب"]):
+        return "money"
     if any(w in t for w in ["نوب", "هبد", "يا عم", "يا اسطى", "مطبق", "حياتنا"]):
         return "personal"
 

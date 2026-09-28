@@ -412,7 +412,7 @@ def render_recap(session_state: Any) -> str:
     else:
         lines.append("\n😡 محدش عصب في المكالمة دي... كده مش طبيعي 😂")
 
-    # Section D: Top-3 topics with % (Taxonomy v2: TOPICAL only, null_topic excluded)
+    # Section D: Top-3 topics with % (Taxonomy v3: TOPICAL only, null_topic excluded)
     lines.append("\n🏷️ **أكتر مواضيع اتكلمتوا فيها:**")
     topical_counts = {t: c for t, c in topic_counts.items() if t not in ("null_topic", "null", "none", "بدون موضوع")}
     null_count = topic_counts.get("null_topic", 0) + topic_counts.get("null", 0) + topic_counts.get("بدون موضوع", 0)
@@ -421,10 +421,12 @@ def render_recap(session_state: Any) -> str:
     coverage_pct = (total_topical_count / total_all_count * 100.0) if total_all_count > 0 else 0.0
 
     if total_topical_count > 0:
+        from bot.arbitration.stats import TOPIC_DISPLAY_NAMES
         top_3 = sorted(topical_counts.items(), key=lambda x: x[1], reverse=True)[:3]
         for rank, (top_name, top_cnt) in enumerate(top_3, 1):
             t_pct = (top_cnt / total_topical_count) * 100.0
-            lines.append(f"{rank}. **{top_name}**: {t_pct:.1f}% ({top_cnt})")
+            display_name = TOPIC_DISPLAY_NAMES.get(top_name.lower(), top_name)
+            lines.append(f"{rank}. **{display_name}**: {t_pct:.1f}% ({top_cnt})")
         if null_count > 0:
             lines.append(f"ℹ️ نسبة التغطية الموضوعية: {coverage_pct:.1f}% (مستبعد {null_count} جمل بدون موضوع)")
     elif null_count > 0:
@@ -720,12 +722,12 @@ async def stop_capture_command(ctx: commands.Context):
         f"📄 **Generated / الملف المستخرج:** `{csv_path}`\n\n"
         "**Instructions / التعليمات:**\n"
         "• **العربية:** استمع لكل ملف WAV، واكتب النص المصري الصحيح في خانة `correct_text`، ثم املأ التصنيفات:\n"
-        "  - `topic`: (football / politics / music / movies / gaming / tech / personal / other / null_topic)\n"
+        "  - `topic`: (football / politics / music / movies / gaming / tech / food / travel / study_work / health / cars / money / personal / other / null_topic)\n"
         "  - `is_claim`: (yes / no)\n"
         "  - `anger`: (none / mild / high)\n"
         "  - `loud`: (normal / loud)\n\n"
         "• **English:** Listen to each WAV, type the CORRECT Egyptian text in `correct_text`, then fill:\n"
-        "  - `topic`: (football / politics / music / movies / gaming / tech / personal / other / null_topic)\n"
+        "  - `topic`: (football / politics / music / movies / gaming / tech / food / travel / study_work / health / cars / money / personal / other / null_topic)\n"
         "  - `is_claim`: (yes / no)\n"
         "  - `anger`: (none / mild / high)\n"
         "  - `loud`: (normal / loud)"

@@ -85,7 +85,11 @@ async def score_session(
             continue
 
         # Rule 3: Enum vocabulary integrity
-        VALID_TOPICS = {"football", "sports", "politics", "music", "movies", "gaming", "tech", "personal", "personal_life", "other", "null_topic", "null", "none"}
+        VALID_TOPICS = {
+            "football", "sports", "politics", "music", "movies", "gaming", "tech",
+            "food", "travel", "study_work", "health", "cars", "money",
+            "personal", "personal_life", "other", "null_topic", "null", "none"
+        }
         VALID_ANGER = {"none", "mild", "high"}
         VALID_LOUD = {"normal", "loud", "screaming"}
 

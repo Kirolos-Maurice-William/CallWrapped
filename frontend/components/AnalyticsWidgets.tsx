@@ -38,6 +38,23 @@ export function formatStreakMMSS(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+const TOPIC_DISPLAY_NAMES: Record<string, string> = {
+  food: "أكل",
+  travel: "سفر",
+  study_work: "دراسة وشغل",
+  health: "صحة",
+  cars: "عربيات",
+  money: "فلوس",
+  football: "كورة",
+  politics: "سياسة",
+  music: "مزيكا",
+  movies: "أفلام",
+  gaming: "ألعاب",
+  tech: "تكنولوجيا",
+  personal: "شخصي",
+  other: "أخرى",
+};
+
 const TOPIC_COLORS = [
   "bg-cyan-500",
   "bg-purple-500",
@@ -45,7 +62,13 @@ const TOPIC_COLORS = [
   "bg-emerald-500",
   "bg-rose-500",
   "bg-indigo-500",
-  "bg-blue-500"
+  "bg-blue-500",
+  "bg-teal-500",
+  "bg-orange-500",
+  "bg-lime-500",
+  "bg-pink-500",
+  "bg-violet-500",
+  "bg-yellow-500"
 ];
 
 interface Props {
@@ -108,7 +131,9 @@ export function AnalyticsWidgets({ analytics }: Props) {
                   return (
                     <div key={topic} className="space-y-1">
                       <div className="flex items-center justify-between text-xs font-medium">
-                        <span className="text-slate-300 capitalize">{topic}</span>
+                        <span className="text-slate-300 capitalize">
+                          {TOPIC_DISPLAY_NAMES[topic.toLowerCase()] ? `${topic} (${TOPIC_DISPLAY_NAMES[topic.toLowerCase()]})` : topic}
+                        </span>
                         <span className="font-mono text-slate-400">
                           {count} ({pct.toFixed(1)}%)
                         </span>

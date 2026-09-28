@@ -59,7 +59,7 @@ For each numbered line "Speaker: Text", classify topic, anger level, and anger e
 
 JSON schema: return an object with "results": array of items for EVERY line in order:
 - line_number: integer (1-based)
-- topic: football|politics|music|movies|gaming|tech|personal_life|other
+- topic: football|politics|music|movies|gaming|tech|food|travel|study_work|health|cars|money|personal|other|null_topic
 - anger: none|mild|high
 - anger_evidence: verbatim quote of frustration/anger or ""
 Write anger_evidence in the SAME language as the input utterance.

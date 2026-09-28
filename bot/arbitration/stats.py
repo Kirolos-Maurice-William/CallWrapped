@@ -4,6 +4,26 @@ from typing import Dict, Optional, Any
 
 logger = logging.getLogger("TalkStats")
 
+# Taxonomy v3 display name mappings (colloquial Egyptian Arabic)
+TOPIC_DISPLAY_NAMES: Dict[str, str] = {
+    "food": "أكل",
+    "travel": "سفر",
+    "study_work": "دراسة وشغل",
+    "health": "صحة",
+    "cars": "عربيات",
+    "money": "فلوس",
+    "football": "كورة",
+    "politics": "سياسة",
+    "music": "مزيكا",
+    "movies": "أفلام",
+    "gaming": "ألعاب",
+    "tech": "تكنولوجيا",
+    "personal": "شخصي",
+    "personal_life": "شخصي",
+    "other": "أخرى",
+    "null_topic": "بدون موضوع",
+}
+
 
 @dataclass
 class SpeakerStats:
