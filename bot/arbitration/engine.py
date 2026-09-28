@@ -237,6 +237,38 @@ class SessionState:
         self.last_offer_time = 0.0
         self.fact_check_mode = False
 
+    def arbitration_lease(self, engine: "ArbitrationEngine") -> "ArbitrationLease":
+        return ArbitrationLease(engine, self.guild_id, self)
+
+
+class ArbitrationLease:
+    """
+    Supervised lifecycle lease that guarantees reset of arbitration state
+    and safe queue draining, even if synthesis, TTS, or network calls encounter
+    an unhandled exception, cancellation, or watchdog timeout.
+    """
+
+    def __init__(self, engine: "ArbitrationEngine", guild_id: int, session: SessionState):
+        self.engine = engine
+        self.guild_id = guild_id
+        self.session = session
+
+    async def __aenter__(self):
+        self.session.is_arbitrating = True
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        try:
+            self.session.pending_offer = None
+        finally:
+            self.session.is_arbitrating = False
+            try:
+                await self.engine._drain_queue(self.guild_id, self.session)
+            except Exception as e:
+                logger.error(f"[ArbitrationLease] Error during queue drain: {e}", exc_info=True)
+                self.session.is_draining = False
+        return False
+
 
 class ArbitrationEngine:
     """
@@ -1085,9 +1117,39 @@ class ArbitrationEngine:
         tc = text_channel or offer.text_channel
 
         t_confirm_start = time.monotonic()
-        session.is_arbitrating = True
+        timeout_sec = getattr(config, "DISPUTE_CONFIRM_TOTAL_TIMEOUT_SEC", 25.0)
         try:
-            # Step A: Await pre-fetched search (cap at 8.0s for network jitter tolerance)
+            async with asyncio.timeout(timeout_sec):
+                async with ArbitrationLease(self, guild_id, session):
+                    await self._execute_confirmation_cycle(
+                        guild_id=guild_id,
+                        session=session,
+                        offer=offer,
+                        confirmation_end_time=confirmation_end_time,
+                        confirmed_by=confirmed_by,
+                        vc=vc,
+                        tc=tc,
+                        t_confirm_start=t_confirm_start
+                    )
+        except (TimeoutError, asyncio.TimeoutError):
+            logger.warning(
+                f"⚠️ [DisputeConfirm Watchdog] Dispute confirmation timed out after {timeout_sec}s for offer {offer.offer_id}"
+            )
+        except Exception as err:
+            logger.error(f"Dispute confirmation cycle failed: {err}", exc_info=True)
+
+    async def _execute_confirmation_cycle(
+        self,
+        guild_id: int,
+        session: SessionState,
+        offer: PendingOffer,
+        confirmation_end_time: float,
+        confirmed_by: str,
+        vc: Any,
+        tc: Any,
+        t_confirm_start: float
+    ):
+        # Step A: Await pre-fetched search (cap at 8.0s for network jitter tolerance)
             sources = []
             search_ms = 0
             confirm_timeout = getattr(config, "DISPUTE_CONFIRM_SEARCH_TIMEOUT_SEC", 8.0)
@@ -1321,13 +1383,6 @@ class ArbitrationEngine:
                     await tc.send(embed=embed)
                 except Exception as e:
                     logger.debug(f"Could not send embed to text channel: {e}")
-
-        except Exception as err:
-            logger.error(f"Dispute confirmation cycle failed: {err}", exc_info=True)
-        finally:
-            session.is_arbitrating = False
-            session.pending_offer = None
-            await self._drain_queue(guild_id, session)
 
     async def _drain_queue(self, guild_id: int, session: SessionState):
         """Drains pending queued utterances through the normal pipeline after arbitration ends."""
