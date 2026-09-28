@@ -216,11 +216,16 @@ class SessionState:
             return
         if name_clean not in self.discovered_entities:
             self.discovered_entities.append(name_clean)
+            if len(self.discovered_entities) > 200:
+                self.discovered_entities.pop(0)
         if aliases:
             for alias in aliases:
                 a_clean = alias.strip()
                 if a_clean:
                     self.entity_aliases[a_clean] = name_clean
+                    if len(self.entity_aliases) > 500:
+                        oldest_key = next(iter(self.entity_aliases))
+                        del self.entity_aliases[oldest_key]
 
     def get_active_keyterms(self, max_terms: int = 40) -> List[str]:
         """Returns session-discovered entities for upstream ASR keyterm biasing."""
@@ -303,6 +308,8 @@ class SessionState:
             curr_topic = self.active_interval.macro_topic
             self.topic_durations[curr_topic] = self.topic_durations.get(curr_topic, 0.0) + dur
             self.completed_intervals.append(self.active_interval)
+            if len(self.completed_intervals) > 500:
+                self.completed_intervals.pop(0)
 
             if macro_topic != "null_topic":
                 self.active_interval = TopicInterval(
@@ -325,6 +332,8 @@ class SessionState:
             curr_topic = self.active_interval.macro_topic
             self.topic_durations[curr_topic] = self.topic_durations.get(curr_topic, 0.0) + dur
             self.completed_intervals.append(self.active_interval)
+            if len(self.completed_intervals) > 500:
+                self.completed_intervals.pop(0)
             self.active_interval = None
 
     def get_topic_durations(self) -> Dict[str, float]:
@@ -913,6 +922,18 @@ class ArbitrationEngine:
         topic = claim_data.get("topic")
         metric = claim_data.get("metric")
         claim_stmt = claim_data.get("claim", raw_text)
+
+        # Cross-script entity canonicalization for ClaimMemory conflict detection
+        if entity:
+            resolved = session.resolve_entity(entity)
+            if resolved:
+                entity = resolved[0]
+            else:
+                session.add_discovered_entity(entity)
+        elif raw_text:
+            resolved = session.resolve_entity(raw_text)
+            if resolved:
+                entity = resolved[0]
 
         # Step B: Log Claim in Event stream
         claim_event = VoiceEvent(
