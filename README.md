@@ -323,6 +323,7 @@ Served locally at `http://localhost:8000` via FastAPI backend and Next.js 14 fro
 3. **Batch STT Latency Floor:** The current production pipeline uploads audio chunks and polls AssemblyAI's batch API. This introduces an inherent **2.6s–3.5s** latency floor from utterance completion to transcript delivery.
 4. **Taxonomy Frozen at v3:** The topic classification enum is strictly frozen at 15 categories. Unseen fringe topics fall back to `other`. Open-vocabulary dynamic clustering is not yet deployed.
 5. **Frontend Build Prerequisite:** The dashboard requires the frontend to be built before first use. start_all.bat does NOT build the frontend automatically.
+6. **Documented Testing Coverage Boundaries:** DAVE E2EE voice decryption, Next.js UI component rendering, auxiliary developer modes (`!mode assistant`, `!mode echo`), and undeployed streaming STT rely on manual or live integration testing rather than automated CI unit tests (detailed in [Documented Testing Coverage Gaps](#documented-testing-coverage-gaps)).
 
 ---
 
@@ -418,6 +419,16 @@ OK
 ```
 
 Every commit and bug fix since base commit `701a7c0` is traced with a dedicated acceptance test in [`REGRESSION_LEDGER.md`](file:///g:/CallWrapper/REGRESSION_LEDGER.md).
+
+### Documented Testing Coverage Gaps
+
+The test suite explicitly prioritizes high-confidence behavioral invariants across real production APIs with zero mocks. The following areas have documented testing boundaries:
+- **DAVE E2EE Decryption:** No automated test (hardware-dependent and requires live Discord voice server handshake; verified via real-voice smoke tests).
+- **Next.js UI Rendering:** No automated test (browser-level rendering manually verified; backend API routes and WebSocket telemetry streams are fully tested).
+- **Auxiliary Developer Modes (`!mode assistant` / `!mode echo`):** No test coverage (prototype utility modes; production referee logic is isolated under Fact Check Mode `!start`).
+- **Streaming STT:** No test (feature not deployed in production; parked pending dialect WER parity).
+
+*These are documented gaps, not oversights.*
 
 ---
 
