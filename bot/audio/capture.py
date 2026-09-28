@@ -59,16 +59,22 @@ def start_capture_session(base_dir: Optional[Path] = None, timestamp: Optional[f
     return session_dir
 
 
-def stop_capture_session(recordings_dir: Optional[Path] = None) -> Tuple[Path, Path]:
+def stop_capture_session(recordings_dir: Optional[Path] = None, grace_seconds: float = 2.0) -> Tuple[Path, Path]:
     """
     Stops the active capture session:
+    - Waits for grace_seconds (default 2.0s) so in-flight STT utterances complete and save
     - Sets config.TEST_CAPTURE_MODE = 0
-    - Generates labels_DRAFT.csv inside the session folder
+    - Generates labels_DRAFT.csv inside the session folder (including in-flight utterances)
     - Clears _active_session_dir
     - Returns (csv_path, session_dir)
     """
     global _active_session_dir
     session_dir = Path(recordings_dir) if recordings_dir else (_active_session_dir or DEFAULT_RECORDINGS_ROOT)
+
+    if grace_seconds > 0:
+        logger.info(f"⏳ [Capture] Stopping capture session with {grace_seconds:.1f}s grace period for in-flight utterances: {session_dir}")
+        time.sleep(grace_seconds)
+
     config.TEST_CAPTURE_MODE = 0
     csv_file = generate_labels_draft_csv(recordings_dir=session_dir)
     _active_session_dir = None

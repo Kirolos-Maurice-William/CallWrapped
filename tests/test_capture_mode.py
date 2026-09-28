@@ -1,4 +1,5 @@
 import tests._setup
+_ = tests._setup
 import os
 import csv
 import json
@@ -17,9 +18,8 @@ from bot.audio.capture import (
     start_capture_session,
     stop_capture_session,
     get_active_session_dir,
-    DEFAULT_RECORDINGS_DIR
 )
-from bot.main import stop_capture_command, start_capture_command, leave_channel
+from bot.main import stop_capture_command, leave_channel
 
 
 class TestCaptureMode(unittest.IsolatedAsyncioTestCase):
@@ -419,6 +419,64 @@ class TestCaptureMode(unittest.IsolatedAsyncioTestCase):
         print("=" * 65)
         print(f"Logged Error:\n{error_logs}")
         print(f"Returned Entry:\n{res}")
+        print("=" * 65 + "\n")
+
+    async def test_stop_capture_grace_period_captures_in_flight_utterance(self):
+        """
+        AUDIO-10 Acceptance Test:
+        !stop-capture has a 2s grace period before disabling TEST_CAPTURE_MODE.
+        An in-flight STT utterance that completes 1s after stop_capture_session is called
+        must still be successfully captured, saved to disk, recorded in session_log.jsonl,
+        and included in labels_DRAFT.csv.
+        """
+        # Start capture session
+        session_dir = start_capture_session(base_dir=self.test_dir)
+        self.assertEqual(config.TEST_CAPTURE_MODE, 1)
+
+        dummy_wav = b"RIFF" + b"\x00" * 40
+
+        # Trigger stop_capture_session in background worker thread (as in !stop-capture command)
+        stop_future = asyncio.to_thread(stop_capture_session, session_dir, grace_seconds=2.0)
+
+        # 1.0s later, in-flight utterance finishes STT and calls save_captured_utterance_async
+        await asyncio.sleep(1.0)
+        self.assertEqual(config.TEST_CAPTURE_MODE, 1, "TEST_CAPTURE_MODE must still be active during 2s grace period")
+
+        in_flight_res = await save_captured_utterance_async(
+            speaker_name="InFlightSpeaker",
+            wav_bytes=dummy_wav,
+            asr_text="جملة مكتملة أثناء مهلة الإيقاف",
+            stt_latency_ms=150.0,
+            ended_by="silence",
+            recordings_dir=session_dir
+        )
+        self.assertIsNotNone(in_flight_res, "In-flight utterance completing 1s after stop must be captured")
+        self.assertEqual(in_flight_res["speaker_name"], "InFlightSpeaker")
+
+        # Wait for stop to finish
+        csv_file, s_dir = await stop_future
+        self.assertEqual(config.TEST_CAPTURE_MODE, 0, "TEST_CAPTURE_MODE must be 0 after grace period")
+        self.assertTrue(csv_file.exists())
+
+        # Verify WAV file exists on disk
+        wav_path = session_dir / in_flight_res["wav_filename"]
+        self.assertTrue(wav_path.exists(), f"WAV file {wav_path} must exist on disk")
+
+        # Verify in-flight utterance is in labels_DRAFT.csv
+        with open(csv_file, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["speaker"], "InFlightSpeaker")
+        self.assertEqual(rows[0]["wav_filename"], in_flight_res["wav_filename"])
+
+        print("\n" + "=" * 65)
+        print("=== AUDIO-10 ACCEPTANCE: CAPTURE GRACE PERIOD (1s POST-STOP) ===")
+        print("=" * 65)
+        print(f"Session Dir:      {session_dir}")
+        print(f"Captured Clip:    {in_flight_res['wav_filename']}")
+        print(f"Labels Draft CSV: {csv_file} (rows: {len(rows)})")
+        print(f"Post-Grace Flag:  {config.TEST_CAPTURE_MODE}")
         print("=" * 65 + "\n")
 
 
