@@ -116,5 +116,119 @@ class TestEveryUtteranceClassifier(unittest.IsolatedAsyncioTestCase):
             config.ANALYTICS_ENABLED = original_flag
 
 
+    async def test_taxonomy_v3_battery_re_run(self):
+        """
+        Taxonomy v3 Battery Re-run:
+        12 historical sentences + 5 dialogue-act lines on real Groq batch API.
+        Verifies every previous result remains IDENTICAL.
+        """
+        print("\n" + "=" * 70)
+        print("=== TAXONOMY v3: FULL 17-SENTENCE BATTERY RE-RUN ===")
+        print("=" * 70 + "\n")
+
+        test_12 = [
+            {"speaker_name": "Ahmed", "text": "الأهلي كسب كأس السوبر بعد ما غلب الزمالك 2-0", "expected_topic": "football", "expected_anger": "none"},
+            {"speaker_name": "Karim", "text": "صلاح أحسن وأمهر وينج في العالم ومفيش حد زيه", "expected_topic": "football", "expected_anger": "none"},
+            {"speaker_name": "Ahmed", "text": "فيلم ولاد رزق 3 نزل في السينما في موسم عيد الأضحى", "expected_topic": "movies", "expected_anger": "none"},
+            {"speaker_name": "Karim", "text": "الفيلم الجديد ده دمه تقيل وممل وميستاهلش تدفع فيه فلوس", "expected_topic": "movies", "expected_anger": "mild"},
+            {"speaker_name": "Ahmed", "text": "مجلس النواب وافق رسمي على قانون الإيجار القديم الجديد", "expected_topic": "politics", "expected_anger": "none"},
+            {"speaker_name": "Karim", "text": "لعبة GTA 6 هتنزل رسمياً في خريف 2025 على الكونسول", "expected_topic": "gaming", "expected_anger": "none"},
+            {"speaker_name": "Ahmed", "text": "لعبة كول أوف ديوتي الجديدة زبالة والرانك فيها بيعصب أوي", "expected_topic": "gaming", "expected_anger": "mild"},
+            {"speaker_name": "Karim", "text": "عمرو دياب نزل ألبوم مكانك وفيه 12 تراك جديد", "expected_topic": "music", "expected_anger": "none"},
+            {"speaker_name": "Ahmed", "text": "يا عم انت نوب وبتضيع علينا الجيم كل مرة ههههه", "expected_topic": "gaming", "expected_anger": "none"},
+            {"speaker_name": "Karim", "text": "يا اسطى بطل هبد بقى وروح نام انت مش فاهم حاجة", "expected_topic": "other", "expected_anger": "none"},
+            {"speaker_name": "Ahmed", "text": "للسط مرتين علطول يا خسارة الدبيل ده زهقت خلاص", "expected_topic": "gaming", "expected_anger": "mild"},
+            {"speaker_name": "Karim", "text": "انت وخد الجيم ده ههههه مبيدكش", "expected_topic": "gaming", "expected_anger": "none"}
+        ]
+
+        test_5_dialogue = [
+            {"speaker_name": "Ahmed", "text": "ازيك يا مصطفى عامل ايه", "expected_topic": "null_topic", "expected_anger": "none"},
+            {"speaker_name": "Karim", "text": "تمام سامعك كويس", "expected_topic": "null_topic", "expected_anger": "none"},
+            {"speaker_name": "Ahmed", "text": "بتسجل صوتنا استنى دقيقة", "expected_topic": "null_topic", "expected_anger": "none"},
+            {"speaker_name": "Karim", "text": "زي الفل جامد", "expected_topic": "null_topic", "expected_anger": "none"},
+            {"speaker_name": "Ahmed", "text": "هنزل أقابل أصحابي بالليل نتكلم في حياتنا", "expected_topic": "personal", "expected_anger": "none"}
+        ]
+
+        all_17 = test_12 + test_5_dialogue
+        results, tokens, ms = await claim_detector.batch_classify(all_17)
+
+        print(f"Batch completed in {ms}ms | Tokens: {tokens}\n")
+        print(f"{'#':<3} | {'Utterance':<45} | {'Predicted Topic':<12} | {'Expected':<12} | {'Anger':<6} | {'Status'}")
+        print("-" * 105)
+
+        for idx, r in enumerate(results, 1):
+            expected = all_17[idx - 1]
+            txt = expected["text"]
+            pred_topic = r.get("topic")
+            pred_anger = r.get("anger")
+            exp_topic = expected["expected_topic"]
+            exp_anger = expected["expected_anger"]
+            status = "MATCH" if (pred_topic == exp_topic and pred_anger == exp_anger) else "DIFF"
+            print(f"{idx:<3} | {txt[:43]:<45} | {pred_topic:<12} | {exp_topic:<12} | {pred_anger:<6} | {status}")
+
+            self.assertEqual(pred_topic, exp_topic, f"Line {idx} topic mismatch: got {pred_topic}, expected {exp_topic}")
+            self.assertEqual(pred_anger, exp_anger, f"Line {idx} anger mismatch: got {pred_anger}, expected {exp_anger}")
+
+        print("\n[SUCCESS] 17/17 historical battery utterances verified identical.")
+
+    async def test_taxonomy_v3_boundary_cases(self):
+        """
+        Taxonomy v3 Boundary Tests:
+        Validates 10 semantic boundary sentences across adjacent categories.
+        """
+        print("\n" + "=" * 70)
+        print("=== TAXONOMY v3: 10 BOUNDARY CASES ON REAL GROQ API ===")
+        print("=" * 70 + "\n")
+
+        boundary_cases = [
+            {"speaker_name": "User", "text": "المطعم ده البيتزا بتاعته تحفة", "expected": "food"},
+            {"speaker_name": "User", "text": "الاكل ده بيخلي الوزن يزيد", "expected": "health"},
+            {"speaker_name": "User", "text": "العربية دي بـ مليون جنيه", "expected": "cars"},
+            {"speaker_name": "User", "text": "الدولار علا تاني", "expected": "money"},
+            {"speaker_name": "User", "text": "بنسافر شرم الشيخ الجمعة", "expected": "travel"},
+            {"speaker_name": "User", "text": "الترم الجاي هادرس ترم تقيل", "expected": "study_work"},
+            {"speaker_name": "User", "text": "باعض في ضهري", "expected": "health"},
+            {"speaker_name": "User", "text": "البنزين زاد تاني", "expected": "money"},
+            {"speaker_name": "User", "text": "هشتري عربية جديدة", "expected": "cars"},
+            {"speaker_name": "User", "text": "الحجز في الفندق 500 جنيه", "expected": "travel"},
+        ]
+
+        results, tokens, ms = await claim_detector.batch_classify(boundary_cases)
+        print(f"Boundary batch completed in {ms}ms | Tokens: {tokens}\n")
+
+        for idx, r in enumerate(results, 1):
+            expected = boundary_cases[idx - 1]
+            got_topic = r.get("topic")
+            exp_topic = expected["expected"]
+            print(f"[{idx:2d}] \"{expected['text']}\" -> {got_topic} (expected: {exp_topic})")
+            self.assertEqual(got_topic, exp_topic, f"Boundary test {idx} mismatch: got {got_topic}, expected {exp_topic}")
+
+        print("\n[SUCCESS] 10/10 boundary cases verified.")
+
+    async def test_taxonomy_v3_anger_spot_check(self):
+        """
+        Taxonomy v3 Anger Spot Check:
+        Verifies frustration wording without laughter triggers mild anger.
+        """
+        print("\n" + "=" * 70)
+        print("=== TAXONOMY v3: ANGER SPOT CHECK ===")
+        print("=" * 70 + "\n")
+
+        spot_cases = [
+            {"speaker_name": "User", "text": "الشغل عاملني زهقت من الصبح", "expected_topic": "study_work", "expected_anger": "mild"},
+            {"speaker_name": "User", "text": "العربية دي بـ مليون جنيه وزهقت من السواقة والزحمة", "expected_topic": "cars", "expected_anger": "mild"}
+        ]
+
+        results, tokens, ms = await claim_detector.batch_classify(spot_cases)
+        for idx, r in enumerate(results, 1):
+            c = spot_cases[idx - 1]
+            print(f"[{idx}] \"{c['text']}\" -> topic: {r.get('topic')}, anger: {r.get('anger')}, evidence: \"{r.get('anger_evidence')}\"")
+            self.assertEqual(r.get("anger"), c["expected_anger"], f"Anger mismatch for line {idx}")
+            self.assertIn("زهقت", r.get("anger_evidence", ""), f"Anger evidence missing for line {idx}")
+
+        print("\n[SUCCESS] Anger spot check passed.")
+
+
 if __name__ == "__main__":
     unittest.main()
+
