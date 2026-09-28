@@ -828,7 +828,8 @@ async def manual_arbitrate(ctx: commands.Context, *, query: str):
         },
         latency=LatencyBreakdown(
             stt_ms=0,
-            llm_ms=0
+            llm_ms=0,
+            planner_ms=0
         ),
         payload={
             "offer_id": offer_id,
@@ -838,6 +839,7 @@ async def manual_arbitrate(ctx: commands.Context, *, query: str):
             "claim_b": f"Verify claim: {query}",
             "entity": query,
             "search_query": query,
+            "planner_ms": 0,
             "expires_in_seconds": 30.0,
             "expires_at": round(now + 30.0, 3)
         }

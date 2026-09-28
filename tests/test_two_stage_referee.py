@@ -145,6 +145,9 @@ class TestTwoStageReferee(unittest.IsolatedAsyncioTestCase):
             offer_events = [e for e in published_events if e.type == "dispute_check_offered"]
             self.assertEqual(len(offer_events), 1, "Must publish exactly 1 dispute_check_offered event")
             self.assertEqual(offer_events[0].payload["entity"], "RTX 5070")
+            self.assertIn("planner_ms", offer_events[0].payload)
+            self.assertIsNotNone(offer_events[0].latency.planner_ms)
+            self.assertGreaterEqual(offer_events[0].timings["offered_at"], offer_events[0].timings["conflict_done_at"])
 
             # 4. Assert pending offer registered with 30s expiry
             self.assertIsNotNone(self.session.pending_offer)
@@ -808,6 +811,111 @@ class TestTwoStageReferee(unittest.IsolatedAsyncioTestCase):
             await check_dispute(mock_ctx)
             mock_confirm.assert_not_called()
             mock_ctx.send.assert_called_once_with("ℹ️ لا يوجد طلب تحقق معلق حالياً.")
+
+    async def test_m_planner_timing_and_latency_accounting(self):
+        """
+        TRACE5-04: Test that offered_at is stamped strictly AFTER plan_search completes,
+        planner_ms is accurately recorded in LatencyBreakdown and event payload,
+        and both are propagated to dispute_check_completed on confirmation.
+        """
+        self.session.claim_memory.add_claim(
+            claim_id="prior_claim_m",
+            speaker_name="Omar",
+            speaker_id="101",
+            raw_text="كارت 5070 نازل بـ 16 جيجا",
+            claim_text="كارت 5070 نازل بـ 16 جيجا",
+            entity="RTX 5070",
+            topic="tech",
+            metric="16 جيجا"
+        )
+
+        mock_claim = (True, {"claim": "كارت الـ 5070 نازل بـ 12 جيجا", "entity": "RTX 5070", "topic": "tech", "metric": "12 جيجا"}, 30)
+        mock_conflict = (True, {"has_conflict": True, "search_query": "RTX 5070 VRAM specs", "target_domains": []}, 40)
+
+        published_events = []
+        def mock_publish(evt):
+            published_events.append(evt)
+
+        mock_plan = ClaimSearchPlan(
+            subject="RTX 5070",
+            predicate="specs",
+            object="12GB",
+            time_anchor=None,
+            time_anchor_confidence=0.0,
+            ambiguity_type=AmbiguityType.NONE,
+            query_variants=["RTX 5070 specs"]
+        )
+
+        async def delayed_plan_search(*args, **kwargs):
+            await asyncio.sleep(0.06)  # 60ms delay
+            return mock_plan
+
+        async def mock_search(query, target_domains=None, **kwargs):
+            return [{"title": "NVIDIA Specs", "url": "https://nvidia.com", "domain": "nvidia.com", "snippet": "12GB GDDR7"}], 50
+
+        assessment_data = {
+            "status": "CONTRADICTED",
+            "confidence": 95,
+            "evidence_strength": "HIGH",
+            "spoken_intervention": "تصحيح سريع",
+            "selected_source_url": "https://nvidia.com",
+            "selected_source_title": "NVIDIA Official",
+            "speaker_a_status": "CONTRADICTED",
+            "speaker_b_status": "SUPPORTED"
+        }
+
+        mock_text_channel = AsyncMock(spec=discord.TextChannel)
+
+        with patch("bot.arbitration.engine.claim_detector.check_claim", new_callable=AsyncMock, return_value=mock_claim), \
+             patch("bot.arbitration.engine.conflict_detector.detect_conflict", new_callable=AsyncMock, return_value=mock_conflict), \
+             patch("bot.arbitration.query_planner.query_planner.plan_search", side_effect=delayed_plan_search), \
+             patch("bot.arbitration.engine.arbitration_verifier.search_evidence", side_effect=mock_search), \
+             patch("bot.arbitration.engine.arbitration_verifier.synthesize_verdict", new_callable=AsyncMock, return_value=(assessment_data, 50, 100, [])), \
+             patch("bot.arbitration.engine.speaker.speak", new_callable=AsyncMock, return_value=200), \
+             patch("bot.arbitration.engine.publisher.publish_sync_task", side_effect=mock_publish):
+
+            await arbitration_engine.process_utterance(
+                guild_id=self.guild_id,
+                user_id=102,
+                speaker_name="Ziad",
+                raw_text="كارت الـ 5070 نازل بـ 12 جيجا",
+                stt_ms=100,
+                voice_client=None,
+                text_channel=mock_text_channel,
+                mode="referee"
+            )
+
+            offer_events = [e for e in published_events if e.type == "dispute_check_offered"]
+            self.assertEqual(len(offer_events), 1)
+            offer_evt = offer_events[0]
+
+            # 1. Assert offered_at is after planner completes
+            self.assertIn("planner_done_at", offer_evt.timings)
+            self.assertGreaterEqual(offer_evt.timings["planner_done_at"], offer_evt.timings["conflict_done_at"])
+            self.assertGreaterEqual(offer_evt.timings["offered_at"], offer_evt.timings["planner_done_at"])
+
+            # 2. Assert planner_ms is present in payload and latency breakdown
+            self.assertIn("planner_ms", offer_evt.payload)
+            self.assertGreaterEqual(offer_evt.payload["planner_ms"], 40)
+            self.assertIsNotNone(offer_evt.latency.planner_ms)
+            self.assertGreaterEqual(offer_evt.latency.planner_ms, 40)
+            self.assertEqual(offer_evt.latency.llm_ms, 30 + 40 + offer_evt.latency.planner_ms)
+
+            # 3. Confirm offer and assert planner_ms propagation to dispute_check_completed
+            await arbitration_engine.confirm_dispute_offer(
+                guild_id=self.guild_id,
+                confirmed_by="Ziad",
+                confirmation_end_time=time.time(),
+                voice_client=None,
+                text_channel=mock_text_channel
+            )
+
+            completed_events = [e for e in published_events if e.type == "dispute_check_completed"]
+            self.assertEqual(len(completed_events), 1)
+            comp_evt = completed_events[0]
+            self.assertIn("planner_ms", comp_evt.payload)
+            self.assertEqual(comp_evt.payload["planner_ms"], offer_evt.payload["planner_ms"])
+            self.assertEqual(comp_evt.latency.planner_ms, offer_evt.latency.planner_ms)
 
 
 if __name__ == "__main__":

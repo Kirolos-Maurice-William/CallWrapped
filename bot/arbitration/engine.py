@@ -69,7 +69,8 @@ class PendingOffer:
         text_channel: Optional[discord.TextChannel] = None,
         user_id: Optional[int] = None,
         stt_ms: int = 0,
-        warm_tts_session: Optional[Any] = None
+        warm_tts_session: Optional[Any] = None,
+        planner_ms: int = 0
     ):
         self.offer_id = offer_id
         self.guild_id = guild_id
@@ -89,6 +90,7 @@ class PendingOffer:
         self.user_id = user_id
         self.stt_ms = stt_ms
         self.warm_tts_session = warm_tts_session
+        self.planner_ms = planner_ms
         self.is_resolved: bool = False
         self.expiry_task: Optional[asyncio.Task] = None
 
@@ -710,16 +712,17 @@ class ArbitrationEngine:
             return
 
         # Step E: Two-Stage Referee Flow: Detect and OFFER (Zero Unsolicited Speech)
-        now = time.time()
+        now_check = time.time()
         cooldown_sec = getattr(config, "DISPUTE_OFFER_COOLDOWN_SEC", 180.0)
-        if (now - session.last_offer_time) < cooldown_sec:
-            remaining = int(cooldown_sec - (now - session.last_offer_time))
+        if (now_check - session.last_offer_time) < cooldown_sec:
+            remaining = int(cooldown_sec - (now_check - session.last_offer_time))
             logger.info(f"DISPUTE_SUPPRESSED: cooldown active (remaining: {remaining}s)")
             return
 
         # Query Planner: Step-Back abstraction + query variants (runs before offer is posted)
         search_plan = None
         query_variants = [search_query]
+        t_plan_start = time.time()
         try:
             from bot.arbitration.query_planner import query_planner
             search_plan = await query_planner.plan_search(
@@ -737,6 +740,11 @@ class ArbitrationEngine:
         except Exception as e:
             logger.warning(f"⚠️ [QueryPlanner] Planning failed, falling back to single query: {e}")
             query_variants = [search_query]
+        t_plan_end = time.time()
+        planner_ms = int((t_plan_end - t_plan_start) * 1000)
+
+        # Stamp offered_at and created_at AFTER planner completes
+        now = time.time()
 
         # If a new offer triggers while an older one is pending (unconfirmed), replace older one with warning
         if session.pending_offer and not session.pending_offer.is_resolved:
@@ -789,7 +797,8 @@ class ArbitrationEngine:
             text_channel=text_channel,
             user_id=user_id,
             stt_ms=stt_ms,
-            warm_tts_session=warm_tts
+            warm_tts_session=warm_tts,
+            planner_ms=planner_ms
         )
         offer.query_variants = query_variants
         offer.search_plan = search_plan
@@ -815,11 +824,13 @@ class ArbitrationEngine:
                 "stt_final_at": round(t_start, 3),
                 "claim_done_at": round(t_claim_end, 3),
                 "conflict_done_at": round(t_conflict_end, 3),
+                "planner_done_at": round(t_plan_end, 3),
                 "offered_at": round(now, 3)
             },
             latency=LatencyBreakdown(
                 stt_ms=stt_ms,
-                llm_ms=claim_ms + conflict_ms
+                llm_ms=claim_ms + conflict_ms + planner_ms,
+                planner_ms=planner_ms
             ),
             payload={
                 "offer_id": offer_id,
@@ -831,6 +842,9 @@ class ArbitrationEngine:
                 "search_query": search_query,
                 "query_variants": query_variants,
                 "ambiguity_type": search_plan.ambiguity_type.value if search_plan else "none",
+                "planner_ms": planner_ms,
+                "claim_ms": claim_ms,
+                "conflict_ms": conflict_ms,
                 "expires_in_seconds": 30.0,
                 "expires_at": round(now + 30.0, 3)
             }
@@ -929,6 +943,7 @@ class ArbitrationEngine:
             latency=LatencyBreakdown(
                 stt_ms=offer.stt_ms,
                 llm_ms=synth_ms,
+                planner_ms=getattr(offer, "planner_ms", 0),
                 search_ms=search_ms,
                 tts_ms=tts_ms,
                 total_ms=int((t_tts_end - t_confirm_start) * 1000)
@@ -937,6 +952,7 @@ class ArbitrationEngine:
                 "offer_id": offer.offer_id,
                 "status": "UNVERIFIABLE",
                 "confirmed_by": confirmed_by,
+                "planner_ms": getattr(offer, "planner_ms", 0),
                 "correct_fact": fallback_text,
                 "speaker_a": offer.speaker_a,
                 "claim_a": offer.claim_a,
@@ -1146,6 +1162,7 @@ class ArbitrationEngine:
                 latency=LatencyBreakdown(
                     stt_ms=offer.stt_ms,
                     llm_ms=synth_ms,
+                    planner_ms=getattr(offer, "planner_ms", 0),
                     search_ms=search_ms,
                     tts_ms=tts_ms,
                     total_ms=int((t_tts_end - t_confirm_start) * 1000)
@@ -1153,6 +1170,7 @@ class ArbitrationEngine:
                 payload={
                     "offer_id": offer.offer_id,
                     "confirmed_by": confirmed_by,
+                    "planner_ms": getattr(offer, "planner_ms", 0),
                     "t_perceived_ms": t_perceived_ms,
                     "status": assessment.get("status", "CONTRADICTED"),
                     "confidence": confidence,

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class LatencyBreakdown(BaseModel):
     stt_ms: Optional[int] = None
     llm_ms: Optional[int] = None
+    planner_ms: Optional[int] = None
     search_ms: Optional[int] = None
     tts_ms: Optional[int] = None
     total_ms: Optional[int] = None
