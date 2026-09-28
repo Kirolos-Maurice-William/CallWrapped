@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, Optional, Any
 
 logger = logging.getLogger("TalkStats")
@@ -84,8 +84,11 @@ class SpeakerStats:
 
         self.last_anger_time = timestamp
 
-        if self.first_anger_quote is None and extracted_quote:
-            self.first_anger_quote = extracted_quote
+        if self.first_anger_quote is None:
+            if extracted_quote and str(extracted_quote).strip():
+                self.first_anger_quote = str(extracted_quote).strip()
+            else:
+                self.first_anger_quote = "(no verbal evidence captured)"
 
         return is_new_episode
 

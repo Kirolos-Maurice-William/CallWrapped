@@ -270,6 +270,69 @@ class ArbitrationEngine:
         finally:
             self._in_flight_classifications.pop(cache_key, None)
 
+    def _record_analytics(
+        self,
+        session: SessionState,
+        guild_id: int,
+        user_id: int,
+        speaker_name: str,
+        raw_text: str,
+        speech_start: float,
+        speech_end: float,
+        correlation_id: str,
+        audio_features: Optional[Any] = None
+    ):
+        """Records talk-time and appends to the session analytics buffer for batched topic/anger classification."""
+        t_fanout_start = time.perf_counter()
+        utterance_key = f"{user_id}_{speech_start}_{raw_text.strip()}"
+        if getattr(config, "ANALYTICS_ENABLED", 1) != 0 and utterance_key not in session.analyzed_utterances:
+            session.analyzed_utterances.add(utterance_key)
+
+            spk_key = str(user_id)
+            duration = max(0.0, speech_end - speech_start)
+            if speech_start == 0.0 and speech_end == 0.0:
+                speech_start = time.time()
+                word_count = len(raw_text.split())
+                duration = max(1.5, word_count * 0.4)
+                speech_end = speech_start + duration
+
+            spk_stats_before = session._stats_tracker.get_speaker(spk_key)
+            prev_total = spk_stats_before.total_speak_seconds if spk_stats_before else 0.0
+
+            stats = session._stats_tracker.record_utterance(
+                speaker_id=spk_key,
+                speech_start=speech_start,
+                speech_end=speech_end,
+                speaker_name=speaker_name
+            )
+            talk_delta_seconds = round(stats.total_speak_seconds - prev_total, 3)
+            streak_seconds = round(stats.current_streak, 3)
+
+            session.analytics_buffer.append({
+                "timestamp": speech_end,
+                "speaker_id": spk_key,
+                "speaker_name": speaker_name,
+                "user_id": user_id,
+                "text": raw_text,
+                "talk_delta_seconds": talk_delta_seconds,
+                "streak_seconds": streak_seconds,
+                "correlation_id": correlation_id,
+                "audio_features": audio_features
+            })
+
+            # Check if buffer overflow, analytics window expired, or schedule timer flush
+            if len(session.analytics_buffer) >= 20:
+                asyncio.create_task(self.flush_analytics(guild_id, reason="buffer_overflow"))
+            elif (time.time() - session.last_analytics_flush) >= config.ANALYTICS_WINDOW_SEC:
+                asyncio.create_task(self.flush_analytics(guild_id, reason="window_timer"))
+            elif session.analytics_timer_task is None or session.analytics_timer_task.done():
+                session.analytics_timer_task = asyncio.create_task(
+                    self._delayed_flush(guild_id, config.ANALYTICS_WINDOW_SEC)
+                )
+
+        fanout_overhead_ms = (time.perf_counter() - t_fanout_start) * 1000
+        logger.info(f"⚡ [Fan-out Dispatcher] Batched analytics buffered in {fanout_overhead_ms:.3f}ms")
+
     async def _delayed_flush(self, guild_id: int, delay: float):
         """Asynchronously flushes analytics after the window delay without blocking."""
         try:
@@ -413,7 +476,6 @@ class ArbitrationEngine:
         mode: str = "referee",
         speech_start: float = 0.0,
         speech_end: float = 0.0,
-        is_drained: bool = False,
         audio_features: Optional[Any] = None
     ):
         t_start = time.monotonic()
@@ -477,57 +539,6 @@ class ArbitrationEngine:
                     )
                 )
 
-        # BATCHED ANALYTICS PATH: Track talk-time & buffer for batched topic/anger reader
-        t_fanout_start = time.perf_counter()
-        utterance_key = f"{user_id}_{speech_start}_{raw_text.strip()}"
-        if getattr(config, "ANALYTICS_ENABLED", 1) != 0 and utterance_key not in session.analyzed_utterances and not is_drained:
-            session.analyzed_utterances.add(utterance_key)
-
-            spk_key = str(user_id)
-            duration = max(0.0, speech_end - speech_start)
-            if speech_start == 0.0 and speech_end == 0.0:
-                speech_start = time.time()
-                word_count = len(raw_text.split())
-                duration = max(1.5, word_count * 0.4)
-                speech_end = speech_start + duration
-
-            spk_stats_before = session._stats_tracker.get_speaker(spk_key)
-            prev_total = spk_stats_before.total_speak_seconds if spk_stats_before else 0.0
-
-            stats = session._stats_tracker.record_utterance(
-                speaker_id=spk_key,
-                speech_start=speech_start,
-                speech_end=speech_end,
-                speaker_name=speaker_name
-            )
-            talk_delta_seconds = round(stats.total_speak_seconds - prev_total, 3)
-            streak_seconds = round(stats.current_streak, 3)
-
-            session.analytics_buffer.append({
-                "timestamp": speech_end,
-                "speaker_id": spk_key,
-                "speaker_name": speaker_name,
-                "user_id": user_id,
-                "text": raw_text,
-                "talk_delta_seconds": talk_delta_seconds,
-                "streak_seconds": streak_seconds,
-                "correlation_id": correlation_id,
-                "audio_features": audio_features
-            })
-
-            # Check if buffer overflow, analytics window expired, or schedule timer flush
-            if len(session.analytics_buffer) >= 20:
-                asyncio.create_task(self.flush_analytics(guild_id, reason="buffer_overflow"))
-            elif (time.time() - session.last_analytics_flush) >= config.ANALYTICS_WINDOW_SEC:
-                asyncio.create_task(self.flush_analytics(guild_id, reason="window_timer"))
-            elif session.analytics_timer_task is None or session.analytics_timer_task.done():
-                session.analytics_timer_task = asyncio.create_task(
-                    self._delayed_flush(guild_id, config.ANALYTICS_WINDOW_SEC)
-                )
-
-        fanout_overhead_ms = (time.perf_counter() - t_fanout_start) * 1000
-        logger.info(f"⚡ [Fan-out Dispatcher] Batched analytics buffered in {fanout_overhead_ms:.3f}ms (non-blocking, arbitrator path running)")
-
         # Echo Mode (Diagnostic testing only)
         if mode == "echo":
             await speaker.speak(voice_client, f"{speaker_name} said: {raw_text}")
@@ -558,13 +569,26 @@ class ArbitrationEngine:
                 "correlation_id": correlation_id,
                 "speech_start": speech_start,
                 "speech_end": speech_end,
-                "is_drained": True
+                "audio_features": audio_features,
             })
             logger.info(
                 f"📥 [Queued Utterance] Session {guild_id} is arbitrating. "
                 f"Queued utterance from {speaker_name} (queue size: {len(session.pending_utterances)}/3)"
             )
             return
+
+        # BATCHED ANALYTICS PATH: Track talk-time & buffer for batched topic/anger reader
+        self._record_analytics(
+            session=session,
+            guild_id=guild_id,
+            user_id=user_id,
+            speaker_name=speaker_name,
+            raw_text=raw_text,
+            speech_start=speech_start,
+            speech_end=speech_end,
+            correlation_id=correlation_id,
+            audio_features=audio_features
+        )
 
         await self._run_pipeline(
             guild_id=guild_id,
@@ -1262,6 +1286,20 @@ class ArbitrationEngine:
                     f"📤 [Draining Queue] Processing queued utterance from {queued['speaker_name']}: '{queued['raw_text']}'"
                 )
                 try:
+                    # 1. Analytics path: record talk time, streak, and buffer for topic/anger classification
+                    self._record_analytics(
+                        session=session,
+                        guild_id=guild_id,
+                        user_id=queued["user_id"],
+                        speaker_name=queued["speaker_name"],
+                        raw_text=queued["raw_text"],
+                        speech_start=queued.get("speech_start", 0.0),
+                        speech_end=queued.get("speech_end", 0.0),
+                        correlation_id=queued.get("correlation_id", f"arb_{uuid.uuid4().hex[:8]}"),
+                        audio_features=queued.get("audio_features")
+                    )
+
+                    # 2. Arbitration pipeline path
                     await self._run_pipeline(
                         guild_id=guild_id,
                         session=session,
