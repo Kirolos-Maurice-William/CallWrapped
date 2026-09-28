@@ -201,6 +201,25 @@ class SessionState:
         """Returns session-discovered entities for upstream ASR keyterm biasing."""
         return list(reversed(self.discovered_entities))[:max_terms]
 
+    def resolve_entity(self, text: str, threshold: float = 0.68) -> Optional[Tuple[str, str, float]]:
+        """
+        Resolves any phonetic variants or known aliases in the text against session entities.
+        If a new phonetic variant is resolved, auto-registers it into entity_aliases.
+        Returns (canonical_name, surface_match, similarity) or None.
+        """
+        from bot.arbitration.entity_normalizer import resolve_entity_in_text
+        match = resolve_entity_in_text(
+            text=text,
+            canonical_entities=self.discovered_entities,
+            aliases=self.entity_aliases,
+            threshold=threshold
+        )
+        if match:
+            canonical, surface, sim = match
+            if surface not in self.entity_aliases:
+                self.entity_aliases[surface] = canonical
+        return match
+
     @property
     def stats_tracker(self) -> SessionStatsTracker:
         return self._stats_tracker

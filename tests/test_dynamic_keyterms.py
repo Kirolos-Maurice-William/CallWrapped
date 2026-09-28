@@ -92,7 +92,16 @@ class TestDynamicKeyterms(unittest.TestCase):
         session.add_discovered_entity("Scout Master")
         self.assertEqual(len(session.discovered_entities), 2)
         
-        # 4. Reset clears registry
+        # 4. Resolve entity via consonant skeleton
+        resolved = session.resolve_entity("حفظ عفوا وستيسكات ماستر وفشخني")
+        self.assertIsNotNone(resolved)
+        canonical, surface, sim = resolved
+        self.assertEqual(canonical, "Scout Master")
+        self.assertEqual(surface, "وستيسكات ماستر")
+        self.assertGreaterEqual(sim, 0.80)
+        self.assertIn("وستيسكات ماستر", session.entity_aliases)
+        
+        # 5. Reset clears registry
         session.reset()
         self.assertEqual(len(session.discovered_entities), 0)
         self.assertEqual(len(session.entity_aliases), 0)
