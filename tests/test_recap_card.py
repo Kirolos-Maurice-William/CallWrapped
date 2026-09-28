@@ -11,10 +11,9 @@ f) Unit: !card command with populated session -> attaches discord.File(filename=
 """
 
 import io
-import os
 import unittest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import tests._setup
 

@@ -8,13 +8,12 @@ All rendering executes off-loop via asyncio.to_thread with zero disk persistence
 
 import io
 import re
-import math
 import logging
 import asyncio
 import functools
 import unicodedata
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Tuple, Union
 
 from PIL import Image, ImageDraw, ImageFont, features
