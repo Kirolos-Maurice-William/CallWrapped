@@ -154,6 +154,28 @@ def is_confirmation_utterance(text: str) -> bool:
     return False
 
 
+class TopicInterval:
+    """Represents a continuous conversational discourse interval."""
+    def __init__(
+        self,
+        macro_topic: str,
+        canonical_tag: str,
+        start_time: float,
+        last_activity_time: float
+    ):
+        self.macro_topic: str = macro_topic
+        self.canonical_tag: str = canonical_tag
+        self.start_time: float = start_time
+        self.last_activity_time: float = last_activity_time
+        self.participating_speakers: Set[str] = set()
+        self.turn_count: int = 0
+        self.evidence_spans: List[str] = []
+
+    @property
+    def duration_seconds(self) -> float:
+        return max(1.0, self.last_activity_time - self.start_time)
+
+
 class SessionState:
     """Tracks sliding dialogue turns, indexed claim memory, server statistics, and batched analytics."""
 
@@ -183,6 +205,9 @@ class SessionState:
         self.fact_check_mode: bool = False
         self.discovered_entities: List[str] = []
         self.entity_aliases: Dict[str, str] = {}
+        self.active_interval: Optional[TopicInterval] = None
+        self.completed_intervals: List[TopicInterval] = []
+        self.topic_durations: Dict[str, float] = {}
 
     def add_discovered_entity(self, canonical_name: str, aliases: Optional[List[str]] = None):
         """Registers a discovered entity and its surface aliases into session memory."""
@@ -219,6 +244,97 @@ class SessionState:
             if surface not in self.entity_aliases:
                 self.entity_aliases[surface] = canonical
         return match
+
+    def record_topic_turn(
+        self,
+        macro_topic: str,
+        canonical_tag: str,
+        speaker_name: str,
+        timestamp: float,
+        duration: float,
+        evidence: str = ""
+    ):
+        """
+        Maintains continuous conversational topic intervals.
+        Inherits active topic across elliptical/anaphoric turns, and detects topic shifts.
+        """
+        if self.active_interval is None:
+            if macro_topic == "null_topic":
+                return
+            self.active_interval = TopicInterval(
+                macro_topic=macro_topic,
+                canonical_tag=canonical_tag or macro_topic,
+                start_time=timestamp,
+                last_activity_time=timestamp + duration
+            )
+            self.active_interval.participating_speakers.add(speaker_name)
+            self.active_interval.turn_count = 1
+            if evidence:
+                self.active_interval.evidence_spans.append(evidence)
+            return
+
+        # Check silence gap: if gap > 45s, natural discourse boundary
+        gap = timestamp - self.active_interval.last_activity_time
+        is_silence_boundary = gap > 45.0
+
+        # Topic continuation check:
+        # Same topic OR (null_topic like laughter/acknowledgment within an active discussion)
+        is_continuation = (
+            not is_silence_boundary
+            and (macro_topic == self.active_interval.macro_topic or macro_topic in ("null_topic", "other"))
+        )
+
+        if is_continuation:
+            self.active_interval.last_activity_time = max(
+                self.active_interval.last_activity_time,
+                timestamp + duration
+            )
+            self.active_interval.participating_speakers.add(speaker_name)
+            self.active_interval.turn_count += 1
+            if canonical_tag and canonical_tag.lower() not in (
+                "other", "null", "none", self.active_interval.macro_topic.lower()
+            ):
+                self.active_interval.canonical_tag = canonical_tag
+            if evidence and evidence not in self.active_interval.evidence_spans:
+                self.active_interval.evidence_spans.append(evidence)
+        else:
+            # Topic Shift! Close active interval and accrue continuous duration
+            dur = self.active_interval.duration_seconds
+            curr_topic = self.active_interval.macro_topic
+            self.topic_durations[curr_topic] = self.topic_durations.get(curr_topic, 0.0) + dur
+            self.completed_intervals.append(self.active_interval)
+
+            if macro_topic != "null_topic":
+                self.active_interval = TopicInterval(
+                    macro_topic=macro_topic,
+                    canonical_tag=canonical_tag or macro_topic,
+                    start_time=timestamp,
+                    last_activity_time=timestamp + duration
+                )
+                self.active_interval.participating_speakers.add(speaker_name)
+                self.active_interval.turn_count = 1
+                if evidence:
+                    self.active_interval.evidence_spans.append(evidence)
+            else:
+                self.active_interval = None
+
+    def close_active_interval(self):
+        """Closes the active interval at session teardown or manual flush."""
+        if self.active_interval is not None:
+            dur = self.active_interval.duration_seconds
+            curr_topic = self.active_interval.macro_topic
+            self.topic_durations[curr_topic] = self.topic_durations.get(curr_topic, 0.0) + dur
+            self.completed_intervals.append(self.active_interval)
+            self.active_interval = None
+
+    def get_topic_durations(self) -> Dict[str, float]:
+        """Returns total continuous durations per topic, including current active interval."""
+        result = dict(self.topic_durations)
+        if self.active_interval is not None:
+            curr_topic = self.active_interval.macro_topic
+            curr_dur = self.active_interval.duration_seconds
+            result[curr_topic] = result.get(curr_topic, 0.0) + curr_dur
+        return result
 
     @property
     def stats_tracker(self) -> SessionStatsTracker:
@@ -268,6 +384,9 @@ class SessionState:
         self.micro_tags.clear()
         self.discovered_entities.clear()
         self.entity_aliases.clear()
+        self.active_interval = None
+        self.completed_intervals.clear()
+        self.topic_durations.clear()
         self.verified_claims_count = 0
         self.disputed_claims_count = 0
         self.unverifiable_count = 0
@@ -513,6 +632,30 @@ class ArbitrationEngine:
             raw_tag = (res.get("tag") or "").strip()
             raw_anger = res.get("anger", "none")
             anger_evidence = res.get("anger_evidence") or ""
+
+            # Cross-script entity resolution and auto-tag upgrade
+            resolved_entity = session.resolve_entity(item.get("text", ""))
+            if resolved_entity:
+                canonical_name, _, _ = resolved_entity
+                if not raw_tag or raw_tag.lower() in ("none", "null", "other", "null_topic"):
+                    raw_tag = canonical_name
+
+            # Auto-register clean discovered entity
+            if raw_tag and raw_tag.lower() not in ("none", "null", "other", "null_topic"):
+                session.add_discovered_entity(raw_tag)
+
+            # Continuous discourse interval tracking
+            turn_dur = max(1.0, float(item.get("talk_delta_seconds", 1.0)))
+            turn_end = float(item.get("timestamp", time.time()))
+            turn_start = turn_end - turn_dur
+            session.record_topic_turn(
+                macro_topic=topic,
+                canonical_tag=raw_tag,
+                speaker_name=item.get("speaker_name", "Speaker"),
+                timestamp=turn_start,
+                duration=turn_dur,
+                evidence=anger_evidence
+            )
 
             # Deterministic late fusion (guarded by ACOUSTIC_FUSION_ENABLED)
             audio_feat = item.get("audio_features")

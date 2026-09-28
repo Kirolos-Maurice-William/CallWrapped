@@ -79,6 +79,9 @@ TOPIC RULES:
 - study_work vs money: the JOB/STUDY event is the subject -> study_work; the SALARY as money news -> money
 - gaming: video game matches, gaming terms, gaming banter ("نوب", "ضيعت الجيم"), and game rants ("للسط", "الدبيل", "الجيم ده") -> gaming
 
+2.1 Context continuation & ellipsis:
+When a line continues an ongoing topic using pronouns, ellipsis, short agreements/disagreements, or follow-ups (e.g., "not is not a good game", "guys not all gaming is about league of legends", "no it is all about it", "مش عاجبني خالص", "أنا شايف العكس"), PRESERVE the active topic (e.g. gaming) rather than defaulting to other or null_topic.
+
 3. null_topic rule:
 null_topic = the line has NO semantic subject: backchannels/acknowledgments ('تمام', 'أيوة', 'ماشي', 'شايف'), greetings ('ازيك', 'سلام عليكم'), call logistics & Discord bot chatter ('بتسجل صوتنا', 'هات الصوت', 'استنى دقيقة', 'البوت ده'), isolated reactions ('زي الفل', 'جامد' as bare reaction), isolated laughter.
 - Discord bot & voice call logistics: talking to/about the Discord bot or call mechanics ('البوت', 'البوت ده', 'اخوي البوت', 'السيرفر', 'البوت سامعنا') is call meta-chatter -> null_topic, NEVER gaming (gaming is strictly video games: GTA, Call of Duty, FIFA, matches, gameplay, ranks).
