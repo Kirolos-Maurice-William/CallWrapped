@@ -8,14 +8,21 @@ echo   Powered by AssemblyAI Universal-3.5 Pro + Groq LPU
 echo ===================================================
 echo.
 
-if not exist backend\venv\Scripts\python.exe (
-    echo [ERROR] Python virtual environment not found in backend\venv!
+set "PY_EXE="
+if exist "%~dp0.venv\Scripts\python.exe" (
+    set "PY_EXE=%~dp0.venv\Scripts\python.exe"
+) else if exist "%~dp0backend\venv\Scripts\python.exe" (
+    set "PY_EXE=%~dp0backend\venv\Scripts\python.exe"
+)
+
+if "%PY_EXE%"=="" (
+    echo [ERROR] Python virtual environment not found in .venv or backend\venv!
     echo Please ensure the virtualenv is set up properly.
     pause
     exit /b 1
 )
 
 echo Starting Discord Voice Bot...
-backend\venv\Scripts\python.exe -m bot.main
+"%PY_EXE%" -m bot.main
 
 pause

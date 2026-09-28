@@ -8,13 +8,20 @@ echo   Listening on http://localhost:8000
 echo ===================================================
 echo.
 
-cd /d "%~dp0backend"
-if not exist "venv\Scripts\python.exe" (
-    echo [ERROR] Python virtual environment not found in backend\venv!
+set "PY_EXE="
+if exist "%~dp0.venv\Scripts\python.exe" (
+    set "PY_EXE=%~dp0.venv\Scripts\python.exe"
+) else if exist "%~dp0backend\venv\Scripts\python.exe" (
+    set "PY_EXE=%~dp0backend\venv\Scripts\python.exe"
+)
+
+if "%PY_EXE%"=="" (
+    echo [ERROR] Python virtual environment not found in .venv or backend\venv!
     pause
     exit /b 1
 )
 
 echo Starting Server...
-venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+cd /d "%~dp0backend"
+"%PY_EXE%" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 pause
