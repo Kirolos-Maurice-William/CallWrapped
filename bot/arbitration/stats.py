@@ -12,16 +12,6 @@ TOPIC_DISPLAY_NAMES: Dict[str, str] = {
     "health": "صحة",
     "cars": "عربيات",
     "money": "فلوس",
-    "football": "كورة",
-    "politics": "سياسة",
-    "music": "مزيكا",
-    "movies": "أفلام",
-    "gaming": "ألعاب",
-    "tech": "تكنولوجيا",
-    "personal": "شخصي",
-    "personal_life": "شخصي",
-    "other": "أخرى",
-    "null_topic": "بدون موضوع",
 }
 
 
