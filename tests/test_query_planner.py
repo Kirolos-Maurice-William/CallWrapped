@@ -25,7 +25,8 @@ from bot.arbitration.query_planner import (
     jaccard_similarity,
     compute_authority_bonus,
     compute_direct_coverage,
-    reciprocal_rank_fusion
+    reciprocal_rank_fusion,
+    extract_year_from_text
 )
 
 
@@ -95,6 +96,12 @@ class TestQueryPlanner(unittest.IsolatedAsyncioTestCase):
         # 7. Model check: ensure production model is strictly qwen/qwen3.8-27b (NOT llama-3.3-70b)
         self.assertNotIn("llama-3.3-70b", query_planner.model_name)
         self.assertEqual(query_planner.model_name, "qwen/qwen3.8-27b")
+
+        # 8. Deterministic year extraction regex helper
+        self.assertEqual(extract_year_from_text("اسبانيا كسبت 2022"), "2022")
+        self.assertEqual(extract_year_from_text("اسبانيا كسبت ٢٠٢٢"), "2022")
+        self.assertEqual(extract_year_from_text("فرنسا في 1998"), "1998")
+        self.assertIsNone(extract_year_from_text("مين كسب كاس العالم"))
 
         print("  ✓ All schema, enum, validation, and model assertions passed.")
 

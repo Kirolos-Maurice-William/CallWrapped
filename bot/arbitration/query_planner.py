@@ -47,6 +47,7 @@ If a date/edition/office is missing, set ambiguity_type and emit NO query that a
 
 === RETRIEVAL PLANNING RULES ===
 1. TIME ANCHORS & TEMPORAL AMBIGUITY:
+   - If the input claim contains an explicit year (4-digit number, Arabic-Indic digits, or written year), you MUST set time_anchor to that year with time_anchor_confidence >= 0.9. Never return time_anchor=null when a year is present in the input.
    - If an explicit year (e.g. 4-digit year like "2022", "2024", "1998") or date appears in the claim text or speaker utterances:
      * You MUST set `time_anchor` = the exact year string (e.g. "2022").
      * Set `time_anchor_confidence` = 1.0.
@@ -107,6 +108,24 @@ PLANNER_SCHEMA = {
         "additionalProperties": False
     }
 }
+ 
+ 
+ARABIC_INDIC_DIGITS_TRANS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+YEAR_REGEX = re.compile(r'(?<!\d)(?:19|20)\d{2}(?!\d)')
+
+
+def extract_year_from_text(text: Optional[str]) -> Optional[str]:
+    """
+    Scans text for 4-digit years (1900-2099), supporting Western and Arabic-Indic digits.
+    Returns the first matching year string or None.
+    """
+    if not text:
+        return None
+    norm_text = text.translate(ARABIC_INDIC_DIGITS_TRANS)
+    match = re.search(r'\b(19|20)\d{2}\b', norm_text) or YEAR_REGEX.search(norm_text)
+    if match:
+        return match.group(0)
+    return None
 
 
 def get_canonical_key(url: str) -> Tuple[str, str]:
@@ -293,11 +312,26 @@ class QueryPlanner:
                 temperature=0.0
             )
             if data:
+                # Deterministic fallback: scan raw claim text for 4-digit years
+                raw_inputs = " ".join(filter(None, [claim_a, claim_b, dimension, fallback_query, entity]))
+                extracted_year = extract_year_from_text(raw_inputs)
+                if not data.get("time_anchor") and extracted_year:
+                    data["time_anchor"] = extracted_year
+                    data["time_anchor_confidence"] = max(data.get("time_anchor_confidence", 0.0), 1.0)
+                    if data.get("ambiguity_type") in ("temporal", AmbiguityType.TEMPORAL.value):
+                        data["ambiguity_type"] = AmbiguityType.NONE.value
+                    logger.info(f"[QueryPlanner] LLM missed year, deterministic fallback: {extracted_year}")
+
                 # Ensure queries are capped at 3 max
                 variants = data.get("query_variants", [])
                 if not variants and fallback_query:
                     variants = [fallback_query]
-                data["query_variants"] = [q.strip() for q in variants if q and q.strip()][:3]
+                clean_variants = [q.strip() for q in variants if q and q.strip()]
+                # If an explicit time_anchor exists, ensure at least one variant includes it
+                anchor = data.get("time_anchor")
+                if anchor and clean_variants and not any(anchor in q for q in clean_variants):
+                    clean_variants[0] = f"{clean_variants[0]} {anchor}"
+                data["query_variants"] = clean_variants[:3]
 
                 plan = ClaimSearchPlan(**data)
                 logger.info(
@@ -309,13 +343,17 @@ class QueryPlanner:
             logger.warning(f"⚠️ [QueryPlanner] Groq planning error: {e}")
 
         # Fallback single-query plan
+        raw_inputs = " ".join(filter(None, [claim_a, claim_b, dimension, fallback_query, entity]))
+        fallback_year = extract_year_from_text(raw_inputs)
         canonical = fallback_query or entity or "verifiable fact check"
+        if fallback_year and fallback_year not in canonical:
+            canonical = f"{canonical} {fallback_year}"
         return ClaimSearchPlan(
             subject=entity or "unknown",
             predicate=dimension or "attribute",
             object=None,
-            time_anchor=None,
-            time_anchor_confidence=0.0,
+            time_anchor=fallback_year,
+            time_anchor_confidence=1.0 if fallback_year else 0.0,
             ambiguity_type=AmbiguityType.NONE,
             query_variants=[canonical]
         )
