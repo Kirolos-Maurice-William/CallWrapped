@@ -77,7 +77,7 @@ TOPIC RULES:
 - cars vs money: the CAR is the subject -> cars; the MONEY/price/economy is the subject -> money ("البنزين زاد تاني" = money)
 - travel vs money: the TRIP is the subject -> travel ("الحجز في الفندق 500 جنيه" = travel); the COST/price is the subject -> money
 - study_work vs money: the JOB/STUDY event is the subject -> study_work; the SALARY as money news -> money
-- gaming: video game matches, gaming terms, and game rants ("للسط", "الدبيل", "الجيم ده") -> gaming
+- gaming: video game matches, gaming terms, gaming banter ("نوب", "ضيعت الجيم"), and game rants ("للسط", "الدبيل", "الجيم ده") -> gaming
 
 3. null_topic rule:
 null_topic = the line has NO semantic subject: backchannels/acknowledgments ('تمام', 'أيوة', 'ماشي', 'شايف'), greetings ('ازيك', 'سلام عليكم'), call logistics ('بتسجل صوتنا', 'هات الصوت', 'استنى دقيقة'), isolated reactions ('زي الفل', 'جامد' as bare reaction), isolated laughter.
@@ -100,7 +100,7 @@ Twin-pair examples:
 "انت زبالة يا عم ههههه ضحكتني" -> none (same insult + laughter)
 "زهقت من السيرفر ده بجد" -> mild
 "زهقت منك يا وحوش هههه" -> none
-banter: "يا نوب ضيعتنا" -> personal, anger: none; "بطل هبد وروح نام" -> other, anger: none
+banter: gaming banter ("يا نوب وبتضيع علينا الجيم") -> gaming, anger: none; general banter ("بطل هبد وروح نام") -> other, anger: none
 
 ACOUSTIC CONTEXT (advisory only):
 Lines may include an advisory acoustic field: [acoustic: was_loud=true, z_peak=3.2].
