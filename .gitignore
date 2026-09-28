@@ -4,6 +4,7 @@ backend/.env
 frontend/.env*.local
 
 # Python
+.venv/
 backend/venv/
 backend/call_intelligence.db
 *.db
@@ -30,4 +31,9 @@ Thumbs.db
 discord_bot/debug_last_audio.wav
 recordings/test_session/
 recordings/test_session_unit_test/
+
+# User Data & Shadow Logs (Prevents PII Leak)
+audit/shadow/
+*.jsonl
+
 

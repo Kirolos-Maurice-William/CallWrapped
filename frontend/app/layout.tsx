@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI Third Participant | Voice Call Intelligence",
+  title: "CallWrapped | Voice Call Intelligence",
   description: "Realtime conversation intelligence, disagreement detection, fact checking, and post-call reports.",
 };
 

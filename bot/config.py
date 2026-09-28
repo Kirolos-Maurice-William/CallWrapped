@@ -14,7 +14,7 @@ else:
 
 
 class BotConfig:
-    """Central configuration for the AssemblyAI Third Participant Voice Agent."""
+    """Central configuration for the CallWrapped Voice Agent."""
 
     # Discord Bot Token
     DISCORD_BOT_TOKEN: str = os.getenv("DISCORD_BOT_TOKEN", "")

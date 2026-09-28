@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 > nul
-title AI Third Participant - Discord Voice Bot (Hackathon Edition)
+title CallWrapped - Discord Voice Bot (Hackathon Edition)
 
 echo ===================================================
-echo   AI Third Participant - Discord Voice Bot Launcher
+echo   CallWrapped - Discord Voice Bot Launcher
 echo   Powered by AssemblyAI Universal-3.5 Pro + Groq LPU
 echo ===================================================
 echo.

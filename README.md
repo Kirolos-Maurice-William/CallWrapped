@@ -299,6 +299,7 @@ CallWrapped uses standard Discord `!` prefix commands (no slash commands):
 ## 🖥️ Live Judge Dashboard
 
 Served locally at `http://localhost:8000` via FastAPI backend and Next.js 14 frontend:
+- **CORS Access Control:** `CORS_ORIGINS` in `.env` controls dashboard access and defaults to `http://localhost:3000,http://127.0.0.1:3000`.
 - **Active Dispute Cards:** Displays real-time side-by-side claims, status badges (`OFFERED`, `CHECKING`, `RESOLVED`, `ABSTAINED`, `REFUSED_PRIVATE`), and direct source links.
 - **Live Latency Tickers:** Millisecond-accurate telemetry for STT poll duration, Groq LPU inference, Tavily search retrieval, and Edge-TTS synthesis.
 - **Conversational Analytics:** Real-time speaker talk-time distribution bar, Streak Champion indicator, frustration quote receipts, and 15-category topical share.
@@ -371,7 +372,7 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 ```
-Populate your API keys in `.env`. Ensure `ACOUSTIC_FUSION_ENABLED=0` remains set.
+Populate your API keys in `.env`. Ensure `ACOUSTIC_FUSION_ENABLED=0` remains set. `CORS_ORIGINS` in `.env` controls dashboard access and defaults to `http://localhost:3000,http://127.0.0.1:3000`.
 
 ### 3. Build Frontend Dashboard
 ```bash

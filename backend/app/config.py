@@ -23,12 +23,12 @@ class Settings(BaseSettings):
     ASSEMBLYAI_MODEL: str = (os.getenv("SPEECH_MODELS") or os.getenv("ASSEMBLYAI_MODEL") or "universal-3-5-pro").split(",")[0].strip()
     
     # LLM Settings
-    GEMINI_API_KEY: str = ""
-    OPENAI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     GROQ_API_KEY_2: str = ""
     GROQ_API_KEY_3: str = ""
     GROQ_API_KEY_4: str = ""
+    GROQ_API_KEY_5: str = ""
+    GROQ_API_KEY_6: str = ""
     
     # Search API
     TAVILY_API_KEY: str = ""
