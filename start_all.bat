@@ -9,13 +9,26 @@ echo   2. Discord Voice Bot (Silent Referee)
 echo ===================================================
 echo.
 
+rem Pre-flight: Check frontend build status
+if not exist "%~dp0frontend\out\index.html" (
+    echo [NOTICE] Frontend build not found in frontend\out.
+    echo Launching Next.js development server on port 3000...
+    start "CallWrapped - Frontend (Dev)" cmd /k "%~dp0start_frontend.bat"
+) else (
+    echo [OK] Frontend static export found in frontend\out.
+)
+
 start "CallWrapped - Backend" cmd /k "%~dp0start_backend.bat"
 timeout /t 3 /nobreak > nul
 
 start "CallWrapped - Discord Bot" cmd /k "%~dp0start_bot.bat"
 
 echo Opening Live Dashboard in browser...
-start http://localhost:8000
+if exist "%~dp0frontend\out\index.html" (
+    start http://localhost:8000
+) else (
+    start http://localhost:3000
+)
 
 echo.
 echo All services launched!
