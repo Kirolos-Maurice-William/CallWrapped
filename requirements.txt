@@ -18,3 +18,5 @@ tldextract>=5.1.0
 Pillow>=10.0.0
 arabic-reshaper>=3.0.0
 python-bidi>=0.4.2
+soxr>=0.4.0
+cachetools>=5.3.0

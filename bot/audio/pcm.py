@@ -25,11 +25,15 @@ def convert_discord_pcm_to_wav(pcm_chunks: List[bytes]) -> bytes:
     stereo_matrix = stereo_data.reshape(-1, 2)
     mono_48k = stereo_matrix.mean(axis=1).astype(np.int16)
 
-    # Downsample 48kHz -> 16kHz (3:1 integer decimation with anti-aliasing averaging)
+    # Downsample 48kHz -> 16kHz (3:1 integer decimation with high-rejection anti-aliasing sinc filter)
     remainder = mono_48k.size % 3
     if remainder != 0:
         mono_48k = mono_48k[:-remainder]
-    mono_16k = mono_48k.reshape(-1, 3).mean(axis=1).astype(np.int16)
+    try:
+        import soxr
+        mono_16k = soxr.resample(mono_48k, in_rate=48000, out_rate=16000, quality="HQ").astype(np.int16)
+    except Exception:
+        mono_16k = mono_48k.reshape(-1, 3).mean(axis=1).astype(np.int16)
 
     # Energy-trim trailing silence (1.5s VAD window) with 150ms safety buffer
     frame_samples = 320  # 20ms at 16kHz
