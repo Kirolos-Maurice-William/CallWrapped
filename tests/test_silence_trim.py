@@ -72,5 +72,30 @@ class TestSilenceTrim(unittest.TestCase):
         self.assertLess(dur, 0.40)
         self.assertGreaterEqual(dur, 0.20)
 
+    def test_convert_discord_pcm_odd_buffer_truncated_by_one_sample(self):
+        """AUDIO-06: Odd-sample buffer does not crash reshape and is truncated by 1 sample."""
+        # 1921 samples (odd int16 sample count -> 3842 bytes)
+        odd_samples = np.ones(1921, dtype=np.int16) * 1000
+        odd_pcm = odd_samples.tobytes()
+        self.assertEqual(len(odd_pcm), 1921 * 2)
+
+        # convert_discord_pcm_to_wav should not crash with ValueError on reshape(-1, 2)
+        wav_bytes = convert_discord_pcm_to_wav([odd_pcm])
+        self.assertTrue(len(wav_bytes) > 44)
+
+        with wave.open(io.BytesIO(wav_bytes), "rb") as wf:
+            frames_out = wf.getnframes()
+        # 1921 samples truncated by 1 sample -> 1920 stereo samples -> 960 mono samples at 48kHz
+        # 960 / 3 = 320 samples at 16kHz
+        self.assertEqual(frames_out, 320)
+
+        # Also test odd byte count (e.g. 3843 bytes)
+        odd_byte_pcm = odd_pcm + b"\x42"
+        wav_bytes_odd_byte = convert_discord_pcm_to_wav([odd_byte_pcm])
+        self.assertTrue(len(wav_bytes_odd_byte) > 44)
+        with wave.open(io.BytesIO(wav_bytes_odd_byte), "rb") as wf:
+            self.assertEqual(wf.getnframes(), 320)
+
+
 if __name__ == "__main__":
     unittest.main()

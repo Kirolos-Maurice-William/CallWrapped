@@ -5,6 +5,7 @@ from enum import Enum
 import json
 import logging
 import math
+import numpy as np
 from pathlib import Path
 import statistics
 import time
@@ -47,31 +48,44 @@ class PCM16Adapter:
         if samples is None:
             return 0, 0
 
+        thresh = cls.CLIPPING_SAMPLE_THRESHOLD
+
         if isinstance(samples, (bytes, bytearray)):
             if len(samples) < 2:
                 return 0, 0
-            arr = array.array('h')
-            arr.frombytes(samples)
+            if len(samples) % 2 != 0:
+                samples = samples[:-1]
+            arr = np.frombuffer(samples, dtype=np.int16)
             total = len(arr)
-            thresh = cls.CLIPPING_SAMPLE_THRESHOLD
-            clipped = sum(1 for s in arr if s >= thresh or s <= -thresh)
+            clipped = int(np.count_nonzero((arr >= thresh) | (arr <= -thresh)))
+            return clipped, total
+
+        if isinstance(samples, np.ndarray):
+            total = samples.size
+            if total == 0:
+                return 0, 0
+            if samples.dtype == np.int16:
+                clipped = int(np.count_nonzero((samples >= thresh) | (samples <= -thresh)))
+            else:
+                arr = samples.astype(np.int32)
+                clipped = int(np.count_nonzero(np.abs(arr) >= thresh))
             return clipped, total
 
         if isinstance(samples, (list, tuple, array.array)):
             total = len(samples)
             if total == 0:
                 return 0, 0
-            thresh = cls.CLIPPING_SAMPLE_THRESHOLD
-            clipped = sum(1 for s in samples if s >= thresh or s <= -thresh)
+            arr = np.asarray(samples, dtype=np.int32)
+            clipped = int(np.count_nonzero(np.abs(arr) >= thresh))
             return clipped, total
 
-        # Duck typing for numpy ndarray or other sequence types without importing numpy
+        # Duck typing fallback for any other sequence
         try:
-            total = len(samples)
+            arr = np.asarray(samples, dtype=np.int32)
+            total = int(arr.size)
             if total == 0:
                 return 0, 0
-            thresh = cls.CLIPPING_SAMPLE_THRESHOLD
-            clipped = sum(1 for s in samples if s >= thresh or s <= -thresh)
+            clipped = int(np.count_nonzero(np.abs(arr) >= thresh))
             return clipped, total
         except Exception as e:
             logger.warning(f"count_clipped_samples failed on input type {type(samples).__name__}: {e}")

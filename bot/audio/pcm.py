@@ -13,7 +13,11 @@ def convert_discord_pcm_to_wav(pcm_chunks: List[bytes]) -> bytes:
     if not pcm_chunks:
         return b""
     raw_bytes = b"".join(pcm_chunks)
+    if len(raw_bytes) % 2 != 0:
+        raw_bytes = raw_bytes[:-1]
     stereo_data = np.frombuffer(raw_bytes, dtype=np.int16)
+    if len(stereo_data) % 2 != 0:
+        stereo_data = stereo_data[:-1]
     if stereo_data.size < 2:
         return b""
 
