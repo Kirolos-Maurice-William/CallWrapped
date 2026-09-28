@@ -119,8 +119,14 @@ async def on_user_utterance(
     if not ctx.voice_client or not ctx.voice_client.is_connected():
         return
 
-    # 1. Transcribe speech using AssemblyAI Universal-3.5 Pro (Preserves raw transcript as evidence!)
-    raw_text, stt_ms = await assemblyai_client.transcribe(wav_bytes, speaker_name=speaker_name)
+    # 1. Transcribe speech using AssemblyAI Universal-3.5 Pro with dynamic keyterms (Preserves raw transcript as evidence!)
+    session = arbitration_engine.get_session(guild_id)
+    active_keyterms = session.get_active_keyterms() if session else None
+    raw_text, stt_ms = await assemblyai_client.transcribe(
+        wav_bytes,
+        speaker_name=speaker_name,
+        extra_keyterms=active_keyterms
+    )
     if not raw_text or len(raw_text.strip()) < 2:
         return
 

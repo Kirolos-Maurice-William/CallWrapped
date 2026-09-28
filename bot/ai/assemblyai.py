@@ -1,7 +1,7 @@
 import time
 import asyncio
 import logging
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
 import httpx
 from bot.config import config
 
@@ -110,6 +110,36 @@ ASSEMBLYAI_CUSTOM_SPELLING = [
 VALID_ASSEMBLYAI_MODELS = {"universal-3-5-pro", "universal-3-pro", "universal-2"}
 
 
+def build_keyterms(extra_keyterms: Optional[List[str]] = None) -> List[str]:
+    """
+    Constructs the keyterms_prompt list for AssemblyAI Universal-3.5 Pro.
+    Prioritizes dynamically discovered session entities (extra_keyterms), then fills
+    the remaining slots from ASSEMBLYAI_KEYTERMS up to the official 100-term ceiling.
+    Ensures deduplication, whitespace stripping, and length sanity (<= 50 chars).
+    """
+    combined: List[str] = []
+    seen: set = set()
+    if extra_keyterms:
+        for term in extra_keyterms:
+            if not term or not isinstance(term, str):
+                continue
+            cleaned = term.strip()
+            if cleaned and len(cleaned) <= 50 and cleaned.lower() not in seen:
+                seen.add(cleaned.lower())
+                combined.append(cleaned)
+            if len(combined) >= 100:
+                break
+    for term in ASSEMBLYAI_KEYTERMS:
+        if len(combined) >= 100:
+            break
+        if not term or not isinstance(term, str):
+            continue
+        cleaned = term.strip()
+        if cleaned and len(cleaned) <= 50 and cleaned.lower() not in seen:
+            seen.add(cleaned.lower())
+            combined.append(cleaned)
+    return combined[:100]
+
 
 class AssemblyAIClient:
     """
@@ -123,7 +153,12 @@ class AssemblyAIClient:
         self.upload_url = "https://api.assemblyai.com/v2/upload"
         self.transcript_url = "https://api.assemblyai.com/v2/transcript"
 
-    async def transcribe(self, wav_bytes: bytes, speaker_name: str = "unknown") -> Tuple[Optional[str], int]:
+    async def transcribe(
+        self,
+        wav_bytes: bytes,
+        speaker_name: str = "unknown",
+        extra_keyterms: Optional[List[str]] = None
+    ) -> Tuple[Optional[str], int]:
         """Transcribes audio and returns (raw_text, latency_ms)."""
         if not self.api_key or not wav_bytes or len(wav_bytes) < 1000:
             return None, 0
@@ -149,7 +184,7 @@ class AssemblyAIClient:
                 if not valid_models:
                     valid_models = ["universal-3-5-pro", "universal-2"]
 
-                # 2. Submit transcription job with code-switching prompts
+                # 2. Submit transcription job with code-switching prompts and dynamic keyterms
                 job_payload = {
                     "audio_url": upload_url,
                     "language_code": config.SPEECH_LANGUAGE,
@@ -157,7 +192,7 @@ class AssemblyAIClient:
                     "punctuate": True,
                     "format_text": True,
                     "prompt": ASSEMBLYAI_CONTEXT_PROMPT,
-                    "keyterms_prompt": ASSEMBLYAI_KEYTERMS,
+                    "keyterms_prompt": build_keyterms(extra_keyterms),
                     "custom_spelling": ASSEMBLYAI_CUSTOM_SPELLING
                 }
 

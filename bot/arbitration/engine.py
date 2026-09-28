@@ -181,6 +181,25 @@ class SessionState:
         self.last_offer_time: float = 0.0
         self.topic_cooldowns: TTLCache = TTLCache(maxsize=100, ttl=getattr(config, "DISPUTE_OFFER_COOLDOWN_SEC", 180.0))
         self.fact_check_mode: bool = False
+        self.discovered_entities: List[str] = []
+        self.entity_aliases: Dict[str, str] = {}
+
+    def add_discovered_entity(self, canonical_name: str, aliases: Optional[List[str]] = None):
+        """Registers a discovered entity and its surface aliases into session memory."""
+        name_clean = canonical_name.strip()
+        if not name_clean:
+            return
+        if name_clean not in self.discovered_entities:
+            self.discovered_entities.append(name_clean)
+        if aliases:
+            for alias in aliases:
+                a_clean = alias.strip()
+                if a_clean:
+                    self.entity_aliases[a_clean] = name_clean
+
+    def get_active_keyterms(self, max_terms: int = 40) -> List[str]:
+        """Returns session-discovered entities for upstream ASR keyterm biasing."""
+        return list(reversed(self.discovered_entities))[:max_terms]
 
     @property
     def stats_tracker(self) -> SessionStatsTracker:
@@ -228,6 +247,8 @@ class SessionState:
         self.analytics_buffer.clear()
         self._topic_counts.clear()
         self.micro_tags.clear()
+        self.discovered_entities.clear()
+        self.entity_aliases.clear()
         self.verified_claims_count = 0
         self.disputed_claims_count = 0
         self.unverifiable_count = 0
