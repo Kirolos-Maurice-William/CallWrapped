@@ -47,6 +47,7 @@
 14. [Test Suite Verification (173 / 173 Passing)](#-test-suite-verification-173--173-passing)
 15. [Audits & Independent Quality Control](#-audits--independent-quality-control)
 16. [Team & Contact](#-team--contact)
+17. [License & Third-Party Notice](#-license--third-party-notice)
 
 ---
 
@@ -440,6 +441,15 @@ Developed by **Team Aang & Bumi** for the **AssemblyAI Voice Agent Hackathon 202
 
 ---
 
+## 📄 License & Third-Party Notice
+
+CallWrapped is released under the [MIT License](LICENSE).
+
+> **Third-Party Notice:** edge-tts (GPL-3.0) is used at runtime but not distributed; the project itself is MIT-licensed. For commercial deployment, replace with a licensed TTS provider.
+
+---
+
 <div align="center">
 <b>CallWrapped — Grounded Truth and Conversational Clarity for Voice Calls.</b>
 </div>
+
