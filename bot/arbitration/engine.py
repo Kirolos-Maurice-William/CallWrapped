@@ -173,6 +173,7 @@ class SessionState:
         self.analytics_buffer: List[Dict[str, Any]] = []
         self.last_analytics_flush: float = time.time()
         self._topic_counts: Dict[str, int] = {}
+        self.micro_tags: Dict[str, int] = {}
         self._flush_lock = asyncio.Lock()
         self.analytics_timer_task: Optional[asyncio.Task] = None
         self.pending_offer: Optional[PendingOffer] = None
@@ -226,6 +227,7 @@ class SessionState:
         self.turns.clear()
         self.analytics_buffer.clear()
         self._topic_counts.clear()
+        self.micro_tags.clear()
         self.verified_claims_count = 0
         self.disputed_claims_count = 0
         self.unverifiable_count = 0
@@ -468,6 +470,7 @@ class ArbitrationEngine:
         for idx, item in enumerate(buffer_to_process, 1):
             res = results_by_line.get(idx, {})
             topic = res.get("topic", "other")
+            raw_tag = (res.get("tag") or "").strip()
             raw_anger = res.get("anger", "none")
             anger_evidence = res.get("anger_evidence") or ""
 
@@ -488,9 +491,12 @@ class ArbitrationEngine:
                 boost_val = 0.0
                 gate_reason = "disabled_by_config"
 
-            # 1. Update topic stats (avoid duplicate increment if publisher is hooked by main.py)
+            # 1. Update topic stats and micro-tags (avoid duplicate increment if publisher is hooked by main.py)
             if getattr(publisher.publish_sync_task, "__name__", "") != "_on_event_published":
                 session._topic_counts[topic] = session._topic_counts.get(topic, 0) + 1
+                if raw_tag and topic != "null_topic":
+                    if raw_tag.lower() not in ("none", "null", "other", "null_topic"):
+                        session.micro_tags[raw_tag] = session.micro_tags.get(raw_tag, 0) + 1
 
             # 2. Update anger with 90s debounce (record_anger ONLY when anger is mild or high)
             spk_key = str(item["user_id"])
@@ -506,7 +512,8 @@ class ArbitrationEngine:
                 stats = session._stats_tracker.get_or_create_speaker(spk_key, item["speaker_name"])
 
             logger.info(
-                f"📈 [Batched Analytics Line] {item['speaker_name']}: topic={topic} | anger={anger} (raw={raw_anger}, boost={boost_val:.2f}, gate={gate_reason}) | "
+                f"📈 [Batched Analytics Line] {item['speaker_name']}: topic={topic} (tag={raw_tag}) | "
+                f"anger={anger} (raw={raw_anger}, boost={boost_val:.2f}, gate={gate_reason}) | "
                 f"episodes={stats.angry_episodes} | quote='{anger_evidence}'"
             )
 
@@ -519,6 +526,7 @@ class ArbitrationEngine:
                 speaker_name=item["speaker_name"],
                 text=item["text"],
                 topic=topic,
+                tag=raw_tag,
                 anger=anger,
                 anger_evidence=anger_evidence,
                 talk_delta_seconds=item["talk_delta_seconds"],
@@ -526,6 +534,7 @@ class ArbitrationEngine:
                 angry_episodes=stats.angry_episodes,
                 payload={
                     "topic": topic,
+                    "tag": raw_tag,
                     "anger": anger,
                     "anger_evidence": anger_evidence,
                     "talk_delta_seconds": item["talk_delta_seconds"],
@@ -538,6 +547,7 @@ class ArbitrationEngine:
                     "batch_reason": reason,
                     "classification": {
                         "topic": topic,
+                        "tag": raw_tag,
                         "anger": anger,
                         "anger_evidence": anger_evidence
                     }

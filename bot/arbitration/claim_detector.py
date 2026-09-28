@@ -43,25 +43,26 @@ INSTANT_CLAIM_SCHEMA = {
     }
 }
 
-# Batched Topic & Anger Prompt (Reuses proven ANGER RULE + twin-pair examples + Taxonomy v3 13-topic expansion)
+# Batched Topic & Anger Prompt (Reuses proven ANGER RULE + twin-pair examples + Taxonomy v3 13-topic expansion + fine-grained tags)
 BATCH_ANALYTICS_PROMPT = """Analyze a window of voice chat utterances (Egyptian Arabic/English).
-For each numbered line "Speaker: Text", classify topic, anger level, and anger evidence.
+For each numbered line "Speaker: Text", classify topic, fine-grained tag, anger level, and anger evidence.
 
 JSON schema: return an object with "results": array of items for EVERY line in order:
 - line_number: integer (1-based)
 - topic: football|politics|music|movies|gaming|tech|food|travel|study_work|health|cars|money|personal|other|null_topic
+- tag: specific entity, subtopic, or product (1-4 words in English/Arabic, e.g. "RTX 5070", "الأهلي", "GTA 6", "قانون الإيجار", "بيتزا نابولي"). For null_topic or when no specific entity exists, output "".
 - anger: none|mild|high
 - anger_evidence: verbatim quote of frustration/anger or ""
 Write anger_evidence in the SAME language as the input utterance.
 
 TOPIC RULES:
 1. Topic examples:
-- football: "الأهلي كسب كأس السوبر"
-- politics: "مجلس النواب وافق على القانون"
-- music: "عمرو دياب نزل ألبوم جديد"
-- movies: "فيلم ولاد رزق في السينما"
-- gaming: "كول أوف ديوتي والرانك بيعصب"
-- tech: "كارت الـ RTX 5070 نازل بـ 12 جيجا"
+- football: "الأهلي كسب كأس السوبر" (tag: "كأس السوبر" or "الأهلي")
+- politics: "مجلس النواب وافق على القانون" (tag: "مجلس النواب")
+- music: "عمرو دياب نزل ألبوم جديد" (tag: "عمرو دياب")
+- movies: "فيلم ولاد رزق في السينما" (tag: "ولاد رزق")
+- gaming: "كول أوف ديوتي والرانك بيعصب" (tag: "Call of Duty")
+- tech: "كارت الـ RTX 5070 نازل بـ 12 جيجا" (tag: "RTX 5070")
 - food: "المطعم ده البيتزا بتاعته تحفة" / "طلبت برجر امبارح كان جامد"
 - travel: "بنسافر شرم الشيخ الجمعة" / "الحجز في الفندق 500 جنيه الليلة"
 - study_work: "بكرا عندي امتحان" / "الشغل عاملني زهقت من الصبح"
@@ -126,13 +127,14 @@ BATCH_ANALYTICS_SCHEMA = {
                                 "personal", "other", "null_topic"
                             ]
                         },
+                        "tag": {"type": "string"},
                         "anger": {
                             "type": "string",
                             "enum": ["none", "mild", "high"]
                         },
                         "anger_evidence": {"type": "string"}
                     },
-                    "required": ["line_number", "topic", "anger", "anger_evidence"],
+                    "required": ["line_number", "topic", "tag", "anger", "anger_evidence"],
                     "additionalProperties": False
                 }
             }
@@ -212,6 +214,22 @@ def infer_topic(text: str) -> str:
     return "other"
 
 
+def infer_tag(text: str, topic: Optional[str] = None) -> str:
+    """Extracts a fine-grained micro-tag (subtopic, entity, or keyword) when present in text."""
+    if not text:
+        return ""
+    t = text.lower()
+    for entity in [
+        "rtx 5070", "rtx 4090", "rtx", "ps5", "playstation", "gta 6", "gta", "call of duty", "cod",
+        "الأهلي", "الزمالك", "صلاح", "كأس السوبر", "دوري أبطال أفريقيا",
+        "عمرو دياب", "ويجز", "ولاد رزق", "الإيجار القديم", "مجلس النواب",
+        "شرم الشيخ", "بيتزا", "برجر", "الدولار", "البنزين"
+    ]:
+        if entity in t:
+            return entity
+    return ""
+
+
 class ClaimDetector:
     """
     Split classification architecture:
@@ -254,6 +272,7 @@ class ClaimDetector:
                 "entity": None,
                 "metric": None,
                 "topic": infer_topic(text),
+                "tag": infer_tag(text),
                 "anger": infer_anger(text)[0],
                 "anger_evidence": infer_anger(text)[1],
                 "_tokens": tokens
@@ -268,9 +287,11 @@ class ClaimDetector:
         if parsed.get("metric") == "":
             parsed["metric"] = None
 
-        # Ensure topic and anger fields exist for regression suite and downstream components
+        # Ensure topic, tag, and anger fields exist for regression suite and downstream components
         if parsed.get("topic") is None:
             parsed["topic"] = infer_topic(text)
+        if parsed.get("tag") is None:
+            parsed["tag"] = parsed.get("entity") or infer_tag(text, parsed.get("topic"))
         if parsed.get("anger") is None:
             ang, ev = infer_anger(text)
             parsed["anger"] = ang

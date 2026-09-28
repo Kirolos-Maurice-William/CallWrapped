@@ -34,6 +34,12 @@ def _on_event_published(event: VoiceEvent):
             if not hasattr(session, "topic_counts"):
                 session.topic_counts = {}
             session.topic_counts[event.topic] = session.topic_counts.get(event.topic, 0) + 1
+            if getattr(event, "tag", None) and event.topic != "null_topic":
+                clean_tag = str(event.tag).strip()
+                if clean_tag and clean_tag.lower() not in ("none", "null", "other", "null_topic"):
+                    if not hasattr(session, "micro_tags"):
+                        session.micro_tags = {}
+                    session.micro_tags[clean_tag] = session.micro_tags.get(clean_tag, 0) + 1
         except (ValueError, TypeError):
             pass
     _original_publish_sync(event)
@@ -430,6 +436,15 @@ def render_recap(session_state: Any) -> str:
             lines.append(f"{rank}. **{display_name}**: {t_pct:.1f}% ({top_cnt})")
         if null_count > 0:
             lines.append(f"ℹ️ نسبة التغطية الموضوعية: {coverage_pct:.1f}% (مستبعد {null_count} جمل بدون موضوع)")
+
+        # Fine-grained micro-tag highlights (eradicates generic "Other" obscurity)
+        micro_tags = getattr(session_state, "micro_tags", {})
+        if micro_tags:
+            valid_tags = {k: v for k, v in micro_tags.items() if k and str(k).lower() not in ("none", "null", "other", "null_topic")}
+            if valid_tags:
+                top_tags = sorted(valid_tags.items(), key=lambda x: x[1], reverse=True)[:4]
+                tag_str = " • ".join(f"#{t} ({c})" for t, c in top_tags)
+                lines.append(f"📌 **أبرز الكلمات والمواضيع الدقيقة:** {tag_str}")
     elif null_count > 0:
         lines.append(f"مفيش مواضيع مسجلة (كل الكلام كان دردشة/تنسيق بدون موضوع - {null_count} جمل).")
     else:

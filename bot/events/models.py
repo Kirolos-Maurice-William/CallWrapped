@@ -45,8 +45,9 @@ class VoiceEvent(BaseModel):
     latency: Optional[LatencyBreakdown] = None
     payload: Dict[str, Any] = Field(default_factory=dict)
 
-    # Analytics fields (Step 5)
+    # Analytics fields (Step 5 & Step 8)
     topic: Optional[str] = None
+    tag: Optional[str] = None
     anger: Optional[str] = None
     anger_evidence: Optional[str] = None
     talk_delta_seconds: Optional[float] = None

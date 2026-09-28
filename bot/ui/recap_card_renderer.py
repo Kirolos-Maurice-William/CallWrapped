@@ -13,7 +13,7 @@ import asyncio
 import functools
 import unicodedata
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple, Union
 
 from PIL import Image, ImageDraw, ImageFont, features
@@ -94,6 +94,7 @@ class RecapCardPayload:
     speaker_stats: List[SpeakerStat]
     top_topics: List[Union[TopicStat, Tuple[str, str, float]]]
     coverage_note: str = ""
+    micro_tags: List[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -450,8 +451,11 @@ def render_recap_card_png(payload: RecapCardPayload) -> bytes:
             draw.rounded_rectangle((132, curr_top_y + 44, 1004, curr_top_y + 52), radius=4, fill=(30, 41, 59))
             draw.rounded_rectangle((132, curr_top_y + 44, 132 + fill_w, curr_top_y + 52), radius=4, fill=(139, 92, 246))
 
-        # TRACE6-02: Overflow indicator for >3 topics
-        if len(payload.top_topics) > 3:
+        # Fine-grained micro-tags or overflow indicator for >3 topics
+        if getattr(payload, "micro_tags", None) and len(payload.top_topics) <= 3:
+            tags_text = "  •  ".join(f"#{t}" for t in payload.micro_tags[:3])
+            draw_text(draw, (76, 1184), tags_text, font_stat_muted, fill=(167, 139, 250))
+        elif len(payload.top_topics) > 3:
             omitted_top = len(payload.top_topics) - 3
             overflow_topic_text = f"+{omitted_top} مواضيع إضافية"
             draw_text(draw, (76, 1184), overflow_topic_text, font_stat_muted, fill=(148, 163, 184))
@@ -583,6 +587,19 @@ def build_card_payload_from_session(
             if t:
                 topic_counts[t] = topic_counts.get(t, 0) + 1
 
+    # Extract micro-tags if available
+    micro_tags_list: List[str] = []
+    micro_tag_counts: Dict[str, int] = {}
+    raw_micro_tags = getattr(session_state, "micro_tags", None)
+    if raw_micro_tags is None and isinstance(session_state, dict):
+        raw_micro_tags = session_state.get("micro_tags")
+    if raw_micro_tags and isinstance(raw_micro_tags, dict):
+        for tag, c in raw_micro_tags.items():
+            if tag and str(tag).lower() not in ("none", "null", "other", "null_topic"):
+                micro_tag_counts[str(tag)] = micro_tag_counts.get(str(tag), 0) + c
+        sorted_micro = sorted(micro_tag_counts.items(), key=lambda x: x[1], reverse=True)
+        micro_tags_list = [t for t, _ in sorted_micro]
+
     topical_counts = {t: c for t, c in topic_counts.items() if t not in ("null_topic", "null", "none", "بدون موضوع")}
     null_count = topic_counts.get("null_topic", 0) + topic_counts.get("null", 0) + topic_counts.get("بدون موضوع", 0)
     total_topical_count = sum(topical_counts.values())
@@ -596,6 +613,8 @@ def build_card_payload_from_session(
     for top_name, top_cnt in sorted_topics:
         t_pct = (top_cnt / total_topical_count * 100.0) if total_topical_count > 0 else 0.0
         display_name = TOPIC_DISPLAY_NAMES.get(top_name.lower(), top_name)
+        if top_name.lower() in ("other", "عام") and micro_tags_list:
+            display_name = f"أخرى ({micro_tags_list[0]})"
         top_topics.append(TopicStat(topic_key=top_name, display_name=display_name, pct=t_pct))
 
     coverage_note = f"نسبة التغطية الموضوعية: {coverage_pct:.1f}%" if total_all_count > 0 else ""
@@ -605,5 +624,6 @@ def build_card_payload_from_session(
         period_label=period_label,
         speaker_stats=speaker_stats,
         top_topics=top_topics,
-        coverage_note=coverage_note
+        coverage_note=coverage_note,
+        micro_tags=micro_tags_list
     )
