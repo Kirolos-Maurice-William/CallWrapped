@@ -1,3 +1,4 @@
+import io
 import sys
 import time
 import asyncio
@@ -447,6 +448,30 @@ async def recap_command(ctx: commands.Context):
     await ctx.send(recap_text)
 
 
+@bot.command(name="card")
+async def card_command(ctx: commands.Context):
+    """Generates and posts a shareable Wrapped recap card as a PNG image."""
+    session = arbitration_engine.get_session(ctx.guild.id)
+    if getattr(session, "analytics_buffer", None):
+        await arbitration_engine.flush_analytics(ctx.guild.id, reason="recap_render")
+
+    from bot.ui.recap_card_renderer import build_card_payload_from_session, render_recap_card_async
+
+    guild_name = getattr(ctx.guild, "name", "Discord Call") if ctx.guild else "Discord Call"
+    payload = build_card_payload_from_session(
+        session,
+        session_title=f"CallWrapped • {guild_name}",
+        period_label="ملخص الجلسة الصوتية وتفاعل المتحدثين"
+    )
+    if not payload:
+        await ctx.send("مفيش بيانات في المكالمة دي لسه.")
+        return
+
+    png_bytes = await render_recap_card_async(payload)
+    file = discord.File(fp=io.BytesIO(png_bytes), filename="callwrapped_recap.png")
+    await ctx.send(file=file)
+
+
 @bot.command(name="help")
 async def show_help(ctx: commands.Context):
     """Displays comprehensive help and hackathon judging instructions."""
@@ -480,6 +505,7 @@ async def show_help(ctx: commands.Context):
             "• `!arbitrate <query>`: On-demand fact verification query (e.g. `!arbitrate RTX 5070 VRAM`).\n"
             "• `!simulate`: Executes the RTX 5070 16GB vs 12GB Golden Demo scenario.\n"
             "• `!recap`: Displays real-time session recap (talk minutes, streaks, frustration, top topics).\n"
+            "• `!card`: Generates a shareable Wrapped visual recap card (PNG).\n"
             "• `!stats`: Displays the server evidence & speaker accuracy leaderboard.\n"
             "• `!status`: Checks latency, API connections, and voice channel state.\n"
             "• `!dashboard`: Link to the live Next.js Judge Dashboard.\n"
