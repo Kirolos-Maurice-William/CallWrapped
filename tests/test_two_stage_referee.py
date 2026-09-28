@@ -12,6 +12,7 @@ from bot.arbitration.engine import arbitration_engine, is_confirmation_utterance
 from bot.arbitration.claim_memory import StoredClaim
 from bot.events.models import VoiceEvent
 from bot.main import bot, start_session, check_dispute, build_fact_check_mode_embed
+from bot.arbitration.query_planner import ClaimSearchPlan, AmbiguityType
 
 
 class TestTwoStageReferee(unittest.IsolatedAsyncioTestCase):
@@ -103,8 +104,19 @@ class TestTwoStageReferee(unittest.IsolatedAsyncioTestCase):
 
         mock_text_channel = AsyncMock(spec=discord.TextChannel)
 
+        mock_plan = ClaimSearchPlan(
+            subject="RTX 5070",
+            predicate="specs",
+            object="12GB",
+            time_anchor=None,
+            time_anchor_confidence=0.0,
+            ambiguity_type=AmbiguityType.NONE,
+            query_variants=["RTX 5070 specs"]
+        )
+
         with patch("bot.arbitration.engine.claim_detector.check_claim", new_callable=AsyncMock, return_value=mock_claim), \
              patch("bot.arbitration.engine.conflict_detector.detect_conflict", new_callable=AsyncMock, return_value=mock_conflict), \
+             patch("bot.arbitration.query_planner.query_planner.plan_search", new_callable=AsyncMock, return_value=mock_plan), \
              patch("bot.arbitration.engine.arbitration_verifier.search_evidence", side_effect=mock_search), \
              patch("bot.arbitration.engine.speaker.speak", new_callable=AsyncMock) as mock_speak, \
              patch("bot.arbitration.engine.publisher.publish_sync_task", side_effect=mock_publish):
@@ -186,8 +198,19 @@ class TestTwoStageReferee(unittest.IsolatedAsyncioTestCase):
         mock_voice_client = MagicMock(spec=discord.VoiceClient)
         mock_voice_client.is_connected.return_value = True
 
+        mock_plan = ClaimSearchPlan(
+            subject="RTX 5070",
+            predicate="specs",
+            object="12GB",
+            time_anchor=None,
+            time_anchor_confidence=0.0,
+            ambiguity_type=AmbiguityType.NONE,
+            query_variants=["RTX 5070 specs"]
+        )
+
         with patch("bot.arbitration.engine.claim_detector.check_claim", new_callable=AsyncMock, return_value=mock_claim), \
              patch("bot.arbitration.engine.conflict_detector.detect_conflict", new_callable=AsyncMock, return_value=mock_conflict), \
+             patch("bot.arbitration.query_planner.query_planner.plan_search", new_callable=AsyncMock, return_value=mock_plan), \
              patch("bot.arbitration.engine.arbitration_verifier.search_evidence", new_callable=AsyncMock, return_value=(sources_data, 60)), \
              patch("bot.arbitration.engine.arbitration_verifier.synthesize_verdict", new_callable=AsyncMock, return_value=(assessment_data, 60, 150, sources_data)), \
              patch("bot.arbitration.engine.speaker.speak", new_callable=AsyncMock, return_value=850) as mock_speak, \
@@ -268,10 +291,21 @@ class TestTwoStageReferee(unittest.IsolatedAsyncioTestCase):
         def mock_publish(evt):
             published_events.append(evt)
 
+        mock_plan = ClaimSearchPlan(
+            subject="RTX 5070",
+            predicate="specs",
+            object="12GB",
+            time_anchor=None,
+            time_anchor_confidence=0.0,
+            ambiguity_type=AmbiguityType.NONE,
+            query_variants=["RTX 5070 specs"]
+        )
+
         # Set expiry timeout to 0.05s for rapid unit test
         with patch.object(config, "DISPUTE_OFFER_EXPIRY_SEC", 0.05), \
              patch("bot.arbitration.engine.claim_detector.check_claim", new_callable=AsyncMock, return_value=mock_claim), \
              patch("bot.arbitration.engine.conflict_detector.detect_conflict", new_callable=AsyncMock, return_value=mock_conflict), \
+             patch("bot.arbitration.query_planner.query_planner.plan_search", new_callable=AsyncMock, return_value=mock_plan), \
              patch("bot.arbitration.engine.arbitration_verifier.search_evidence", new_callable=AsyncMock, return_value=([], 10)), \
              patch("bot.arbitration.engine.speaker.speak", new_callable=AsyncMock) as mock_speak, \
              patch("bot.arbitration.engine.publisher.publish_sync_task", side_effect=mock_publish), \
@@ -326,9 +360,19 @@ class TestTwoStageReferee(unittest.IsolatedAsyncioTestCase):
 
         mock_claim = (True, {"claim": "كارت الـ 5070 نازل بـ 12 جيجا", "entity": "RTX 5070", "topic": "tech", "metric": "12 جيجا"}, 30)
         mock_conflict = (True, {"has_conflict": True, "search_query": "RTX 5070 specs", "target_domains": []}, 40)
+        mock_plan = ClaimSearchPlan(
+            subject="RTX 5070",
+            predicate="specs",
+            object="12GB",
+            time_anchor=None,
+            time_anchor_confidence=0.0,
+            ambiguity_type=AmbiguityType.NONE,
+            query_variants=["RTX 5070 specs"]
+        )
 
         with patch("bot.arbitration.engine.claim_detector.check_claim", new_callable=AsyncMock, return_value=mock_claim), \
              patch("bot.arbitration.engine.conflict_detector.detect_conflict", new_callable=AsyncMock, return_value=mock_conflict), \
+             patch("bot.arbitration.query_planner.query_planner.plan_search", new_callable=AsyncMock, return_value=mock_plan), \
              patch("bot.arbitration.engine.arbitration_verifier.search_evidence", new_callable=AsyncMock, return_value=([], 10)), \
              patch("bot.arbitration.engine.speaker.speak", new_callable=AsyncMock), \
              patch("bot.arbitration.engine.publisher.publish_sync_task", MagicMock()), \
@@ -545,8 +589,19 @@ class TestTwoStageReferee(unittest.IsolatedAsyncioTestCase):
         self.session.pending_offer = old_offer
         self.session.last_offer_time = time.time() - 200  # cooldown expired
 
+        mock_plan = ClaimSearchPlan(
+            subject="RTX 5070",
+            predicate="specs",
+            object="12GB",
+            time_anchor=None,
+            time_anchor_confidence=0.0,
+            ambiguity_type=AmbiguityType.NONE,
+            query_variants=["RTX 5070 specs"]
+        )
+
         with patch("bot.arbitration.engine.claim_detector.check_claim", new_callable=AsyncMock, return_value=mock_claim), \
              patch("bot.arbitration.engine.conflict_detector.detect_conflict", new_callable=AsyncMock, return_value=mock_conflict), \
+             patch("bot.arbitration.query_planner.query_planner.plan_search", new_callable=AsyncMock, return_value=mock_plan), \
              patch("bot.arbitration.engine.arbitration_verifier.search_evidence", new_callable=AsyncMock, return_value=([], 10)), \
              patch("bot.arbitration.engine.speaker.speak", new_callable=AsyncMock), \
              patch("bot.arbitration.engine.publisher.publish_sync_task", MagicMock()), \

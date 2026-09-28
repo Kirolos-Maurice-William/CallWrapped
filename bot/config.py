@@ -56,6 +56,7 @@ class BotConfig:
     # Two-Stage Referee Settings
     DISPUTE_OFFER_COOLDOWN_SEC: float = float(os.getenv("DISPUTE_OFFER_COOLDOWN_SEC", "180.0"))
     DISPUTE_OFFER_EXPIRY_SEC: float = float(os.getenv("DISPUTE_OFFER_EXPIRY_SEC", "30.0"))
+    DISPUTE_CONFIRM_SEARCH_TIMEOUT_SEC: float = float(os.getenv("DISPUTE_CONFIRM_SEARCH_TIMEOUT_SEC", "8.0"))
 
     # Live Web Dashboard Integration URL
     BACKEND_API_URL: str = os.getenv("BACKEND_API_URL", "http://127.0.0.1:8000")
