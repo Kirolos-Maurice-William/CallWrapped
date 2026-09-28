@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 from bot.ai.groq import groq_client
 
 logger = logging.getLogger("ConflictDetector")
@@ -67,8 +67,28 @@ class ConflictDetector:
         speaker_a: str,
         claim_a: str,
         speaker_b: str,
-        claim_b: str
+        claim_b: str,
+        channel_members: Optional[List[str]] = None
     ) -> Tuple[bool, Optional[Dict[str, Any]], int]:
+        from bot.arbitration.verifier import is_private_claim
+        for text in (claim_a, claim_b):
+            is_priv, priv_reason = is_private_claim(text, channel_members=channel_members)
+            if is_priv:
+                priv_data = {
+                    "has_conflict": False,
+                    "entity_type": "PRIVATE",
+                    "entity_name": text,
+                    "is_refused_private": True,
+                    "dashboard_label": "Private claim — no lookup performed",
+                    "rejection_reason": priv_reason or "voice_channel_member",
+                    "confidence": 100
+                }
+                logger.info(
+                    f"🚫 [Referee Refusal] Channel member / private entity detected in claim ('{text}'): "
+                    f"Private claim — no lookup performed ({priv_reason})"
+                )
+                return False, priv_data, 0
+
         user_prompt = (
             f"Speaker A ({speaker_a}): \"{claim_a}\"\n"
             f"Speaker B ({speaker_b}): \"{claim_b}\""
@@ -83,6 +103,13 @@ class ConflictDetector:
         has_conflict = bool(data.get("has_conflict"))
         disputed_aspect = data.get("disputed_aspect", "")
         rejection_reason = data.get("rejection_reason", "none")
+
+        # Check channel member match on returned entity_name
+        is_priv, priv_reason = is_private_claim(entity_name, channel_members=channel_members, claim_text=f"{claim_a} {claim_b}")
+        if is_priv:
+            entity_type = "PRIVATE"
+            data["entity_type"] = "PRIVATE"
+            data["rejection_reason"] = priv_reason or "voice_channel_member"
 
         # 1. Private Entity Refusal Gate
         if entity_type == "PRIVATE":

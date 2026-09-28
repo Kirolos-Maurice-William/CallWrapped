@@ -1,11 +1,66 @@
 import re
 import logging
-from urllib.parse import urlparse
 from typing import Dict, Any, Optional, Tuple, List
 from bot.ai.tavily import tavily_client
 from bot.ai.groq import groq_client
 
 logger = logging.getLogger("ArbitrationVerifier")
+
+
+def is_arabic_text(text: str) -> bool:
+    """Returns True if text contains Arabic characters."""
+    if not text:
+        return False
+    return any("\u0600" <= c <= "\u06FF" for c in text)
+
+
+def determine_verdict_language(claim_a: str, claim_b: str) -> bool:
+    """
+    Determines whether verdict should be in Arabic (True) or English (False).
+    Rules:
+    - English argument (neither claim has Arabic) -> False (English)
+    - Arabic argument (both claims have Arabic) -> True (Arabic)
+    - Mixed (one Arabic, one English) -> match the language of the LAST assertion (claim_b)
+    """
+    a_arabic = is_arabic_text(claim_a)
+    b_arabic = is_arabic_text(claim_b)
+
+    if a_arabic and b_arabic:
+        return True
+    if not a_arabic and not b_arabic:
+        return False
+    # Mixed: match the language of the last assertion being fact-checked
+    return b_arabic
+
+
+def is_private_claim(
+    entity: Optional[str],
+    channel_members: Optional[List[str]] = None,
+    claim_text: str = ""
+) -> Tuple[bool, Optional[str]]:
+    """
+    Evaluates whether an entity or claim references a private person or channel member.
+    If entity matches any channel member's display name (case-insensitive, partial match),
+    treats as PRIVATE_PERSON regardless of whether the name matches a public figure.
+    """
+    private_nouns = {"صاحبي", "اخويا", "أخويا", "ابن عمي", "قريبي", "جاري", "زميلي", "واحد صاحبي", "my friend", "my brother", "my cousin"}
+    combined_text = f"{entity or ''} {claim_text}".strip().lower()
+
+    if any(noun in combined_text for noun in private_nouns):
+        return True, "private_noun"
+
+    if entity and channel_members:
+        clean_entity = entity.strip().lower()
+        for member in channel_members:
+            if not member:
+                continue
+            clean_member = member.strip().lower()
+            if clean_member and clean_entity:
+                if clean_member in clean_entity or clean_entity in clean_member:
+                    return True, "voice_channel_member"
+
+    return False, None
+
 
 VERIFICATION_SYNTHESIS_PROMPT = """You are an objective evidence-based fact-checking engine.
 Evaluate two conversational statements against the retrieved ground-truth web search snippets.
@@ -37,6 +92,9 @@ Respond STRICTLY in JSON:
 
 class ArbitrationVerifier:
     """Queries Tavily and synthesizes evidence into an objective verdict without hallucination."""
+
+    is_private_claim = staticmethod(is_private_claim)
+    determine_verdict_language = staticmethod(determine_verdict_language)
 
     def format_intervention_clauses(
         self,
@@ -171,10 +229,11 @@ class ArbitrationVerifier:
             for i, s in enumerate(sources[:3])
         ])
 
-        has_arabic = any("\u0600" <= c <= "\u06FF" for c in (claim_a + claim_b))
+        use_arabic = determine_verdict_language(claim_a, claim_b)
         lang_note = (
             "\nLanguage Note: The claims are in Arabic. 'correct_fact' MUST be written in natural Arabic (translate facts from English evidence as needed)."
-            if has_arabic else ""
+            if use_arabic else
+            "\nLanguage Note: The claims are in English. 'correct_fact' MUST be written in natural English."
         )
 
         # Check for Tavily include_answer in retrieved search evidence
@@ -216,12 +275,12 @@ class ArbitrationVerifier:
                 assessment["selected_source_url"] = sources[0].get("url")
                 assessment["selected_source_title"] = sources[0].get("title", "Official Source")
 
-            # Check if conversation has Arabic characters
-            has_arabic = any("\u0600" <= c <= "\u06FF" for c in (claim_a + claim_b))
+            # Check verdict language: English -> English, Arabic -> Arabic, Mixed -> last assertion
+            use_arabic = determine_verdict_language(claim_a, claim_b)
 
             # Step 3: Enforce template-based intervention
-            fact_clause, hedge_clause = self.format_intervention_clauses(assessment, is_arabic=has_arabic)
-            spoken_text = self.format_intervention_template(assessment, is_arabic=has_arabic)
+            fact_clause, hedge_clause = self.format_intervention_clauses(assessment, is_arabic=use_arabic)
+            spoken_text = self.format_intervention_template(assessment, is_arabic=use_arabic)
             assessment["fact_clause"] = fact_clause
             assessment["hedge_clause"] = hedge_clause
             assessment["comparison_details"] = assessment.get("comparison_details", "")

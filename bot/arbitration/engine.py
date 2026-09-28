@@ -689,13 +689,53 @@ class ArbitrationEngine:
             # No conflicting statement on same topic/entity from another speaker yet
             return
 
+        # Extract voice channel member display names
+        channel_members: List[str] = []
+        if voice_client and hasattr(voice_client, "channel") and voice_client.channel and hasattr(voice_client.channel, "members"):
+            channel_members = [getattr(m, "display_name", str(m)) for m in voice_client.channel.members]
+
+        # Fast-gate private channel member check before conflict detection
+        from bot.arbitration.verifier import is_private_claim
+        is_member_private, priv_reason = is_private_claim(entity, channel_members=channel_members, claim_text=claim_stmt)
+        if is_member_private:
+            logger.info(
+                f"🚫 [Private Entity Refusal] Skipping lookup for voice channel member / private entity "
+                f"'{entity}': Private claim — no lookup performed ({priv_reason})"
+            )
+            private_event = VoiceEvent(
+                session_id=str(guild_id),
+                correlation_id=correlation_id,
+                type="intervention",
+                speaker_id=str(user_id),
+                speaker_name=speaker_name,
+                text=raw_text,
+                payload={
+                    "status": "REFUSED_PRIVATE",
+                    "label": "Private claim — no lookup performed",
+                    "correct_fact": "Private claim — no lookup performed",
+                    "entity_type": "PRIVATE",
+                    "entity_name": entity,
+                    "speaker_a": prior_claim.speaker_name,
+                    "claim_a": prior_claim.claim_text,
+                    "speaker_b": speaker_name,
+                    "claim_b": claim_stmt,
+                    "why_i_spoke": [
+                        "Private entity detected (bare first name / call participant)",
+                        "Web lookup refused: Private claim — no lookup performed"
+                    ]
+                }
+            )
+            publisher.publish_sync_task(private_event)
+            return
+
         # Step D: Groq Conflict Analyzer between the two relevant claims
         t_conflict_start = time.monotonic()
         is_conflict, conflict_data, conflict_ms = await conflict_detector.detect_conflict(
             speaker_a=prior_claim.speaker_name,
             claim_a=prior_claim.claim_text,
             speaker_b=speaker_name,
-            claim_b=claim_stmt
+            claim_b=claim_stmt,
+            channel_members=channel_members
         )
         t_conflict_end = time.monotonic()
 
@@ -1151,8 +1191,9 @@ class ArbitrationEngine:
 
             # Corroboration: hedged_single → low-confidence hedge override
             if corr.verdict_tier == "hedged_single":
-                has_arabic = any("\u0600" <= c <= "\u06FF" for c in (offer.claim_a + offer.claim_b))
-                if has_arabic:
+                from bot.arbitration.verifier import determine_verdict_language
+                use_arabic = determine_verdict_language(offer.claim_a, offer.claim_b)
+                if use_arabic:
                     from bot.arbitration.corroboration import CorroborationResult
                     hedge_clause = CorroborationResult.HEDGED_SINGLE_AR
                 else:
