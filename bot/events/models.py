@@ -39,6 +39,7 @@ class VoiceEvent(BaseModel):
     type: str  # "transcript" | "claim" | "dispute" | "verification" | "intervention" | "dispute_check_offered" | "dispute_check_completed" | "dispute_check_expired" | "fact_check_mode_update"
     speaker_id: Optional[str] = None
     speaker_name: str
+    confirmed_by: Optional[str] = None
     text: str
     timings: Optional[Dict[str, float]] = None
     latency: Optional[LatencyBreakdown] = None

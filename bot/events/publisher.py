@@ -12,6 +12,7 @@ class EventPublisher:
 
     def __init__(self, api_url: str = None):
         self.api_url = (api_url or config.BACKEND_API_URL).rstrip("/")
+        self._background_tasks = set()
 
     async def publish(self, event: VoiceEvent):
         if not self.api_url:
@@ -27,7 +28,9 @@ class EventPublisher:
         """Dispatches an asynchronous background task without blocking calling thread."""
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(self.publish(event))
+            task = loop.create_task(self.publish(event))
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
         except RuntimeError:
             pass
 

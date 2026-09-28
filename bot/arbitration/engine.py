@@ -93,6 +93,7 @@ class PendingOffer:
         self.warm_tts_session = warm_tts_session
         self.planner_ms = planner_ms
         self.is_resolved: bool = False
+        self.is_confirmed: bool = False
         self.expiry_task: Optional[asyncio.Task] = None
 
     def cancel(self):
@@ -165,6 +166,7 @@ class SessionState:
         self._flush_lock = asyncio.Lock()
         self.analytics_timer_task: Optional[asyncio.Task] = None
         self.pending_offer: Optional[PendingOffer] = None
+        self.confirm_lock: asyncio.Lock = asyncio.Lock()
         self.last_offer_time: float = 0.0
         self.fact_check_mode: bool = False
 
@@ -937,41 +939,25 @@ class ArbitrationEngine:
         logger.info(f"ABSTAIN: unverifiable_dispute (offer_id: {offer.offer_id})")
         fallback_text = "تعذر التحقق من المعلومة من مصادر موثوقة."
 
-        t_tts_start = time.monotonic()
-        tts_ms = await speaker.speak(vc, fallback_text)
-        t_tts_end = time.monotonic()
-
-        if tc:
-            try:
-                embed = discord.Embed(
-                    title="⚖️ Verified Factual Arbitration",
-                    description=f"⚠️ **{fallback_text}**\n\n• **{offer.speaker_a}:** {offer.claim_a}\n• **{offer.speaker_b}:** {offer.claim_b}",
-                    color=config.EMBED_COLOR_VERDICT
-                )
-                embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
-                await tc.send(embed=embed)
-            except Exception as e:
-                logger.debug(f"Could not send unverifiable embed to text channel: {e}")
-
+        # Publish dispute_check_completed BEFORE TTS speak (DATA-05)
         completed_event = VoiceEvent(
             session_id=str(guild_id),
             correlation_id=offer.correlation_id,
             type="dispute_check_completed",
             speaker_id=str(offer.user_id or 0),
-            speaker_name=confirmed_by,
+            speaker_name=offer.speaker_b,
+            confirmed_by=confirmed_by,
             text=fallback_text,
             timings={
                 "search_done_at": round(t_confirm_start, 3),
                 "synth_done_at": round(time.monotonic(), 3),
-                "tts_done_at": round(t_tts_end, 3)
             },
             latency=LatencyBreakdown(
                 stt_ms=offer.stt_ms,
                 llm_ms=synth_ms,
                 planner_ms=getattr(offer, "planner_ms", 0),
                 search_ms=search_ms,
-                tts_ms=tts_ms,
-                total_ms=int((t_tts_end - t_confirm_start) * 1000)
+                total_ms=int((time.monotonic() - t_confirm_start) * 1000)
             ),
             payload={
                 "offer_id": offer.offer_id,
@@ -998,6 +984,22 @@ class ArbitrationEngine:
         )
         publisher.publish_sync_task(completed_event)
 
+        t_tts_start = time.monotonic()
+        tts_ms = await speaker.speak(vc, fallback_text)
+        t_tts_end = time.monotonic()
+
+        if tc:
+            try:
+                embed = discord.Embed(
+                    title="⚖️ Verified Factual Arbitration",
+                    description=f"⚠️ **{fallback_text}**\n\n• **{offer.speaker_a}:** {offer.claim_a}\n• **{offer.speaker_b}:** {offer.claim_b}",
+                    color=config.EMBED_COLOR_VERDICT
+                )
+                embed.set_footer(text=f"AssemblyAI {config.speech_model_display} • Groq LPU • Tavily")
+                await tc.send(embed=embed)
+            except Exception as e:
+                logger.debug(f"Could not send unverifiable embed to text channel: {e}")
+
     async def confirm_dispute_offer(
         self,
         guild_id: int,
@@ -1017,11 +1019,17 @@ class ArbitrationEngine:
         """
         session = self.get_session(guild_id)
         offer = target_offer or session.pending_offer
-        if not offer or (target_offer is None and offer.is_resolved):
+        if not offer:
             logger.debug(f"[DisputeConfirm] No active pending offer for guild {guild_id}")
-            return
+            return "already confirmed"
 
-        offer.is_resolved = True
+        async with session.confirm_lock:
+            if getattr(offer, "is_confirmed", False) or (target_offer is None and offer.is_resolved):
+                logger.debug(f"[DisputeConfirm] Offer {offer.offer_id} already confirmed or resolved")
+                return "already confirmed"
+            offer.is_confirmed = True
+            offer.is_resolved = True
+
         if offer.expiry_task and not offer.expiry_task.done():
             offer.expiry_task.cancel()
 
@@ -1153,7 +1161,59 @@ class ArbitrationEngine:
                 assessment["spoken_intervention"] = spoken_text
                 assessment["hedge_clause"] = hedge_clause
 
-            # Check warm session
+            # Step C1: Publish VoiceEvent(type="dispute_check_completed") BEFORE TTS speak (DATA-05)
+            completed_event = VoiceEvent(
+                session_id=str(guild_id),
+                correlation_id=offer.correlation_id,
+                type="dispute_check_completed",
+                speaker_id=str(offer.user_id or 0),
+                speaker_name=offer.speaker_b,
+                confirmed_by=confirmed_by,
+                text=spoken_text,
+                timings={
+                    "search_done_at": round(t_synth_start, 3),
+                    "synth_done_at": round(t_synth_end, 3),
+                },
+                latency=LatencyBreakdown(
+                    stt_ms=offer.stt_ms,
+                    llm_ms=synth_ms,
+                    planner_ms=getattr(offer, "planner_ms", 0),
+                    search_ms=search_ms,
+                    total_ms=int((t_synth_end - t_confirm_start) * 1000)
+                ),
+                payload={
+                    "offer_id": offer.offer_id,
+                    "confirmed_by": confirmed_by,
+                    "planner_ms": getattr(offer, "planner_ms", 0),
+                    "status": assessment.get("status", "CONTRADICTED"),
+                    "confidence": confidence,
+                    "evidence_strength": evidence_strength,
+                    "correct_fact": fact_clause,
+                    "speaker_a": offer.speaker_a,
+                    "claim_a": offer.claim_a,
+                    "speaker_a_status": spk_a_status,
+                    "speaker_b": offer.speaker_b,
+                    "claim_b": offer.claim_b,
+                    "speaker_b_status": spk_b_status,
+                    "winner": offer.speaker_a if spk_a_status == "SUPPORTED" else (offer.speaker_b if spk_b_status == "SUPPORTED" else None),
+                    "loser": offer.speaker_a if spk_a_status == "CONTRADICTED" else (offer.speaker_b if spk_b_status == "CONTRADICTED" else None),
+                    "source_url": source_url,
+                    "source_title": source_title,
+                    "spoken_intervention": spoken_text,
+                    "corroboration": assessment.get("corroboration"),
+                    "why_i_spoke": [
+                        "Factual dispute detected and offer issued",
+                        f"Explicit confirmation received from '{confirmed_by}'",
+                        f"Pre-fetched evidence verified ({search_ms}ms search, {synth_ms}ms Groq)",
+                        f"Corroboration: {corr.independent_count}/{corr.total_before_filter} independent sources (tier={corr.verdict_tier})",
+                        f"Authoritative source located: {source_title}",
+                        "Spoken hedged verdict delivered"
+                    ]
+                }
+            )
+            publisher.publish_sync_task(completed_event)
+
+            # Step C2: Speak verdict via TTS (the ONLY path that speaks)
             warm_session = getattr(offer, "warm_tts_session", None)
             handshake_ms = 0
             if warm_session and warm_session.is_valid():
@@ -1212,60 +1272,6 @@ class ArbitrationEngine:
                     await tc.send(embed=embed)
                 except Exception as e:
                     logger.debug(f"Could not send embed to text channel: {e}")
-
-            # Step F: Publish VoiceEvent(type="dispute_check_completed")
-            completed_event = VoiceEvent(
-                session_id=str(guild_id),
-                correlation_id=offer.correlation_id,
-                type="dispute_check_completed",
-                speaker_id=str(offer.user_id or 0),
-                speaker_name=confirmed_by,
-                text=spoken_text,
-                timings={
-                    "search_done_at": round(t_synth_start, 3),
-                    "synth_done_at": round(t_synth_end, 3),
-                    "tts_done_at": round(t_tts_end, 3)
-                },
-                latency=LatencyBreakdown(
-                    stt_ms=offer.stt_ms,
-                    llm_ms=synth_ms,
-                    planner_ms=getattr(offer, "planner_ms", 0),
-                    search_ms=search_ms,
-                    tts_ms=tts_ms,
-                    total_ms=int((t_tts_end - t_confirm_start) * 1000)
-                ),
-                payload={
-                    "offer_id": offer.offer_id,
-                    "confirmed_by": confirmed_by,
-                    "planner_ms": getattr(offer, "planner_ms", 0),
-                    "t_perceived_ms": t_perceived_ms,
-                    "status": assessment.get("status", "CONTRADICTED"),
-                    "confidence": confidence,
-                    "evidence_strength": evidence_strength,
-                    "correct_fact": fact_clause,
-                    "speaker_a": offer.speaker_a,
-                    "claim_a": offer.claim_a,
-                    "speaker_a_status": spk_a_status,
-                    "speaker_b": offer.speaker_b,
-                    "claim_b": offer.claim_b,
-                    "speaker_b_status": spk_b_status,
-                    "winner": offer.speaker_a if spk_a_status == "SUPPORTED" else (offer.speaker_b if spk_b_status == "SUPPORTED" else None),
-                    "loser": offer.speaker_a if spk_a_status == "CONTRADICTED" else (offer.speaker_b if spk_b_status == "CONTRADICTED" else None),
-                    "source_url": source_url,
-                    "source_title": source_title,
-                    "spoken_intervention": spoken_text,
-                    "corroboration": assessment.get("corroboration"),
-                    "why_i_spoke": [
-                        "Factual dispute detected and offer issued",
-                        f"Explicit confirmation received from '{confirmed_by}'",
-                        f"Pre-fetched evidence verified ({search_ms}ms search, {synth_ms}ms Groq)",
-                        f"Corroboration: {corr.independent_count}/{corr.total_before_filter} independent sources (tier={corr.verdict_tier})",
-                        f"Authoritative source located: {source_title}",
-                        f"Spoken hedged verdict delivered (T_perceived: {t_perceived_ms}ms)"
-                    ]
-                }
-            )
-            publisher.publish_sync_task(completed_event)
 
         except Exception as err:
             logger.error(f"Dispute confirmation cycle failed: {err}", exc_info=True)
