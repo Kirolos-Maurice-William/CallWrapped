@@ -80,14 +80,16 @@ TOPIC RULES:
 - gaming: video game matches, gaming terms, gaming banter ("نوب", "ضيعت الجيم"), and game rants ("للسط", "الدبيل", "الجيم ده") -> gaming
 
 3. null_topic rule:
-null_topic = the line has NO semantic subject: backchannels/acknowledgments ('تمام', 'أيوة', 'ماشي', 'شايف'), greetings ('ازيك', 'سلام عليكم'), call logistics ('بتسجل صوتنا', 'هات الصوت', 'استنى دقيقة'), isolated reactions ('زي الفل', 'جامد' as bare reaction), isolated laughter.
+null_topic = the line has NO semantic subject: backchannels/acknowledgments ('تمام', 'أيوة', 'ماشي', 'شايف'), greetings ('ازيك', 'سلام عليكم'), call logistics & Discord bot chatter ('بتسجل صوتنا', 'هات الصوت', 'استنى دقيقة', 'البوت ده'), isolated reactions ('زي الفل', 'جامد' as bare reaction), isolated laughter.
+- Discord bot & voice call logistics: talking to/about the Discord bot or call mechanics ('البوت', 'البوت ده', 'اخوي البوت', 'السيرفر', 'البوت سامعنا') is call meta-chatter -> null_topic, NEVER gaming (gaming is strictly video games: GTA, Call of Duty, FIFA, matches, gameplay, ranks).
 Personal content (family, plans, feelings, daily events) = 'personal', NOT null_topic.
 When unsure between personal and null: does the line convey information about the speaker's life? personal. Is it pure conversational glue? null_topic.
 
-null_topic examples (3 examples):
+null_topic examples:
 - "ازيك يا مصطفى عامل ايه" -> null_topic
 - "تمام سامعك كويس" -> null_topic
 - "بتسجل صوتنا استنى دقيقة" -> null_topic
+- "البوت ده ما عنده بولز" -> null_topic
 
 ANGER RULE (check in order):
 1. Joking markers present: "هههه", "LOL", "😂", playful teasing, exaggeration for laughs -> anger: none
@@ -199,7 +201,7 @@ def infer_topic(text: str) -> str:
         return "personal"
 
     # 2. null_topic checks: word-boundary aware and bare-reaction constraints
-    null_phrases = ["سلام عليكم", "زي الفل", "استنى دقيقة", "بتسجل صوتنا"]
+    null_phrases = ["سلام عليكم", "زي الفل", "استنى دقيقة", "بتسجل صوتنا", "البوت ده", "اخوي البوت"]
     if any(p in t for p in null_phrases):
         return "null_topic"
 
