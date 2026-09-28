@@ -320,6 +320,7 @@ Served locally at `http://localhost:8000` via FastAPI backend and Next.js 14 fro
 2. **Acoustic Loudness Fusion Disabled:** Volume magnitude alone proved unviable for emotion classification in group calls (causing a **-5.7%** net accuracy degradation). It is disabled in production pending pitch/F0 contour modeling.
 3. **Batch STT Latency Floor:** The current production pipeline uploads audio chunks and polls AssemblyAI's batch API. This introduces an inherent **2.6s–3.5s** latency floor from utterance completion to transcript delivery.
 4. **Taxonomy Frozen at v3:** The topic classification enum is strictly frozen at 15 categories. Unseen fringe topics fall back to `other`. Open-vocabulary dynamic clustering is not yet deployed.
+5. **Frontend Build Prerequisite:** The dashboard requires the frontend to be built before first use. start_all.bat does NOT build the frontend automatically.
 
 ---
 
@@ -347,7 +348,9 @@ In building CallWrapped, several intuitive design directions were explored, test
 
 ### Prerequisites
 - **Python:** 3.12+ (tested on Windows 11 & Linux)
-- **Node.js:** 18+ (for frontend dashboard)
+- **FFmpeg (REQUIRED for TTS):** `winget install Gyan.FFmpeg` (Windows) / `apt install ffmpeg` (Linux). Without it, the bot crashes on any spoken verdict.
+- **Linux System Packages:** `libopus0`, `libopus-dev`, `libffi-dev` (required for Discord voice receive)
+- **Node.js:** 18+ for frontend dashboard
 - **API Keys Required:**
   - `ASSEMBLYAI_API_KEY`: Speech-to-text processing.
   - `GROQ_API_KEY`: Epistemic reasoning and classification (supports up to 6 keys: `GROQ_API_KEY_2` through `6`).
@@ -370,14 +373,19 @@ cp .env.example .env
 ```
 Populate your API keys in `.env`. Ensure `ACOUSTIC_FUSION_ENABLED=0` remains set.
 
-### 3. Launch Services
+### 3. Build Frontend Dashboard
+```bash
+cd frontend && npm install && npm run build && cd ..
+```
+
+### 4. Launch Services
 Run the all-in-one launcher:
 ```bash
 start_all.bat
 ```
 *(Or launch `start_backend.bat`, `start_bot.bat`, and `start_frontend.bat` in separate terminals).*
 
-### 4. Experience the Golden Demo (Step-by-Step)
+### 5. Experience the Golden Demo (Step-by-Step)
 1. Join a voice channel in your Discord server and type `!join`.
 2. Activate Fact Check Mode by typing `!start`.
 3. Open the Live Dashboard at `http://localhost:8000`.
