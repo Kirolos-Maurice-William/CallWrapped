@@ -376,6 +376,60 @@ class TestRecapCardRenderer(unittest.IsolatedAsyncioTestCase):
         print(f"  [PROOF] Rendered PNG verified: {len(png_bytes)} bytes, size {img.size}")
         print("PASS")
 
+    async def test_h_card_command_error_handling(self):
+        """
+        Test h (TRACE6-03):
+        - When render_recap_card_async raises an exception (e.g. Pillow error),
+          !card catches it, logs error, sends 'حدث خطأ أثناء إنشاء كارت الملخص.', and doesn't crash.
+        - When discord.HTTPException occurs on upload, sends 'حدث خطأ أثناء إنشاء كارت الملخص.'.
+        """
+        print("\n=== TEST H: !CARD ERROR HANDLING (TRACE6-03) ===")
+        import discord
+        from bot.main import card_command
+        from bot.arbitration import arbitration_engine
+
+        mock_ctx = AsyncMock()
+        mock_ctx.guild.id = 888777444
+        mock_ctx.guild.name = "Error Test Server"
+
+        session = arbitration_engine.get_session(mock_ctx.guild.id)
+        session.reset()
+
+        class DummySpeaker:
+            def __init__(self, name, speak_sec):
+                self.speaker_name = name
+                self.speaker_id = name
+                self.total_speak_seconds = speak_sec
+                self.utterance_count = 5
+                self.longest_streak_seconds = 10.0
+                self.angry_episodes = 0
+                self.first_anger_quote = None
+
+        session.stats_tracker.speakers = {"s1": DummySpeaker("Tamer", 100.0)}
+        session.speakers = session.stats_tracker.speakers
+        session.topic_counts = {"tech": 2}
+
+        # Case 1: Render exception
+        with patch("bot.ui.recap_card_renderer.render_recap_card_async", side_effect=RuntimeError("Simulated Pillow render failure")):
+            await card_command(mock_ctx)
+
+        mock_ctx.send.assert_called_with("حدث خطأ أثناء إنشاء كارت الملخص.")
+        print("  [PROOF] Render exception handled gracefully -> Arabic error sent to Discord.")
+
+        # Case 2: Discord HTTPException on upload
+        mock_ctx.reset_mock()
+        mock_ctx.send.side_effect = [
+            discord.HTTPException(response=MagicMock(status=500), message="Upload error"),
+            None
+        ]
+        with patch("bot.ui.recap_card_renderer.render_recap_card_async", return_value=b"fake_png_bytes"):
+            await card_command(mock_ctx)
+
+        self.assertEqual(mock_ctx.send.call_count, 2)
+        mock_ctx.send.assert_called_with("حدث خطأ أثناء إنشاء كارت الملخص.")
+        print("  [PROOF] Discord HTTPException handled gracefully -> Arabic error sent to Discord.")
+        print("PASS")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -467,9 +467,16 @@ async def card_command(ctx: commands.Context):
         await ctx.send("مفيش بيانات في المكالمة دي لسه.")
         return
 
-    png_bytes = await render_recap_card_async(payload)
-    file = discord.File(fp=io.BytesIO(png_bytes), filename="callwrapped_recap.png")
-    await ctx.send(file=file)
+    try:
+        png_bytes = await render_recap_card_async(payload)
+        file = discord.File(fp=io.BytesIO(png_bytes), filename="callwrapped_recap.png")
+        await ctx.send(file=file)
+    except discord.HTTPException as e:
+        logger.error(f"[CardCommand] Discord HTTP error uploading recap card: {e}", exc_info=True)
+        await ctx.send("حدث خطأ أثناء إنشاء كارت الملخص.")
+    except Exception as e:
+        logger.error(f"[CardCommand] Error generating recap card: {e}", exc_info=True)
+        await ctx.send("حدث خطأ أثناء إنشاء كارت الملخص.")
 
 
 @bot.command(name="help")
