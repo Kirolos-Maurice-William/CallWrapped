@@ -606,12 +606,32 @@ def build_card_payload_from_session(
     total_all_count = total_topical_count + null_count
     coverage_pct = (total_topical_count / total_all_count * 100.0) if total_all_count > 0 else 0.0
 
-    from bot.arbitration.stats import TOPIC_DISPLAY_NAMES
+    from bot.arbitration.stats import TOPIC_DISPLAY_NAMES, compute_topic_importance
+
+    # Extract continuous topic durations and intervals if present
+    topic_durations: Dict[str, float] = {}
+    if hasattr(session_state, "get_topic_durations") and callable(session_state.get_topic_durations):
+        try:
+            topic_durations = session_state.get_topic_durations() or {}
+        except Exception:
+            topic_durations = {}
+    elif isinstance(session_state, dict) and "topic_durations" in session_state:
+        topic_durations = session_state.get("topic_durations") or {}
+
+    intervals = list(getattr(session_state, "completed_intervals", []))
+    active_itv = getattr(session_state, "active_interval", None)
+    if active_itv:
+        intervals.append(active_itv)
+
+    ranked_topics = compute_topic_importance(
+        topic_durations=topic_durations,
+        topic_counts=topic_counts,
+        intervals=intervals,
+        total_speakers=len(speaker_stats)
+    )
 
     top_topics: List[TopicStat] = []
-    sorted_topics = sorted(topical_counts.items(), key=lambda x: x[1], reverse=True)
-    for top_name, top_cnt in sorted_topics:
-        t_pct = (top_cnt / total_topical_count * 100.0) if total_topical_count > 0 else 0.0
+    for top_name, importance_score, t_pct in ranked_topics:
         display_name = TOPIC_DISPLAY_NAMES.get(top_name.lower(), top_name)
         if top_name.lower() in ("other", "عام") and micro_tags_list:
             display_name = f"أخرى ({micro_tags_list[0]})"

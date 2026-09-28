@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List, Set, Tuple
 
 logger = logging.getLogger("TalkStats")
 
@@ -13,6 +13,69 @@ TOPIC_DISPLAY_NAMES: Dict[str, str] = {
     "cars": "عربيات",
     "money": "فلوس",
 }
+
+
+def compute_topic_importance(
+    topic_durations: Dict[str, float],
+    topic_counts: Dict[str, int],
+    intervals: Optional[list] = None,
+    total_speakers: int = 1
+) -> List[Tuple[str, float, float]]:
+    """
+    Computes Spotify Wrapped Importance Ranking for discussion topics.
+    Formula:
+      I(topic) = 0.50 * d_norm + 0.30 * p_ratio + 0.20 * t_norm
+    where:
+      d_norm = continuous duration of topic / sum(all topical durations)
+      p_ratio = unique speakers who engaged in topic / total call speakers
+      t_norm = turn count in topic / sum(all topical turns)
+
+    Returns sorted list of (topic_key, importance_score, display_pct).
+    """
+    ignored = {"null_topic", "null", "none", "بدون موضوع"}
+    filtered_durs = {k: v for k, v in topic_durations.items() if k and k not in ignored and v > 0}
+    filtered_counts = {k: v for k, v in topic_counts.items() if k and k not in ignored and v > 0}
+
+    all_keys = list(dict.fromkeys(list(filtered_durs.keys()) + list(filtered_counts.keys())))
+    if not all_keys:
+        return []
+
+    has_durations = bool(filtered_durs)
+    tot_dur = sum(filtered_durs.values()) if has_durations else 0.0
+    tot_cnt = sum(filtered_counts.get(k, 1) for k in all_keys)
+
+    speakers_per_topic: Dict[str, Set[str]] = {k: set() for k in all_keys}
+    turns_per_topic: Dict[str, int] = {k: 0 for k in all_keys}
+    if intervals:
+        for itv in intervals:
+            top = getattr(itv, "macro_topic", None)
+            if top in speakers_per_topic:
+                spks = getattr(itv, "participating_speakers", set())
+                speakers_per_topic[top].update(spks)
+                turns_per_topic[top] += getattr(itv, "turn_count", 1)
+
+    scored: List[Tuple[str, float, float]] = []
+    for k in all_keys:
+        dur = filtered_durs.get(k, 0.0)
+        cnt = filtered_counts.get(k, turns_per_topic.get(k, 1))
+
+        if has_durations and tot_dur > 0:
+            d_norm = dur / tot_dur
+            t_norm = cnt / max(1, tot_cnt)
+            spk_set = speakers_per_topic.get(k, set())
+            p_ratio = (len(spk_set) / max(1, total_speakers)) if spk_set else d_norm
+            importance = 0.50 * d_norm + 0.30 * p_ratio + 0.20 * t_norm
+            display_pct = round(d_norm * 100.0, 1)
+        else:
+            c_norm = cnt / max(1, tot_cnt)
+            importance = c_norm
+            display_pct = round(c_norm * 100.0, 1)
+
+        scored.append((k, importance, display_pct))
+
+    scored.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    return scored
+
 
 
 @dataclass

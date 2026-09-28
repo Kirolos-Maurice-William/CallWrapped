@@ -427,19 +427,50 @@ def render_recap(session_state: Any) -> str:
 
     # Section D: Top-3 topics with % (Taxonomy v3: TOPICAL only, null_topic excluded)
     lines.append("\n🏷️ **أكتر مواضيع اتكلمتوا فيها:**")
+
+    # Extract continuous topic durations and intervals if present
+    topic_durations: Dict[str, float] = {}
+    if hasattr(session_state, "get_topic_durations") and callable(session_state.get_topic_durations):
+        try:
+            topic_durations = session_state.get_topic_durations() or {}
+        except Exception:
+            topic_durations = {}
+    elif isinstance(session_state, dict) and "topic_durations" in session_state:
+        topic_durations = session_state.get("topic_durations") or {}
+
+    intervals = list(getattr(session_state, "completed_intervals", []))
+    active_itv = getattr(session_state, "active_interval", None)
+    if active_itv:
+        intervals.append(active_itv)
+
     topical_counts = {t: c for t, c in topic_counts.items() if t not in ("null_topic", "null", "none", "بدون موضوع")}
     null_count = topic_counts.get("null_topic", 0) + topic_counts.get("null", 0) + topic_counts.get("بدون موضوع", 0)
     total_topical_count = sum(topical_counts.values())
     total_all_count = total_topical_count + null_count
     coverage_pct = (total_topical_count / total_all_count * 100.0) if total_all_count > 0 else 0.0
 
-    if total_topical_count > 0:
-        from bot.arbitration.stats import TOPIC_DISPLAY_NAMES
-        top_3 = sorted(topical_counts.items(), key=lambda x: x[1], reverse=True)[:3]
-        for rank, (top_name, top_cnt) in enumerate(top_3, 1):
-            t_pct = (top_cnt / total_topical_count) * 100.0
+    from bot.arbitration.stats import TOPIC_DISPLAY_NAMES, compute_topic_importance
+
+    ranked_topics = compute_topic_importance(
+        topic_durations=topic_durations,
+        topic_counts=topic_counts,
+        intervals=intervals,
+        total_speakers=len(speakers)
+    )
+
+    has_durations = bool({k: v for k, v in topic_durations.items() if k not in ("null_topic", "null", "none", "بدون موضوع") and v > 0})
+
+    if ranked_topics:
+        top_3 = ranked_topics[:3]
+        for rank, (top_name, importance_score, t_pct) in enumerate(top_3, 1):
             display_name = TOPIC_DISPLAY_NAMES.get(top_name.lower(), top_name)
-            lines.append(f"{rank}. **{display_name}**: {t_pct:.1f}% ({top_cnt})")
+            if has_durations:
+                dur_sec = topic_durations.get(top_name, 0.0)
+                dur_str = f"{dur_sec / 60.0:.1f}m" if dur_sec >= 60.0 else f"{int(round(dur_sec))}s"
+                lines.append(f"{rank}. **{display_name}**: {t_pct:.1f}% ({dur_str})")
+            else:
+                top_cnt = topic_counts.get(top_name, 0)
+                lines.append(f"{rank}. **{display_name}**: {t_pct:.1f}% ({top_cnt})")
         if null_count > 0:
             lines.append(f"ℹ️ نسبة التغطية الموضوعية: {coverage_pct:.1f}% (مستبعد {null_count} جمل بدون موضوع)")
 
