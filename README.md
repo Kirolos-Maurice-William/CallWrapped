@@ -37,7 +37,7 @@
    - [F. Scientific Rigor: The Acoustic Fusion Ablation Study](#f-scientific-rigor-the-acoustic-fusion-ablation-study)
 5. [Taxonomy v3 (15 Semantic Categories & Conversational Streaks)](#-taxonomy-v3-15-semantic-categories--conversational-streaks)
 6. [Empirical Evaluation on Real Sessions (Scorecard Table)](#-empirical-evaluation-on-real-sessions-scorecard-table)
-7. [Commands Reference](#-commands-reference)
+7. [Traditional Prefix Commands](#-traditional-prefix-commands)
 8. [Live Judge Dashboard](#-live-judge-dashboard)
 9. [Privacy & Epistemic Safety](#-privacy--epistemic-safety)
 10. [Known Limitations](#-known-limitations)
@@ -174,19 +174,20 @@ CallWrapped utilizes **AssemblyAI Universal-3.5 Pro** operating via batch upload
   - Language configuration (`EXP 5`): Fixed `language_code="ar"` matched 22.15% WER with +92ms faster p50.
   - *Data leakage caveat:* Custom spellings were tuned and evaluated on the same 17-clip MGB-3 subset. On spontaneous, multi-party live Discord calls with rapid overlap, micro WER measures **36.9%–44.7%** (see [Empirical Evaluation](#-empirical-evaluation-on-real-sessions-scorecard-table)).
 - **STT Processing Latency:** Median processing latency p50 = **3.06s** across production batches.
+- **Streaming Exploration:** Streaming STT (WebSocket) was explored and benchmarked (see `assemblyai_capability_report.json`) but deliberately deferred — the batch pipeline is the verified production path. Streaming migration is gated on a side-by-side WER benchmark (see Roadmap).
 
 ### B. Split Classification Architecture (Instant vs. Batched)
 
 Running full topic modeling, multi-speaker streak tracking, and claim extraction on every 1.5s utterance would destroy token quotas and introduce severe latency. CallWrapped separates these tasks into two pipelines:
-- **Instant Claim Path (`claim_detector.check_claim`):** Uses an ultra-slim prompt ($\le 400$ tokens) on Groq LPU executing in $\approx 210\text{ms}$. Only extracts `is_factual_claim`, `claim`, `entity`, and `metric`. Directly feeds conflict detection.
-- **Batched Analytics Path (`claim_detector.batch_classify`):** Buffers speech utterances over a 75-second window. Flushes up to 20 utterances in a single Groq call using strict JSON schema. Computes 15-category topic distribution, conversational streaks, and anger receipts for `!recap` and the web dashboard.
+- **Instant Claim Path (`claim_detector.check_claim`):** Uses an ultra-slim prompt ($\le 400$ tokens) on Groq LPU executing in sub-second (measured 276ms-1s depending on load). Only extracts `is_factual_claim`, `claim`, `entity`, and `metric`. Directly feeds conflict detection.
+- **Batched Analytics Path (`claim_detector.batch_classify`):** Buffers speech utterances over a 75-second window. Flushes up to 15+ utterances in a single call (measured: 15 lines, 1817ms) using strict JSON schema. Computes 15-category topic distribution, conversational streaks, and anger receipts for `!recap` and the web dashboard.
 
 ### C. Pure Python Dispute Tracker FSM (Shadow Mode)
 
 Engineered in [`bot/arbitration/dispute_tracker.py`](file:///g:/CallWrapper/bot/arbitration/dispute_tracker.py) with zero external dependencies:
 - **Proposition Families:** Normalizes entities and clusters opposing statements under common slots (e.g. `RTX 5070` with memory values `16GB` vs `12GB`).
 - **Thread Lifecycle:** `TRACKING → CONFLICT_DETECTED → OFFERED → RESOLVED / ABSTAINED`.
-- **Temporal Decay & Eviction:** Inactive claims decay over 120 seconds. Memory is capped with FIFO eviction (500 items) to prevent unbounded memory growth.
+- **Temporal Decay & Eviction:** Inactive claims decay over 150 seconds. Memory is capped with FIFO eviction (500 items) to prevent unbounded memory growth.
 - **Shadow Mode Status:** The dispute tracker FSM currently runs in **shadow mode** (`audit/shadow/`), logging transitions and validating state coherence against real session replays before being granted authoritative gating over live voice.
 
 ### D. 6-Key Groq LPU Rotation Pool & TPD Pacing
@@ -262,6 +263,8 @@ CallWrapped was evaluated on **4 distinct real-world recorded human sessions** t
 
 *\*Label-Rule Caveat on Claim Agreement:* In Batches 2–4, human annotators labeled all argumentative conversational turns as claims (e.g. debating movie plot points or shouting price guesses). The classifier enforces a strict extraction rule requiring a verifiable entity and numeric/metric slot. Consequently, speculative banter was classified as non-claims, lowering raw agreement but preserving epistemic precision.
 
+> **Shadow-mode dispute tracker:** 3/3 agreement with human judgment on dispute presence across all sessions (live referee: 0 false interventions, honest abstention on unverifiable claims).
+
 ### Ground-Truth Resolution Highlights:
 - **World Cup Final Dispute (Batch 3):** Two speakers disputed the 2022 World Cup winner (Argentina vs France/Spain/Australia). The bot retrieved official ground truth citing **FIFA.com** and verified Argentina's victory upon confirmation.
 - **Agricultural Land Prices (Batch 4):** Speakers argued over price per feddan in rural Egypt. Because agricultural land prices fluctuate wildly and lack authoritative indexed indices, the bot performed an **honest abstention** without hallucinating numbers.
@@ -270,13 +273,13 @@ CallWrapped was evaluated on **4 distinct real-world recorded human sessions** t
 
 ---
 
-## 🎮 Commands Reference
+## 🎮 Traditional Prefix Commands
 
 CallWrapped uses standard Discord `!` prefix commands (no slash commands):
 
 | Command | Arguments | Description |
 | :--- | :--- | :--- |
-| `!start` | None | Activates Fact Check Mode (offers-only refereeing; posts transparency notice). |
+| `!start` | None | Posts consent notice + activates Fact Check Mode (offers-only refereeing). |
 | `!check` | None | Confirms a pending dispute check offer and triggers spoken two-clause resolution. |
 | `!arbitrate` | `<claim>` | Manually triggers an on-demand fact check offer for a specific factual claim. |
 | `!recap` | None | Generates session conversational recap (talk-time share, streaks, frustration receipts). |
