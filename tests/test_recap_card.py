@@ -29,6 +29,7 @@ from bot.ui.recap_card_renderer import (
     ensure_latin_digits,
     truncate_text,
     draw_text,
+    get_font,
     render_recap_card_png,
     render_recap_card_async,
     build_card_payload_from_session,
@@ -429,6 +430,47 @@ class TestRecapCardRenderer(unittest.IsolatedAsyncioTestCase):
         mock_ctx.send.assert_called_with("حدث خطأ أثناء إنشاء كارت الملخص.")
         print("  [PROOF] Discord HTTPException handled gracefully -> Arabic error sent to Discord.")
         print("PASS")
+
+    def test_i_font_fallback_degraded_mode(self):
+        """
+        Test i (TRACE6-04):
+        - Simulate missing font directory / files
+        - Verify CRITICAL log message is emitted
+        - Card still renders with Latin text visible (degraded mode)
+        """
+        print("\n=== TEST I: FONT FALLBACK DEGRADED MODE (TRACE6-04) ===")
+        get_font.cache_clear()
+        try:
+            payload = RecapCardPayload(
+                session_title="Voice Session Recap",
+                period_label="Degraded Mode Test",
+                speaker_stats=[
+                    SpeakerStat(name="Ziad", talk_seconds=60.0, share_pct=100.0, streak_seconds=15.0, angry_episodes=0)
+                ],
+                top_topics=[
+                    TopicStat(topic_key="general", display_name="General Chat", pct=100.0)
+                ]
+            )
+
+            with self.assertLogs("RecapCard", level="CRITICAL") as cm:
+                with patch("bot.ui.recap_card_renderer.FONTS_DIR", Path("nonexistent_fonts_test_dir")):
+                    png_bytes = render_recap_card_png(payload)
+
+            # 1. Assert CRITICAL log was emitted
+            critical_found = any("[RecapCard] Arabic font unavailable — card will have tofu characters. Check assets/fonts/ directory." in log for log in cm.output)
+            self.assertTrue(critical_found, "Must log CRITICAL when fonts are missing")
+
+            # 2. Card still generated
+            self.assertGreater(len(png_bytes), 10 * 1024)
+            img = Image.open(io.BytesIO(png_bytes))
+            self.assertEqual(img.size, (1080, 1350))
+            self.assertEqual(img.format, "PNG")
+
+            print(f"  [PROOF] Logged CRITICAL: {cm.output[0]}")
+            print(f"  [PROOF] Degraded card successfully generated: {len(png_bytes)} bytes, size {img.size}")
+            print("PASS")
+        finally:
+            get_font.cache_clear()
 
 
 if __name__ == "__main__":

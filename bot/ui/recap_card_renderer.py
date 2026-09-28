@@ -45,7 +45,7 @@ CARD_HEIGHT = 1350
 
 
 @functools.lru_cache(maxsize=32)
-def get_font(font_name: str, size: int) -> ImageFont.FreeTypeFont:
+def get_font(font_name: str, size: int) -> Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]:
     """Loads and caches bundled TrueType fonts relative to project root."""
     font_path = FONTS_DIR / font_name
     if font_path.exists():
@@ -60,6 +60,7 @@ def get_font(font_name: str, size: int) -> ImageFont.FreeTypeFont:
             return ImageFont.truetype(str(alt_path), size)
         except Exception:
             pass
+    logger.critical("[RecapCard] Arabic font unavailable — card will have tofu characters. Check assets/fonts/ directory.")
     return ImageFont.load_default()
 
 
