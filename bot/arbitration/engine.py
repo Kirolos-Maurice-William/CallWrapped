@@ -13,6 +13,7 @@ from bot.arbitration.verifier import arbitration_verifier
 from bot.arbitration.claim_memory import ClaimMemory, StoredClaim
 from bot.arbitration.stats import SessionStatsTracker
 from bot.arbitration.fast_gate import fast_gate
+from bot.arbitration.corroboration import independence_filter
 from bot.events.models import VoiceEvent, LatencyBreakdown
 from bot.events.publisher import publisher
 from bot.config import config
@@ -1032,6 +1033,27 @@ class ArbitrationEngine:
                 )
                 return
 
+            # Step A½: Corroboration — filter syndicated/co-dependent sources
+            corr = independence_filter(sources, target_domains=getattr(offer, "target_domains", None))
+            if corr.verdict_tier == "abstain":
+                logger.warning(
+                    f"⚠️ [DisputeConfirm] Corroboration: 0 independent sources "
+                    f"(before filter: {corr.total_before_filter})"
+                )
+                await self._handle_unverifiable_dispute(
+                    guild_id=guild_id,
+                    session=session,
+                    offer=offer,
+                    confirmed_by=confirmed_by,
+                    vc=vc,
+                    tc=tc,
+                    t_confirm_start=t_confirm_start,
+                    search_ms=search_ms,
+                    synth_ms=0
+                )
+                return
+            sources = corr.independent_sources
+
             # Step B: Synthesize via Groq verifier
             t_synth_start = time.monotonic()
             assessment, search_ms, synth_ms, sources = await arbitration_verifier.synthesize_verdict(
@@ -1066,6 +1088,15 @@ class ArbitrationEngine:
             spk_a_status = assessment.get("speaker_a_status", "UNKNOWN")
             spk_b_status = assessment.get("speaker_b_status", "UNKNOWN")
 
+            # Corroboration metadata for event payload
+            assessment["corroboration"] = {
+                "independent_count": corr.independent_count,
+                "total_before_filter": corr.total_before_filter,
+                "has_official_source": corr.has_official_source,
+                "verdict_tier": corr.verdict_tier,
+                "clusters_merged": len(corr.duplicate_clusters),
+            }
+
             # Update speaker stats
             if offer.speaker_a in session.speaker_stats:
                 if spk_a_status == "SUPPORTED":
@@ -1085,6 +1116,18 @@ class ArbitrationEngine:
             # Step C: Speak verdict via TTS (the ONLY path that speaks)
             fact_clause = assessment.get("fact_clause") or assessment.get("correct_fact") or spoken_text
             hedge_clause = assessment.get("hedge_clause") or ""
+
+            # Corroboration: hedged_single → low-confidence hedge override
+            if corr.verdict_tier == "hedged_single":
+                has_arabic = any("\u0600" <= c <= "\u06FF" for c in (offer.claim_a + offer.claim_b))
+                if has_arabic:
+                    from bot.arbitration.corroboration import CorroborationResult
+                    hedge_clause = CorroborationResult.HEDGED_SINGLE_AR
+                else:
+                    hedge_clause = "This info came from a single source — take it with a grain of salt. Link on the dashboard."
+                spoken_text = f"{fact_clause} {hedge_clause}"
+                assessment["spoken_intervention"] = spoken_text
+                assessment["hedge_clause"] = hedge_clause
 
             # Check warm session
             warm_session = getattr(offer, "warm_tts_session", None)
@@ -1187,10 +1230,12 @@ class ArbitrationEngine:
                     "source_url": source_url,
                     "source_title": source_title,
                     "spoken_intervention": spoken_text,
+                    "corroboration": assessment.get("corroboration"),
                     "why_i_spoke": [
                         "Factual dispute detected and offer issued",
                         f"Explicit confirmation received from '{confirmed_by}'",
                         f"Pre-fetched evidence verified ({search_ms}ms search, {synth_ms}ms Groq)",
+                        f"Corroboration: {corr.independent_count}/{corr.total_before_filter} independent sources (tier={corr.verdict_tier})",
                         f"Authoritative source located: {source_title}",
                         f"Spoken hedged verdict delivered (T_perceived: {t_perceived_ms}ms)"
                     ]
