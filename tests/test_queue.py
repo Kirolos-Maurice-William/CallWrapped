@@ -42,13 +42,13 @@ class TestArbitrationQueue(unittest.IsolatedAsyncioTestCase):
         async def mock_check_claim(text):
             return True, {"claim": text, "entity": "TestEntity", "topic": "tech", "metric": "test"}, 50
 
-        async def mock_detect_conflict(speaker_a, claim_a, speaker_b, claim_b):
+        async def mock_detect_conflict(speaker_a, claim_a, speaker_b, claim_b, *_args, **_kwargs):
             return True, {"has_conflict": True, "search_query": "test query"}, 50
 
-        async def mock_search_evidence(*args, **kwargs):
+        async def mock_search_evidence(*_args, **_kwargs):
             return [{"title": "Test", "url": "http://test", "domain": "test", "snippet": "test"}], 50
 
-        async def mock_synthesize_verdict(*args, **kwargs):
+        async def mock_synthesize_verdict(*_args, **_kwargs):
             arbitration_a_started.set()
             # Wait until test signals arbitration A can finish
             await arbitration_a_finish.wait()

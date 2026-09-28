@@ -730,13 +730,21 @@ class ArbitrationEngine:
 
         # Step D: Groq Conflict Analyzer between the two relevant claims
         t_conflict_start = time.monotonic()
-        is_conflict, conflict_data, conflict_ms = await conflict_detector.detect_conflict(
-            speaker_a=prior_claim.speaker_name,
-            claim_a=prior_claim.claim_text,
-            speaker_b=speaker_name,
-            claim_b=claim_stmt,
-            channel_members=channel_members
-        )
+        try:
+            is_conflict, conflict_data, conflict_ms = await conflict_detector.detect_conflict(
+                speaker_a=prior_claim.speaker_name,
+                claim_a=prior_claim.claim_text,
+                speaker_b=speaker_name,
+                claim_b=claim_stmt,
+                channel_members=channel_members
+            )
+        except TypeError:
+            is_conflict, conflict_data, conflict_ms = await conflict_detector.detect_conflict(
+                speaker_a=prior_claim.speaker_name,
+                claim_a=prior_claim.claim_text,
+                speaker_b=speaker_name,
+                claim_b=claim_stmt
+            )
         t_conflict_end = time.monotonic()
 
         if conflict_data and conflict_data.get("entity_type") == "PRIVATE":
