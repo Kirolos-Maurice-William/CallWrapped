@@ -279,6 +279,7 @@ CallWrapped uses standard Discord `!` prefix commands (no slash commands):
 
 | Command | Arguments | Description |
 | :--- | :--- | :--- |
+| `!join` | None | Connects the bot to your current voice channel. |
 | `!start` | None | Posts consent notice + activates Fact Check Mode (offers-only refereeing). |
 | `!check` | None | Confirms a pending dispute check offer and triggers spoken two-clause resolution. |
 | `!arbitrate` | `<claim>` | Manually triggers an on-demand fact check offer for a specific factual claim. |
@@ -401,7 +402,7 @@ backend/venv/Scripts/python -m unittest discover tests
 ```
 
 ```text
-Ran 173 tests in 133.074s
+Ran 173 tests in 125.700s
 
 OK
 ```
