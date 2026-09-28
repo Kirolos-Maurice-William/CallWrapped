@@ -100,10 +100,74 @@ class ArbitrationVerifier:
     async def search_evidence(
         self,
         search_query: str,
-        target_domains: Optional[List[str]] = None
+        target_domains: Optional[List[str]] = None,
+        query_variants: Optional[List[str]] = None,
+        claim_context: Optional[str] = None,
+        entity: Optional[str] = None,
+        dimension: Optional[str] = None,
+        speaker_a: Optional[str] = None,
+        claim_a: Optional[str] = None,
+        speaker_b: Optional[str] = None,
+        claim_b: Optional[str] = None
     ) -> Tuple[List[Dict[str, Any]], int]:
-        """Queries Tavily using Tiered Source Policy. Returns (sources, search_ms)."""
+        """
+        Queries Tavily using Step-Back Query Planning and Fan-out Search with RRF.
+        If query planning fails or only 1 query is available, falls back to single-query search.
+        """
+        # 1. If explicit query_variants provided (>1), fan out directly
+        if query_variants and len(query_variants) > 1:
+            from bot.arbitration.query_planner import query_planner
+            return await query_planner.execute_fan_out_search(
+                query_variants=query_variants,
+                target_domains=target_domains,
+                claim_context=claim_context or (f"{claim_a} vs {claim_b}" if claim_a else None),
+                entity=entity
+            )
+
+        # 2. If conversational context is available, run QueryPlanner for Step-Back fan-out
+        if (claim_a and claim_b) or entity:
+            try:
+                from bot.arbitration.query_planner import query_planner
+                plan = await query_planner.plan_search(
+                    entity=entity,
+                    dimension=dimension,
+                    speaker_a=speaker_a,
+                    claim_a=claim_a,
+                    speaker_b=speaker_b,
+                    claim_b=claim_b,
+                    fallback_query=search_query,
+                    target_domains=target_domains
+                )
+                if plan and plan.query_variants and len(plan.query_variants) > 1:
+                    return await query_planner.execute_fan_out_search(
+                        query_variants=plan.query_variants,
+                        target_domains=target_domains,
+                        claim_context=claim_context or f"{claim_a} vs {claim_b}",
+                        entity=entity or plan.subject
+                    )
+                elif plan and plan.query_variants:
+                    search_query = plan.query_variants[0]
+            except Exception as e:
+                logger.warning(f"⚠️ [SearchEvidence] Query planning failed, using single search: {e}")
+
+        # 3. Single-query fallback
         return await tavily_client.search(search_query, target_domains=target_domains)
+
+    async def search_evidence_fanout(
+        self,
+        query_variants: List[str],
+        target_domains: Optional[List[str]] = None,
+        claim_context: Optional[str] = None,
+        entity: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Direct fan-out search helper with Reciprocal Rank Fusion."""
+        from bot.arbitration.query_planner import query_planner
+        return await query_planner.execute_fan_out_search(
+            query_variants=query_variants,
+            target_domains=target_domains,
+            claim_context=claim_context,
+            entity=entity
+        )
 
     async def synthesize_verdict(
         self,

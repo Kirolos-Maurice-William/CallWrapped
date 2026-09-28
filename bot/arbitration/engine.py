@@ -717,6 +717,27 @@ class ArbitrationEngine:
             logger.info(f"DISPUTE_SUPPRESSED: cooldown active (remaining: {remaining}s)")
             return
 
+        # Query Planner: Step-Back abstraction + query variants (runs before offer is posted)
+        search_plan = None
+        query_variants = [search_query]
+        try:
+            from bot.arbitration.query_planner import query_planner
+            search_plan = await query_planner.plan_search(
+                entity=entity or conflict_data.get("entity_name"),
+                dimension=conflict_data.get("disputed_aspect") or conflict_data.get("conflict_type"),
+                speaker_a=prior_claim.speaker_name,
+                claim_a=prior_claim.claim_text,
+                speaker_b=speaker_name,
+                claim_b=claim_stmt,
+                fallback_query=search_query,
+                target_domains=target_domains
+            )
+            if search_plan and search_plan.query_variants:
+                query_variants = search_plan.query_variants
+        except Exception as e:
+            logger.warning(f"⚠️ [QueryPlanner] Planning failed, falling back to single query: {e}")
+            query_variants = [search_query]
+
         # If a new offer triggers while an older one is pending (unconfirmed), replace older one with warning
         if session.pending_offer and not session.pending_offer.is_resolved:
             logger.warning(
@@ -726,10 +747,25 @@ class ArbitrationEngine:
 
         session.last_offer_time = now
 
-        # Pre-fetch: fire Tavily search in background immediately (do NOT wait before offering)
-        prefetch_task = asyncio.create_task(
-            arbitration_verifier.search_evidence(search_query, target_domains=target_domains)
-        )
+        # Pre-fetch: fire fan-out search in background immediately (do NOT wait before offering)
+        async def _dispatch_prefetch():
+            try:
+                return await arbitration_verifier.search_evidence(
+                    search_query,
+                    target_domains=target_domains,
+                    query_variants=query_variants,
+                    claim_context=f"{prior_claim.claim_text} vs {claim_stmt}",
+                    entity=entity or (search_plan.subject if search_plan else None)
+                )
+            except TypeError as te:
+                if "unexpected keyword argument" in str(te):
+                    return await arbitration_verifier.search_evidence(
+                        search_query,
+                        target_domains=target_domains
+                    )
+                raise
+
+        prefetch_task = asyncio.create_task(_dispatch_prefetch())
 
         # Pre-warm: establish and hold warm Edge-TTS connection in background alongside search prefetch (35s timeout)
         warm_tts = speaker.create_warm_session(timeout_seconds=35.0)
@@ -755,6 +791,8 @@ class ArbitrationEngine:
             stt_ms=stt_ms,
             warm_tts_session=warm_tts
         )
+        offer.query_variants = query_variants
+        offer.search_plan = search_plan
         session.pending_offer = offer
 
         # Post Arabic offer message to Discord text channel
@@ -791,6 +829,8 @@ class ArbitrationEngine:
                 "claim_b": claim_stmt,
                 "entity": entity,
                 "search_query": search_query,
+                "query_variants": query_variants,
+                "ambiguity_type": search_plan.ambiguity_type.value if search_plan else "none",
                 "expires_in_seconds": 30.0,
                 "expires_at": round(now + 30.0, 3)
             }
@@ -950,13 +990,14 @@ class ArbitrationEngine:
         t_confirm_start = time.monotonic()
         session.is_arbitrating = True
         try:
-            # Step A: Await pre-fetched search (cap at 5s)
+            # Step A: Await pre-fetched search (cap at 8.0s for network jitter tolerance)
             sources = []
             search_ms = 0
+            confirm_timeout = getattr(config, "DISPUTE_CONFIRM_SEARCH_TIMEOUT_SEC", 8.0)
             try:
-                sources, search_ms = await asyncio.wait_for(offer.prefetch_task, timeout=5.0)
+                sources, search_ms = await asyncio.wait_for(offer.prefetch_task, timeout=confirm_timeout)
             except asyncio.TimeoutError:
-                logger.warning(f"⚠️ [DisputeConfirm] Pre-fetched search timed out after 5s for offer {offer.offer_id}")
+                logger.warning(f"⚠️ [DisputeConfirm] Pre-fetched search timed out after {confirm_timeout}s for offer {offer.offer_id}")
             except Exception as e:
                 logger.warning(f"⚠️ [DisputeConfirm] Pre-fetched search failed: {e}")
 
