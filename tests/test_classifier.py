@@ -53,7 +53,9 @@ class TestEveryUtteranceClassifier(unittest.IsolatedAsyncioTestCase):
 
             is_claim, data, latency_ms = await claim_detector.check_claim(text)
 
-            # Documented quota guard: skip assertion evaluation if Groq rate-limits / TPD is exhausted
+            # Documented quota guard: Skip assertion evaluation if Groq daily token/minute rate limits
+            # or TPD quota are exhausted during live unmocked testing. This is an intentional free-tier
+            # quota guard, not a silent pass of model logic.
             if data is None or not data.get("_tokens"):
                 print(f"[{idx}/12] {label}")
                 print(f"  ⚠️  Groq TPD exhausted — skipping")

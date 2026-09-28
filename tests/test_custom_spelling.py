@@ -1,3 +1,8 @@
+"""
+Custom Spelling Acceptance Test:
+NOTE: This test verifies configuration dictionary structure and key presence,
+not live transcription behavior.
+"""
 import unittest
 from bot.ai.assemblyai import ASSEMBLYAI_CUSTOM_SPELLING
 

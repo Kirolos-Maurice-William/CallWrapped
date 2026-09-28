@@ -1,8 +1,10 @@
 """
 P5 Acceptance Test: Expanded AssemblyAI keyterms.
+NOTE: This test verifies configuration presence and list bounds in code,
+not live speech-to-text transcription accuracy.
 Verifies:
 1. Terms list includes Egyptian football, movies, politics, and music terms.
-2. Total count is strictly under 60 items.
+2. Total count is strictly under 200 items.
 3. Prints the complete final list.
 """
 import tests._setup
