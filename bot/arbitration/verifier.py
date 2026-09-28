@@ -153,22 +153,6 @@ class ArbitrationVerifier:
         # 3. Single-query fallback
         return await tavily_client.search(search_query, target_domains=target_domains)
 
-    async def search_evidence_fanout(
-        self,
-        query_variants: List[str],
-        target_domains: Optional[List[str]] = None,
-        claim_context: Optional[str] = None,
-        entity: Optional[str] = None
-    ) -> Tuple[List[Dict[str, Any]], int]:
-        """Direct fan-out search helper with Reciprocal Rank Fusion."""
-        from bot.arbitration.query_planner import query_planner
-        return await query_planner.execute_fan_out_search(
-            query_variants=query_variants,
-            target_domains=target_domains,
-            claim_context=claim_context,
-            entity=entity
-        )
-
     async def synthesize_verdict(
         self,
         speaker_a: str,

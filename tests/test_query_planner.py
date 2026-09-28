@@ -10,7 +10,6 @@ e) FIFA.com confirmation: assert fifa.com appears in top-5 merged results for Wo
 
 import sys
 import re
-import json
 import asyncio
 import unittest
 
