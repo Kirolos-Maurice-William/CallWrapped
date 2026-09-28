@@ -13,7 +13,7 @@ f) Unit: !card command with populated session -> attaches discord.File(filename=
 import io
 import unittest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import tests._setup
 
@@ -28,6 +28,7 @@ from bot.ui.recap_card_renderer import (
     clean_emoji,
     ensure_latin_digits,
     truncate_text,
+    draw_text,
     render_recap_card_png,
     render_recap_card_async,
     build_card_payload_from_session,
@@ -312,6 +313,67 @@ class TestRecapCardRenderer(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(img.format, "PNG")
         print(f"  [PROOF] Attachment verified: Dimensions={img.size}, Format={img.format}")
 
+        print("PASS")
+
+    def test_g_speaker_and_topic_overflow(self):
+        """
+        Test g (TRACE6-02):
+        - When payload has >3 speakers (e.g. 5), card renders top 3 and footnote '+2 مشاركين إضافيين'
+        - When payload has >3 topics (e.g. 5), card renders top 3 and footnote '+2 مواضيع إضافية'
+        """
+        print("\n=== TEST G: SPEAKER & TOPIC OVERFLOW (>3 ITEMS) ===")
+        speakers = [
+            SpeakerStat(name="أحمد", talk_seconds=180.0, share_pct=40.0, streak_seconds=45.0, angry_episodes=0),
+            SpeakerStat(name="تامر", talk_seconds=120.0, share_pct=26.7, streak_seconds=30.0, angry_episodes=0),
+            SpeakerStat(name="كريم", talk_seconds=90.0, share_pct=20.0, streak_seconds=15.0, angry_episodes=0),
+            SpeakerStat(name="سارة", talk_seconds=40.0, share_pct=8.9, streak_seconds=10.0, angry_episodes=0),
+            SpeakerStat(name="منى", talk_seconds=20.0, share_pct=4.4, streak_seconds=5.0, angry_episodes=0),
+        ]
+        topics = [
+            TopicStat(topic_key="football", display_name="الكورة والرياضة", pct=35.0),
+            TopicStat(topic_key="gaming", display_name="ألعاب الفيديو", pct=25.0),
+            TopicStat(topic_key="tech", display_name="تكنولوجيا وبرمجة", pct=20.0),
+            TopicStat(topic_key="movies", display_name="أفلام ومسلسلات", pct=12.0),
+            TopicStat(topic_key="food", display_name="أكل ومطاعم", pct=8.0),
+        ]
+        payload = RecapCardPayload(
+            session_title="سهرة الجيمينج",
+            period_label="جلسة مع 5 متحدثين",
+            speaker_stats=speakers,
+            top_topics=topics,
+            coverage_note="نسبة التغطية الموضوعية: 100.0%"
+        )
+
+        with patch("bot.ui.recap_card_renderer.draw_text", wraps=draw_text) as mock_draw:
+            png_bytes = render_recap_card_png(payload)
+
+        self.assertGreater(len(png_bytes), 10 * 1024)
+        img = Image.open(io.BytesIO(png_bytes))
+        self.assertEqual(img.size, (1080, 1350))
+
+        drawn_texts = [call.args[2] for call in mock_draw.call_args_list if len(call.args) > 2]
+
+        # Verify top 3 speakers are drawn, omitted are not
+        self.assertIn("أحمد", drawn_texts)
+        self.assertIn("تامر", drawn_texts)
+        self.assertIn("كريم", drawn_texts)
+        self.assertNotIn("سارة", drawn_texts)
+        self.assertNotIn("منى", drawn_texts)
+        self.assertIn("+2 مشاركين إضافيين", drawn_texts)
+
+        # Verify top 3 topics are drawn, omitted are not
+        self.assertIn("الكورة والرياضة", drawn_texts)
+        self.assertIn("ألعاب الفيديو", drawn_texts)
+        self.assertIn("تكنولوجيا وبرمجة", drawn_texts)
+        self.assertNotIn("أفلام ومسلسلات", drawn_texts)
+        self.assertNotIn("أكل ومطاعم", drawn_texts)
+        self.assertIn("+2 مواضيع إضافية", drawn_texts)
+
+        print("  [PROOF] Top 3 speakers drawn: أحمد, تامر, كريم (سارة and منى omitted)")
+        print("  [PROOF] Speaker overflow footnote verified in drawn text: '+2 مشاركين إضافيين'")
+        print("  [PROOF] Top 3 topics drawn: الكورة والرياضة, ألعاب الفيديو, تكنولوجيا وبرمجة")
+        print("  [PROOF] Topic overflow footnote verified in drawn text: '+2 مواضيع إضافية'")
+        print(f"  [PROOF] Rendered PNG verified: {len(png_bytes)} bytes, size {img.size}")
         print("PASS")
 
 

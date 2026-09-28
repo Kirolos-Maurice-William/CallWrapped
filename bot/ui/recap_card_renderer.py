@@ -377,6 +377,12 @@ def render_recap_card_png(payload: RecapCardPayload) -> bytes:
             w_stk, _ = measure_text(draw, streak_str, font_stat_muted)
             draw_text(draw, (1004 - w_stk, curr_y + 44), streak_str, font_stat_muted, fill=(148, 163, 184))
 
+        # TRACE6-02: Overflow indicator for >3 speakers
+        if len(payload.speaker_stats) > 3:
+            omitted_spk = len(payload.speaker_stats) - 3
+            overflow_spk_text = f"+{omitted_spk} مشاركين إضافيين"
+            draw_text(draw, (76, 574), overflow_spk_text, font_stat_muted, fill=(148, 163, 184))
+
     # -----------------------------------------------------------------------
     # Section C: Frustration Moments & Receipts (y: 630 to 890)
     # -----------------------------------------------------------------------
@@ -403,9 +409,9 @@ def render_recap_card_png(payload: RecapCardPayload) -> bytes:
         draw_text(draw, (76, 770), calm_en, font_stat_muted, fill=(100, 116, 139))
 
     # -----------------------------------------------------------------------
-    # Section D: Top Topics (y: 910 to 1210)
+    # Section D: Top Topics (y: 910 to 1218)
     # -----------------------------------------------------------------------
-    draw_panel(draw, (48, 910, 1032, 1210), bg_color=(18, 24, 40), border_color=(35, 48, 74), radius=24)
+    draw_panel(draw, (48, 910, 1032, 1218), bg_color=(18, 24, 40), border_color=(35, 48, 74), radius=24)
     draw_text(draw, (76, 932), "أكتر مواضيع اتكلمتوا فيها  |  TOP TOPICS", font_section, fill=(192, 132, 252))
 
     topics = list(payload.top_topics)[:3]
@@ -442,6 +448,12 @@ def render_recap_card_png(payload: RecapCardPayload) -> bytes:
             fill_w = max(4, int(bar_w * (pct_val / 100.0)))
             draw.rounded_rectangle((132, curr_top_y + 44, 1004, curr_top_y + 52), radius=4, fill=(30, 41, 59))
             draw.rounded_rectangle((132, curr_top_y + 44, 132 + fill_w, curr_top_y + 52), radius=4, fill=(139, 92, 246))
+
+        # TRACE6-02: Overflow indicator for >3 topics
+        if len(payload.top_topics) > 3:
+            omitted_top = len(payload.top_topics) - 3
+            overflow_topic_text = f"+{omitted_top} مواضيع إضافية"
+            draw_text(draw, (76, 1184), overflow_topic_text, font_stat_muted, fill=(148, 163, 184))
 
     # -----------------------------------------------------------------------
     # Section E: Footer (y: 1230 to 1320)
@@ -579,8 +591,8 @@ def build_card_payload_from_session(
     from bot.arbitration.stats import TOPIC_DISPLAY_NAMES
 
     top_topics: List[TopicStat] = []
-    top_3 = sorted(topical_counts.items(), key=lambda x: x[1], reverse=True)[:3]
-    for top_name, top_cnt in top_3:
+    sorted_topics = sorted(topical_counts.items(), key=lambda x: x[1], reverse=True)
+    for top_name, top_cnt in sorted_topics:
         t_pct = (top_cnt / total_topical_count * 100.0) if total_topical_count > 0 else 0.0
         display_name = TOPIC_DISPLAY_NAMES.get(top_name.lower(), top_name)
         top_topics.append(TopicStat(topic_key=top_name, display_name=display_name, pct=t_pct))
