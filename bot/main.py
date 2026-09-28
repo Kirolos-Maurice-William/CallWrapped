@@ -18,7 +18,7 @@ import uuid
 from bot.config import config
 from bot.audio import AudioReceiver, install_dave_adapter
 from bot.ai import assemblyai_client, speaker
-from bot.arbitration import arbitration_engine, arbitration_verifier
+from bot.arbitration import arbitration_engine, arbitration_verifier, normalize_topic_key
 from bot.arbitration.engine import PendingOffer
 from bot.events.models import VoiceEvent, LatencyBreakdown
 from bot.events.publisher import publisher
@@ -787,9 +787,9 @@ async def manual_arbitrate(ctx: commands.Context, *, query: str):
     session = arbitration_engine.get_session(ctx.guild.id)
     now = time.time()
 
-    cooldown_sec = getattr(config, "DISPUTE_OFFER_COOLDOWN_SEC", 180.0)
-    if session.last_offer_time > 0 and (now - session.last_offer_time) < cooldown_sec:
-        remaining = int(cooldown_sec - (now - session.last_offer_time))
+    topic_key = normalize_topic_key(entity=None, topic=query)
+    is_cooldown, remaining, reason = session.is_in_cooldown(topic_key, now)
+    if is_cooldown:
         logger.info(f"DISPUTE_SUPPRESSED: cooldown active (remaining: {remaining}s)")
         await ctx.send(f"⏳ فترة التهدئة نشطة. يرجى الانتظار {remaining} ثانية قبل طلب تدقيق جديد. | Cooldown active: please wait {remaining}s.")
         return
@@ -801,7 +801,7 @@ async def manual_arbitrate(ctx: commands.Context, *, query: str):
         )
         session.pending_offer.cancel()
 
-    session.last_offer_time = now
+    session.record_offer(topic_key, now)
 
     # Pre-fetch: fire Tavily search in background immediately
     prefetch_task = asyncio.create_task(

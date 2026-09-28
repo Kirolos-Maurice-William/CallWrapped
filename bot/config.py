@@ -53,8 +53,8 @@ class BotConfig:
     # Test-Mode Capture Flag (clip factory)
     TEST_CAPTURE_MODE: int = int(os.getenv("TEST_CAPTURE_MODE", "0"))
 
-    # Two-Stage Referee Settings
     DISPUTE_OFFER_COOLDOWN_SEC: float = float(os.getenv("DISPUTE_OFFER_COOLDOWN_SEC", "180.0"))
+    DISPUTE_GLOBAL_BACKSTOP_SEC: float = float(os.getenv("DISPUTE_GLOBAL_BACKSTOP_SEC", "30.0"))
     DISPUTE_OFFER_EXPIRY_SEC: float = float(os.getenv("DISPUTE_OFFER_EXPIRY_SEC", "30.0"))
     DISPUTE_CONFIRM_SEARCH_TIMEOUT_SEC: float = float(os.getenv("DISPUTE_CONFIRM_SEARCH_TIMEOUT_SEC", "8.0"))
     DISPUTE_CONFIRM_TOTAL_TIMEOUT_SEC: float = float(os.getenv("DISPUTE_CONFIRM_TOTAL_TIMEOUT_SEC", "25.0"))

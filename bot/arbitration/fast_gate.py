@@ -36,7 +36,13 @@ class FastGate:
         # Assertions in English
         r"\b(is|has|features|specs|released|supports|faster|better|cheaper|expensive|costs|weighs|dated)\b",
         # Disagreements & counters in English
-        r"\b(no you're wrong|that's wrong|not true|actually|incorrect|false|nope|definitely not|contradict\w*|disagree\w*)\b"
+        r"\b(no you're wrong|that's wrong|not true|actually|incorrect|false|nope|definitely not|contradict\w*|disagree\w*)\b",
+        # Arabic written numerals and quantities (e.g. "خمسين الف", "خمسة بس")
+        r"\b(واحد|اتنين|تلاتة|ثلاثة|اربعة|أربعة|خمسة|ستة|سبعة|تمانية|ثمانية|تسعة|عشرة|حداشر|اثناشر|عشرين|تلاتين|ثلاثين|اربعين|أربعين|خمسين|ستين|سبعين|تمانين|ثمانين|تسعين|مية|مائة|ألف|الف|مليون|مليار|نص|ربع)\b",
+        # Calendar, days of week, and time indicators (e.g. "الخميس", "الساعة تسعة")
+        r"\b(السبت|الحد|الأحد|الاتنين|الاثنين|التلات|الثلاثاء|الاربع|الأربعاء|الخميس|الجمعة|الساعة)\b",
+        # Colloquial counter particles and tag disagreement structures
+        r"(^(لا|لأ|مش)\s+.*(بس|\?|؟)?$|^(لا|لأ|مش)\s+(واحد|اتنين|تلاتة|ثلاثة|اربعة|أربعة|خمسة|ستة|سبعة|تمانية|ثمانية|تسعة|عشرة|عشرين|خمسين|مية|الف|السبت|الجمعة|الخميس))"
     ]
 
     def is_candidate(self, text: str) -> Tuple[bool, str]:

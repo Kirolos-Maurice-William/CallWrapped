@@ -19,8 +19,18 @@ from bot.events.publisher import publisher
 from bot.config import config
 from bot.audio.fusion import fuse_anger
 import asyncio
+from cachetools import TTLCache
 
 logger = logging.getLogger("ArbitrationEngine")
+
+
+def normalize_topic_key(entity: Optional[str] = None, topic: Optional[str] = None) -> str:
+    """Normalizes entity/topic into a consistent cache key for per-topic cooldown tracking."""
+    ent = (entity or "").strip().lower()
+    top = (topic or "").strip().lower()
+    if ent and top:
+        return f"{top}:{ent}"
+    return ent or top or "general_dispute"
 
 
 class FifoSet:
@@ -168,6 +178,7 @@ class SessionState:
         self.pending_offer: Optional[PendingOffer] = None
         self.confirm_lock: asyncio.Lock = asyncio.Lock()
         self.last_offer_time: float = 0.0
+        self.topic_cooldowns: TTLCache = TTLCache(maxsize=100, ttl=getattr(config, "DISPUTE_OFFER_COOLDOWN_SEC", 180.0))
         self.fact_check_mode: bool = False
 
     @property
@@ -235,7 +246,43 @@ class SessionState:
             self.pending_offer.cancel()
         self.pending_offer = None
         self.last_offer_time = 0.0
+        self.topic_cooldowns.clear()
         self.fact_check_mode = False
+
+    def is_in_cooldown(self, topic_key: str, now: Optional[float] = None) -> Tuple[bool, int, str]:
+        """
+        Evaluates whether an offer is rate-limited:
+        1. Global backstop cooldown (e.g. 30s) prevents back-to-back spam.
+        2. Per-topic cooldown (180s) prevents repeating the same dispute.
+        Returns (is_cooldown, remaining_seconds, reason).
+        """
+        now = now if now is not None else time.time()
+        global_backstop = getattr(config, "DISPUTE_GLOBAL_BACKSTOP_SEC", 30.0)
+        cooldown_sec = getattr(config, "DISPUTE_OFFER_COOLDOWN_SEC", 180.0)
+
+        # If last_offer_time was elapsed or forced in the past >= cooldown_sec, clear expired topic cache
+        if self.last_offer_time > 0 and (now - self.last_offer_time) >= cooldown_sec:
+            self.topic_cooldowns.clear()
+
+        # 1. Check global backstop
+        if self.last_offer_time > 0 and (now - self.last_offer_time) < global_backstop:
+            rem = int(global_backstop - (now - self.last_offer_time))
+            return True, rem, "global_backstop"
+
+        # 2. Check per-topic cooldown
+        if topic_key in self.topic_cooldowns:
+            offered_at = self.topic_cooldowns[topic_key]
+            if (now - offered_at) < cooldown_sec:
+                rem = int(cooldown_sec - (now - offered_at))
+                return True, rem, f"topic:{topic_key}"
+
+        return False, 0, "none"
+
+    def record_offer(self, topic_key: str, now: Optional[float] = None):
+        """Records offer timestamp globally and in the per-topic TTL cache."""
+        now = now if now is not None else time.time()
+        self.last_offer_time = now
+        self.topic_cooldowns[topic_key] = now
 
     def arbitration_lease(self, engine: "ArbitrationEngine") -> "ArbitrationLease":
         return ArbitrationLease(engine, self.guild_id, self)
@@ -820,9 +867,12 @@ class ArbitrationEngine:
 
         # Step E: Two-Stage Referee Flow: Detect and OFFER (Zero Unsolicited Speech)
         now_check = time.time()
-        cooldown_sec = getattr(config, "DISPUTE_OFFER_COOLDOWN_SEC", 180.0)
-        if (now_check - session.last_offer_time) < cooldown_sec:
-            remaining = int(cooldown_sec - (now_check - session.last_offer_time))
+        topic_key = normalize_topic_key(
+            entity=entity or conflict_data.get("entity_name"),
+            topic=topic or conflict_data.get("conflict_type")
+        )
+        is_cooldown, remaining, reason = session.is_in_cooldown(topic_key, now_check)
+        if is_cooldown:
             logger.info(f"DISPUTE_SUPPRESSED: cooldown active (remaining: {remaining}s)")
             return
 
@@ -860,7 +910,7 @@ class ArbitrationEngine:
             )
             session.pending_offer.cancel()
 
-        session.last_offer_time = now
+        session.record_offer(topic_key, now)
 
         # Pre-fetch: fire fan-out search in background immediately (do NOT wait before offering)
         async def _dispatch_prefetch():
