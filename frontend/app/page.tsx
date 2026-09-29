@@ -559,23 +559,18 @@ export default function CallWrappedDashboard() {
     <div className="min-h-screen bg-[#1e1f22] text-[#F2F3F5] flex flex-col font-sans selection:bg-[#5865F2] selection:text-white">
       {/* 1. TOP HEADER & STATUS BAR (DISCORD DARK) */}
       <header className="border-b border-[#383a40] bg-[#1e1f22]/95 backdrop-blur sticky top-0 z-50 px-4 md:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-[#5865F2] text-white shadow-lg shadow-[#5865F2]/25">
-            <Scale className="w-5 h-5" />
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg md:text-xl font-black tracking-tight text-[#F2F3F5]">
+              CALLWRAPPED
+            </h1>
+            <span className="text-[11px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-md bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/25">
+              AI Voice Referee
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg md:text-xl font-black tracking-tight text-[#F2F3F5]">
-                CALLWRAPPED
-              </h1>
-              <span className="text-[11px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-md bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/25">
-                AI Voice Referee
-              </span>
-            </div>
-            <p className="text-xs text-[#949BA4] hidden sm:block">
-              Multi-Speaker Discord E2EE • {speechModel} Code-Switching • Groq LPU • Tavily Ground-Truth
-            </p>
-          </div>
+          <p className="text-xs text-[#949BA4] hidden sm:block">
+            Multi-Speaker Discord E2EE • {speechModel} Code-Switching • Groq LPU • Tavily Ground-Truth
+          </p>
         </div>
 
         {/* Live Indicator & Controls */}
@@ -660,23 +655,46 @@ export default function CallWrappedDashboard() {
           <div className="lg:col-span-7 flex flex-col space-y-6">
 
             {/* HERO ACTIVE EVIDENCE ARBITRATION CARD */}
-            <div className="relative rounded-2xl bg-[#2b2d31] border-2 border-[#23A55A]/40 shadow-xl shadow-black/40 p-5 md:p-6 overflow-hidden">
+            <div className={`relative rounded-2xl bg-[#2b2d31] shadow-xl shadow-black/40 p-5 md:p-6 overflow-hidden transition-all ${
+              activeDispute ? "border-2 border-[#23A55A]/40 shadow-[#23A55A]/5" : "border border-[#383a40]"
+            }`}>
               <div className="flex items-center justify-between gap-3 border-b border-[#383a40] pb-4 mb-5">
                 <div className="flex items-center gap-2.5">
-                  <span className="p-2 rounded-xl bg-[#23A55A]/20 text-[#23A55A] border border-[#23A55A]/30">
-                    <ShieldCheck className="w-5 h-5" />
-                  </span>
-                  <div>
-                    <h2 className="text-base font-bold text-[#F2F3F5] tracking-wide flex items-center gap-2">
-                      EVIDENCE-BASED ARBITRATION
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#23A55A]/20 text-[#23A55A] border border-[#23A55A]/30 animate-pulse">
-                        VERIFIED
+                  {activeDispute ? (
+                    <>
+                      <span className="p-2 rounded-xl bg-[#23A55A]/20 text-[#23A55A] border border-[#23A55A]/30">
+                        <ShieldCheck className="w-5 h-5" />
                       </span>
-                    </h2>
-                    <p className="text-xs text-[#949BA4]">
-                      Contradiction caught, verified against authoritative sources, and settled via voice intervention.
-                    </p>
-                  </div>
+                      <div>
+                        <h2 className="text-base font-bold text-[#F2F3F5] tracking-wide flex items-center gap-2">
+                          EVIDENCE-BASED ARBITRATION
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#23A55A]/20 text-[#23A55A] border border-[#23A55A]/30 animate-pulse">
+                            VERIFIED
+                          </span>
+                        </h2>
+                        <p className="text-xs text-[#949BA4]">
+                          Contradiction caught, verified against authoritative sources, and settled via voice intervention.
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="p-2 rounded-xl bg-[#5865F2]/20 text-[#5865F2] border border-[#5865F2]/30">
+                        <Scale className="w-5 h-5" />
+                      </span>
+                      <div>
+                        <h2 className="text-base font-bold text-[#F2F3F5] tracking-wide flex items-center gap-2">
+                          SILENT REFEREE MONITORING
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#5865F2]/20 text-[#5865F2] border border-[#5865F2]/30">
+                            LISTENING
+                          </span>
+                        </h2>
+                        <p className="text-xs text-[#949BA4]">
+                          Passively monitoring voice channel. Active arbitration triggers when an objective dispute is detected.
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {activeDispute?.confidence && (
@@ -889,7 +907,10 @@ export default function CallWrappedDashboard() {
                     >
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-bold text-[#F2F3F5] flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-[#5865F2] text-white flex items-center justify-center text-[10px] font-bold">
+                          <span
+                            aria-hidden="true"
+                            className="w-5 h-5 rounded-full bg-[#5865F2] text-white flex items-center justify-center text-[10px] font-bold select-none shrink-0"
+                          >
                             {t.speaker_name.charAt(0).toUpperCase()}
                           </span>
                           <span dir="auto">{t.speaker_name}</span>
@@ -937,171 +958,46 @@ export default function CallWrappedDashboard() {
           {/* ======================================================== */}
           <div className="lg:col-span-5 flex flex-col space-y-6">
 
-            {/* 1. CALLWRAPPED BADGES & RECORDS */}
+            {/* 1. TOPIC DISTRIBUTION */}
             <div className="rounded-2xl bg-[#2b2d31] border border-[#383a40] p-5 space-y-3 shadow-lg">
               <div className="flex items-center justify-between border-b border-[#383a40] pb-3">
                 <div className="flex items-center gap-2">
-                  <Award className="w-4 h-4 text-[#F0B232]" />
+                  <PieChart className="w-4 h-4 text-[#5865F2]" />
                   <h3 className="text-sm font-bold text-[#F2F3F5] tracking-wide uppercase">
-                    Call Badges & Records
+                    Topic Distribution
                   </h3>
                 </div>
-                <button
-                  onClick={() => setShowRecapModal(true)}
-                  className="text-[11px] font-bold text-[#5865F2] hover:text-[#5865F2]/80 transition-colors cursor-pointer"
-                >
-                  View Wrapped Card →
-                </button>
+                {totalAllTopics > 0 && (
+                  <span className="text-[10px] font-mono text-[#949BA4]">
+                    {topicalCoveragePct.toFixed(0)}% coverage
+                  </span>
+                )}
               </div>
 
-              {analytics.longest_streak && analytics.longest_streak.speaker_name && analytics.longest_streak.streak_seconds > 0 ? (
+              {totalTopicalCount > 0 ? (
                 <div className="space-y-2.5">
-                  {/* The Monologue King */}
-                  <div className="p-3 rounded-xl bg-[#1e1f22] border border-[#F0B232]/30 text-center space-y-1">
-                    <div className="inline-flex p-1.5 rounded-xl bg-[#F0B232]/20 text-[#F0B232] border border-[#F0B232]/40">
-                      <Award className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase font-bold text-[#F0B232] tracking-wider">
-                        The Monologue King
-                      </div>
-                      <div className="text-sm font-bold text-[#F2F3F5] flex items-center justify-center gap-1.5" dir="auto">
-                        <span>👑</span>
-                        <span>{analytics.longest_streak.speaker_name}</span>
-                      </div>
-                      <div className="text-lg font-extrabold font-mono text-[#F0B232]">
-                        {formatStreakMMSS(analytics.longest_streak.streak_seconds)}
-                      </div>
-                      <div className="text-[10px] font-mono text-[#949BA4]">
-                        ({formatDurationHuman(analytics.longest_streak.streak_seconds)} uninterrupted)
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* The Silent Observer */}
-                  {hasSpeakers && speakerEntries.length >= 2 && (() => {
-                    const quietest = speakerEntries[speakerEntries.length - 1];
-                    const secondQuietest = speakerEntries[speakerEntries.length - 2];
-                    if (secondQuietest.talk_seconds - quietest.talk_seconds >= 1.0) {
-                      const qPct = analytics.total_talk_seconds > 0 ? (quietest.talk_seconds / analytics.total_talk_seconds) * 100 : 0;
-                      return (
-                        <div className="p-2.5 rounded-xl bg-[#1e1f22] border border-[#5865F2]/30 flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="text-base">🤫</span>
-                            <div>
-                              <div className="text-[9px] uppercase font-bold text-[#5865F2] tracking-wider">
-                                The Silent Observer
-                              </div>
-                              <div className="font-bold text-[#F2F3F5] truncate max-w-[120px]" dir="auto">
-                                {quietest.speaker_name}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right font-mono text-[#5865F2]">
-                            <div className="font-bold text-xs">{formatDurationHuman(quietest.talk_seconds)}</div>
-                            <div className="text-[9px] text-[#949BA4]">({qPct.toFixed(1)}% airtime)</div>
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-
-                  {/* The Most Unfiltered */}
-                  {hasSpeakers && speakerEntries.length >= 2 && (() => {
-                    const withVulgarity = speakerEntries.filter(s => (s.vulgarity_count || 0) > 0);
-                    if (withVulgarity.length === 0) return null;
-                    const sortedVulgar = [...withVulgarity].sort((a, b) => (b.vulgarity_count || 0) - (a.vulgarity_count || 0));
-                    const top = sortedVulgar[0];
-                    if (sortedVulgar.length >= 2 && (sortedVulgar[1].vulgarity_count || 0) === (top.vulgarity_count || 0)) {
-                      return null;
-                    }
+                  {sortedTopics.map(([topic, count], idx) => {
+                    const pct = (count / totalTopicalCount) * 100;
+                    const color = TOPIC_COLORS[idx % TOPIC_COLORS.length];
                     return (
-                      <div className="p-2.5 rounded-xl bg-[#1e1f22] border border-[#F23F43]/30 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">🌶️</span>
-                          <div>
-                            <div className="text-[9px] uppercase font-bold text-[#F23F43] tracking-wider">
-                              The Most Unfiltered
-                            </div>
-                            <div className="font-bold text-[#F2F3F5] truncate max-w-[120px]" dir="auto">
-                              {top.speaker_name}
-                            </div>
-                          </div>
+                      <div key={topic} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-medium">
+                          <span className="text-[#DBDEE1] capitalize">
+                            {TOPIC_DISPLAY_NAMES[topic.toLowerCase()] ? `${topic} (${TOPIC_DISPLAY_NAMES[topic.toLowerCase()]})` : topic}
+                          </span>
+                          <span className="font-mono text-[#949BA4]">
+                            {count} ({pct.toFixed(1)}%)
+                          </span>
                         </div>
-                        <div className="text-right font-mono text-[#F23F43]">
-                          <div className="font-bold text-xs">{top.vulgarity_count} raw tokens</div>
-                          <div className="text-[9px] text-[#949BA4]">
-                            {top.vulgarity_terms && top.vulgarity_terms.length > 0 ? top.vulgarity_terms.slice(0, 2).join(", ") : "uncensored"}
-                          </div>
+                        <div className="w-full bg-[#1e1f22] h-2 rounded-full overflow-hidden border border-[#383a40]">
+                          <div
+                            className={`h-full ${color} rounded-full transition-all duration-500`}
+                            style={{ width: `${pct}%` }}
+                          />
                         </div>
                       </div>
                     );
-                  })()}
-
-                  {/* The Diplomat */}
-                  {hasSpeakers && speakerEntries.length >= 2 && (() => {
-                    const diplomatCandidates = speakerEntries.filter(
-                      s => (s.vulgarity_count || 0) === 0 && s.angry_episodes === 0 && s.talk_seconds >= 15.0
-                    );
-                    if (diplomatCandidates.length === 0) return null;
-                    const sortedDiplomats = [...diplomatCandidates].sort((a, b) => b.talk_seconds - a.talk_seconds);
-                    const topDiplomat = sortedDiplomats[0];
-                    if (sortedDiplomats.length >= 2 && (topDiplomat.talk_seconds - sortedDiplomats[1].talk_seconds) < 1.0) {
-                      return null;
-                    }
-                    return (
-                      <div className="p-2.5 rounded-xl bg-[#1e1f22] border border-[#23A55A]/30 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">🕊️</span>
-                          <div>
-                            <div className="text-[9px] uppercase font-bold text-[#23A55A] tracking-wider">
-                              The Diplomat
-                            </div>
-                            <div className="font-bold text-[#F2F3F5] truncate max-w-[120px]" dir="auto">
-                              {topDiplomat.speaker_name}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right font-mono text-[#23A55A]">
-                          <div className="font-bold text-xs">{formatDurationHuman(topDiplomat.talk_seconds)}</div>
-                          <div className="text-[9px] text-[#949BA4]">100% peaceful</div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* The Roast Master */}
-                  {hasSpeakers && speakerEntries.length >= 2 && (() => {
-                    const withBanter = speakerEntries.filter(s => (s.banter_count || 0) > 0);
-                    if (withBanter.length === 0) return null;
-                    const sortedBanter = [...withBanter].sort((a, b) => (b.banter_count || 0) - (a.banter_count || 0));
-                    const topBanter = sortedBanter[0];
-                    if (sortedBanter.length >= 2 && (sortedBanter[1].banter_count || 0) === (topBanter.banter_count || 0)) {
-                      return null;
-                    }
-                    return (
-                      <div className="p-2.5 rounded-xl bg-[#1e1f22] border border-purple-500/30 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">🎭</span>
-                          <div>
-                            <div className="text-[9px] uppercase font-bold text-purple-400 tracking-wider">
-                              The Roast Master
-                            </div>
-                            <div className="font-bold text-[#F2F3F5] truncate max-w-[120px]" dir="auto">
-                              {topBanter.speaker_name}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right font-mono text-purple-400">
-                          <div className="font-bold text-xs">{topBanter.banter_count} {topBanter.banter_count === 1 ? "roast turn" : "roast turns"}</div>
-                          <div className="text-[9px] text-[#949BA4]">
-                            {topBanter.banter_terms && topBanter.banter_terms.length > 0 ? topBanter.banter_terms.slice(0, 2).join(", ") : "friendly teasing"}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  })}
                 </div>
               ) : (
                 <div className="py-6 text-center text-xs text-[#949BA4] italic">
@@ -1261,55 +1157,7 @@ export default function CallWrappedDashboard() {
               )}
             </div>
 
-            {/* 4. TOPIC DISTRIBUTION */}
-            <div className="rounded-2xl bg-[#2b2d31] border border-[#383a40] p-5 space-y-3 shadow-lg">
-              <div className="flex items-center justify-between border-b border-[#383a40] pb-3">
-                <div className="flex items-center gap-2">
-                  <PieChart className="w-4 h-4 text-[#5865F2]" />
-                  <h3 className="text-sm font-bold text-[#F2F3F5] tracking-wide uppercase">
-                    Topic Distribution
-                  </h3>
-                </div>
-                {totalAllTopics > 0 && (
-                  <span className="text-[10px] font-mono text-[#949BA4]">
-                    {topicalCoveragePct.toFixed(0)}% coverage
-                  </span>
-                )}
-              </div>
-
-              {totalTopicalCount > 0 ? (
-                <div className="space-y-2.5">
-                  {sortedTopics.map(([topic, count], idx) => {
-                    const pct = (count / totalTopicalCount) * 100;
-                    const color = TOPIC_COLORS[idx % TOPIC_COLORS.length];
-                    return (
-                      <div key={topic} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs font-medium">
-                          <span className="text-[#DBDEE1] capitalize">
-                            {TOPIC_DISPLAY_NAMES[topic.toLowerCase()] ? `${topic} (${TOPIC_DISPLAY_NAMES[topic.toLowerCase()]})` : topic}
-                          </span>
-                          <span className="font-mono text-[#949BA4]">
-                            {count} ({pct.toFixed(1)}%)
-                          </span>
-                        </div>
-                        <div className="w-full bg-[#1e1f22] h-2 rounded-full overflow-hidden border border-[#383a40]">
-                          <div
-                            className={`h-full ${color} rounded-full transition-all duration-500`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="py-6 text-center text-xs text-[#949BA4] italic">
-                  waiting for call data…
-                </div>
-              )}
-            </div>
-
-            {/* 5. SERVER EVIDENCE & ACCURACY LEADERBOARD */}
+            {/* 4. SERVER EVIDENCE & ACCURACY LEADERBOARD */}
             <div className="rounded-2xl bg-[#2b2d31] border border-[#383a40] p-5 space-y-3 shadow-lg">
               <div className="flex items-center justify-between border-b border-[#383a40] pb-3">
                 <div className="flex items-center gap-2">
@@ -1358,6 +1206,57 @@ export default function CallWrappedDashboard() {
                   Participant statistics will populate automatically as voice activity is recorded.
                 </p>
               )}
+            </div>
+
+            {/* 5. CALLWRAPPED RECAP & HIGHLIGHTS BANNER */}
+            <div className="rounded-2xl bg-gradient-to-br from-[#2b2d31] to-[#1e1f22] border border-[#5865F2]/40 p-5 space-y-3.5 shadow-lg relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-[#383a40] pb-3">
+                <div className="flex items-center gap-2">
+                  <Award className="w-4 h-4 text-[#F0B232]" />
+                  <h3 className="text-sm font-bold text-[#F2F3F5] tracking-wide uppercase">
+                    CallWrapped Highlights
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#5865F2]/20 text-[#5865F2] font-semibold">
+                  LIVE RECAP
+                </span>
+              </div>
+
+              {analytics.longest_streak && analytics.longest_streak.speaker_name && analytics.longest_streak.streak_seconds > 0 ? (
+                <div className="p-3 rounded-xl bg-[#1e1f22] border border-[#F0B232]/30 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">👑</span>
+                    <div>
+                      <div className="text-[10px] uppercase font-bold text-[#F0B232] tracking-wider">
+                        The Monologue King
+                      </div>
+                      <div className="text-sm font-bold text-[#F2F3F5]" dir="auto">
+                        {analytics.longest_streak.speaker_name}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-extrabold font-mono text-[#F0B232]">
+                      {formatStreakMMSS(analytics.longest_streak.streak_seconds)}
+                    </div>
+                    <div className="text-[9px] font-mono text-[#949BA4]">
+                      uninterrupted
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-2 text-center text-xs text-[#949BA4] italic">
+                  Awaiting call activity for records…
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowRecapModal(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold text-xs shadow-md shadow-[#5865F2]/25 transition-all cursor-pointer"
+              >
+                <span>🎁 Open Full CallWrapped Card</span>
+                <span>→</span>
+              </button>
             </div>
 
           </div>

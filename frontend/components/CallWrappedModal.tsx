@@ -54,11 +54,15 @@ export function CallWrappedModal({
   );
 
   const diplomatCandidates = speakerList.filter(
-    s => (s.vulgarity_count || 0) === 0 && s.angry_episodes === 0 && s.talk_seconds >= 15.0
+    s => (s.vulgarity_count || 0) === 0 && s.angry_episodes === 0 && (s.banter_count || 0) === 0 && s.talk_seconds >= 15.0
   ).sort((a, b) => b.talk_seconds - a.talk_seconds);
-  const topDiplomat = diplomatCandidates[0];
+  // Prioritize non-Monologue King to avoid badge hoarding if multiple peaceful speakers qualify
+  const secondaryDiplomatCandidates = diplomatCandidates.filter(
+    s => !longest_streak?.speaker_name || s.speaker_name !== longest_streak.speaker_name
+  );
+  const topDiplomat = secondaryDiplomatCandidates.length > 0 ? secondaryDiplomatCandidates[0] : diplomatCandidates[0];
   const isDiplomatEligible = Boolean(
-    speakerList.length >= 2 && topDiplomat && (diplomatCandidates.length < 2 || (topDiplomat.talk_seconds - diplomatCandidates[1].talk_seconds >= 1.0))
+    speakerList.length >= 2 && topDiplomat && (diplomatCandidates.length < 2 || (topDiplomat.talk_seconds >= 15.0))
   );
 
   const banterSpeakers = speakerList.filter(s => (s.banter_count || 0) > 0).sort((a, b) => (b.banter_count || 0) - (a.banter_count || 0));
