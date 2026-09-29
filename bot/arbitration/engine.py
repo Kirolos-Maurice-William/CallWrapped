@@ -170,6 +170,8 @@ class TopicInterval:
         self.participating_speakers: Set[str] = set()
         self.turn_count: int = 0
         self.evidence_spans: List[str] = []
+        self.speaker_durations: Dict[str, float] = {}
+        self.speaker_turns: Dict[str, int] = {}
 
     @property
     def duration_seconds(self) -> float:
@@ -289,13 +291,16 @@ class SessionState:
             )
             self.active_interval.participating_speakers.add(speaker_name)
             self.active_interval.turn_count = 1
+            self.active_interval.speaker_durations[speaker_name] = duration
+            self.active_interval.speaker_turns[speaker_name] = 1
             if evidence:
                 self.active_interval.evidence_spans.append(evidence)
             return
 
-        # Check silence gap: if gap > 45s, natural discourse boundary
+        # Check silence gap: if gap > config.TOPIC_SILENCE_BOUNDARY_SEC, natural discourse boundary
+        silence_threshold = getattr(config, "TOPIC_SILENCE_BOUNDARY_SEC", 35.0)
         gap = timestamp - self.active_interval.last_activity_time
-        is_silence_boundary = gap > 45.0
+        is_silence_boundary = gap > silence_threshold
 
         # Topic continuation check:
         # Same topic OR (null_topic like laughter/acknowledgment within an active discussion)
@@ -311,6 +316,12 @@ class SessionState:
             )
             self.active_interval.participating_speakers.add(speaker_name)
             self.active_interval.turn_count += 1
+            self.active_interval.speaker_durations[speaker_name] = (
+                self.active_interval.speaker_durations.get(speaker_name, 0.0) + duration
+            )
+            self.active_interval.speaker_turns[speaker_name] = (
+                self.active_interval.speaker_turns.get(speaker_name, 0) + 1
+            )
             if canonical_tag and canonical_tag.lower() not in (
                 "other", "null", "none", self.active_interval.macro_topic.lower()
             ):
@@ -335,6 +346,8 @@ class SessionState:
                 )
                 self.active_interval.participating_speakers.add(speaker_name)
                 self.active_interval.turn_count = 1
+                self.active_interval.speaker_durations[speaker_name] = duration
+                self.active_interval.speaker_turns[speaker_name] = 1
                 if evidence:
                     self.active_interval.evidence_spans.append(evidence)
             else:
@@ -359,6 +372,17 @@ class SessionState:
             curr_dur = self.active_interval.duration_seconds
             result[curr_topic] = result.get(curr_topic, 0.0) + curr_dur
         return result
+
+    def get_topic_mvps(self) -> Dict[str, Tuple[str, float]]:
+        """
+        Calculates conversational dominance (Topic MVP) per macro topic.
+        Returns: {macro_topic: (speaker_name, dominance_share_pct)}
+        """
+        from bot.arbitration.stats import compute_topic_mvps
+        all_intervals = list(self.completed_intervals)
+        if self.active_interval is not None:
+            all_intervals.append(self.active_interval)
+        return compute_topic_mvps(all_intervals)
 
     @property
     def stats_tracker(self) -> SessionStatsTracker:

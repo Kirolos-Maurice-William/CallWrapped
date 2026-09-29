@@ -46,6 +46,7 @@ class BotConfig:
     ANALYTICS_ENABLED: int = int(os.getenv("ANALYTICS_ENABLED", "1"))
     default_window = "0" if any("test_fanout" in a for a in sys.argv) else "75"
     ANALYTICS_WINDOW_SEC: float = float(os.getenv("ANALYTICS_WINDOW_SEC", default_window))
+    TOPIC_SILENCE_BOUNDARY_SEC: float = float(os.getenv("TOPIC_SILENCE_BOUNDARY_SEC", "35.0"))
 
     # Acoustic Loudness & Emotion Fusion (0 = disabled in prod, 1 = experimental re-enable)
     ACOUSTIC_FUSION_ENABLED: int = int(os.getenv("ACOUSTIC_FUSION_ENABLED", "0"))

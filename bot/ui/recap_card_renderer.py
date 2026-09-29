@@ -84,6 +84,8 @@ class TopicStat:
     topic_key: str
     display_name: str
     pct: float
+    mvp_speaker: Optional[str] = None
+    mvp_share: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -426,24 +428,38 @@ def render_recap_card_png(payload: RecapCardPayload) -> bytes:
             curr_top_y = top_y + (rank - 1) * top_gap
             if isinstance(topic, (list, tuple)):
                 key, dname, pct = topic[0], topic[1], float(topic[2])
+                mvp_spk, mvp_share = None, None
             elif hasattr(topic, "display_name"):
                 key, dname, pct = getattr(topic, "topic_key", ""), getattr(topic, "display_name", ""), float(getattr(topic, "pct", 0.0))
+                mvp_spk = getattr(topic, "mvp_speaker", None)
+                mvp_share = getattr(topic, "mvp_share", None)
             else:
                 key, dname, pct = str(topic), str(topic), 0.0
+                mvp_spk, mvp_share = None, None
 
             # Rank number pill
             draw.rounded_rectangle((76, curr_top_y, 116, curr_top_y + 38), radius=10, fill=(35, 48, 74))
             draw_text(draw, (88, curr_top_y + 6), str(rank), font_stat_val, fill=(255, 255, 255))
-
-            # Topic name
-            name_text = truncate_text(dname or key, max_chars=32)
-            draw_text(draw, (132, curr_top_y + 4), name_text, font_speaker_name, fill=(241, 245, 249))
 
             # Topic percentage
             pct_val = max(0.0, min(100.0, pct))
             pct_str = f"{pct_val:.1f}%"
             w_pct, _ = measure_text(draw, pct_str, font_stat_val)
             draw_text(draw, (1004 - w_pct, curr_top_y + 4), pct_str, font_stat_val, fill=(192, 132, 252))
+
+            # Topic MVP badge (amber pill/text before percentage)
+            mvp_offset = 0
+            if mvp_spk:
+                mvp_badge_str = f"[Top: {mvp_spk}]"
+                w_mvp, _ = measure_text(draw, mvp_badge_str, font_stat_muted)
+                mvp_x = (1004 - w_pct) - w_mvp - 14
+                draw_text(draw, (mvp_x, curr_top_y + 6), mvp_badge_str, font_stat_muted, fill=(251, 191, 36))
+                mvp_offset = w_mvp + 20
+
+            # Topic name (adjusted max chars if MVP present)
+            max_chars = 22 if mvp_spk else 32
+            name_text = truncate_text(dname or key, max_chars=max_chars)
+            draw_text(draw, (132, curr_top_y + 4), name_text, font_speaker_name, fill=(241, 245, 249))
 
             # Horizontal bar underneath
             bar_w = 872
@@ -606,7 +622,7 @@ def build_card_payload_from_session(
     total_all_count = total_topical_count + null_count
     coverage_pct = (total_topical_count / total_all_count * 100.0) if total_all_count > 0 else 0.0
 
-    from bot.arbitration.stats import TOPIC_DISPLAY_NAMES, compute_topic_importance
+    from bot.arbitration.stats import TOPIC_DISPLAY_NAMES, compute_topic_importance, compute_topic_mvps
 
     # Extract continuous topic durations and intervals if present
     topic_durations: Dict[str, float] = {}
@@ -623,6 +639,8 @@ def build_card_payload_from_session(
     if active_itv:
         intervals.append(active_itv)
 
+    mvps = compute_topic_mvps(intervals) if intervals else {}
+
     ranked_topics = compute_topic_importance(
         topic_durations=topic_durations,
         topic_counts=topic_counts,
@@ -635,7 +653,21 @@ def build_card_payload_from_session(
         display_name = TOPIC_DISPLAY_NAMES.get(top_name.lower(), top_name)
         if top_name.lower() in ("other", "عام") and micro_tags_list:
             display_name = f"أخرى ({micro_tags_list[0]})"
-        top_topics.append(TopicStat(topic_key=top_name, display_name=display_name, pct=t_pct))
+        
+        mvp_spk = None
+        mvp_share = None
+        if top_name:
+            mvp_info = mvps.get(top_name) or mvps.get(top_name.lower())
+            if mvp_info:
+                mvp_spk, mvp_share = mvp_info
+
+        top_topics.append(TopicStat(
+            topic_key=top_name,
+            display_name=display_name,
+            pct=t_pct,
+            mvp_speaker=mvp_spk,
+            mvp_share=mvp_share
+        ))
 
     coverage_note = f"نسبة التغطية الموضوعية: {coverage_pct:.1f}%" if total_all_count > 0 else ""
 

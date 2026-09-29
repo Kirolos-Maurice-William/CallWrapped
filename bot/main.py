@@ -451,7 +451,7 @@ def render_recap(session_state: Any) -> str:
     total_all_count = total_topical_count + null_count
     coverage_pct = (total_topical_count / total_all_count * 100.0) if total_all_count > 0 else 0.0
 
-    from bot.arbitration.stats import TOPIC_DISPLAY_NAMES, compute_topic_importance
+    from bot.arbitration.stats import TOPIC_DISPLAY_NAMES, compute_topic_importance, compute_topic_mvps
 
     ranked_topics = compute_topic_importance(
         topic_durations=topic_durations,
@@ -460,16 +460,23 @@ def render_recap(session_state: Any) -> str:
         total_speakers=len(speakers)
     )
 
+    mvps = compute_topic_mvps(intervals) if intervals else {}
     has_durations = bool({k: v for k, v in topic_durations.items() if k not in ("null_topic", "null", "none", "بدون موضوع") and v > 0})
 
     if ranked_topics:
         top_3 = ranked_topics[:3]
         for rank, (top_name, importance_score, t_pct) in enumerate(top_3, 1):
             display_name = TOPIC_DISPLAY_NAMES.get(top_name.lower(), top_name)
+            mvp_badge = ""
+            if has_durations and top_name:
+                mvp_info = mvps.get(top_name) or mvps.get(top_name.lower())
+                if mvp_info:
+                    mvp_name, mvp_pct = mvp_info
+                    mvp_badge = f" — 👑 {mvp_name} ({int(round(mvp_pct))}%)"
             if has_durations:
                 dur_sec = topic_durations.get(top_name, 0.0)
                 dur_str = f"{dur_sec / 60.0:.1f}m" if dur_sec >= 60.0 else f"{int(round(dur_sec))}s"
-                lines.append(f"{rank}. **{display_name}**: {t_pct:.1f}% ({dur_str})")
+                lines.append(f"{rank}. **{display_name}**: {t_pct:.1f}% ({dur_str}){mvp_badge}")
             else:
                 top_cnt = topic_counts.get(top_name, 0)
                 lines.append(f"{rank}. **{display_name}**: {t_pct:.1f}% ({top_cnt})")

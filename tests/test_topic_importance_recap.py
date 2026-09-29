@@ -111,6 +111,77 @@ class TestTopicImportanceRecap(unittest.TestCase):
         self.assertEqual(tech_stat.topic_key, "tech")
         self.assertAlmostEqual(tech_stat.pct, 25.0, places=1)
 
+    def test_compute_topic_mvps_dominance_and_solo_exclusion(self):
+        """Verifies that compute_topic_mvps correctly calculates topic leader and excludes solo monologues."""
+        from bot.arbitration.stats import compute_topic_mvps
+
+        itv_multi = TopicInterval("gaming", "CS2", 0.0, 100.0)
+        itv_multi.speaker_durations = {"Alice": 70.0, "Bob": 30.0}
+        itv_multi.participating_speakers = {"Alice", "Bob"}
+
+        itv_solo = TopicInterval("tech", "Docker", 110.0, 210.0)
+        itv_solo.speaker_durations = {"Alice": 100.0}
+        itv_solo.participating_speakers = {"Alice"}
+
+        mvps = compute_topic_mvps([itv_multi, itv_solo])
+
+        # Multi-party topic has Alice as MVP with 70.0%
+        self.assertIn("gaming", mvps)
+        self.assertEqual(mvps["gaming"], ("Alice", 70.0))
+
+        # Solo monologue topic awards no MVP (multi-party requirement)
+        self.assertNotIn("tech", mvps)
+
+    def test_render_recap_and_card_with_mvp_badge(self):
+        """Verifies that Topic MVP badge displays in text recap and renders in social card PNG."""
+        from bot.ui.recap_card_renderer import render_recap_card_png
+
+        session = SessionState(guild_id=999)
+        session.stats_tracker.record_utterance("alice", 0.0, 70.0, "Alice")
+        session.stats_tracker.record_utterance("bob", 70.0, 100.0, "Bob")
+
+        # Multi-party gaming: Alice speaks 70s, Bob speaks 30s
+        session.record_topic_turn("gaming", "Valorant", "Alice", 0.0, 70.0)
+        session.record_topic_turn("gaming", "Valorant", "Bob", 71.0, 30.0)
+
+        # 1. Text recap check
+        recap_text = render_recap(session)
+        self.assertIn("👑 Alice (70%)", recap_text)
+
+        # 2. Card payload check
+        payload = build_card_payload_from_session(session, session_title="MVP Card Test")
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload.top_topics[0].mvp_speaker, "Alice")
+        self.assertEqual(payload.top_topics[0].mvp_share, 70.0)
+
+        # 3. Card PNG rendering check (no exception, valid PNG header)
+        png_bytes = render_recap_card_png(payload)
+        self.assertTrue(png_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
+
+    def test_configurable_silence_boundary(self):
+        """Verifies that configurable silence gap controls interval boundary segmentation."""
+        from bot.config import config
+
+        session = SessionState(guild_id=101)
+        original_boundary = getattr(config, "TOPIC_SILENCE_BOUNDARY_SEC", 35.0)
+
+        try:
+            # Set threshold to 20 seconds
+            config.TOPIC_SILENCE_BOUNDARY_SEC = 20.0
+
+            # Turn 1: 0s to 10s
+            session.record_topic_turn("gaming", "Apex", "Alice", 0.0, 10.0)
+            self.assertEqual(session.active_interval.macro_topic, "gaming")
+
+            # Turn 2: Starts at 35s (gap = 25s > 20s threshold -> should close interval and start new one)
+            session.record_topic_turn("gaming", "Apex", "Bob", 35.0, 10.0)
+            self.assertEqual(len(session.completed_intervals), 1)
+            self.assertEqual(session.completed_intervals[0].duration_seconds, 10.0)
+            self.assertEqual(session.active_interval.start_time, 35.0)
+
+        finally:
+            config.TOPIC_SILENCE_BOUNDARY_SEC = original_boundary
+
 
 if __name__ == "__main__":
     unittest.main()

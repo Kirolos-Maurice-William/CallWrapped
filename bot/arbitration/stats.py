@@ -77,6 +77,51 @@ def compute_topic_importance(
     return scored
 
 
+def compute_topic_mvps(intervals: Optional[list] = None) -> Dict[str, Tuple[str, float]]:
+    """
+    Computes domain dominance (Topic MVP) from conversational discourse intervals.
+    Returns: {topic_key: (top_speaker_name, dominance_share_pct)}
+    Grounded in conversational analysis (Jurafsky & Martin Ch. 26).
+    Only awards badges in multi-party topics (>= 2 participating speakers).
+    """
+    if not intervals:
+        return {}
+
+    topic_speaker_durations: Dict[str, Dict[str, float]] = {}
+    ignored = {"null_topic", "null", "none", "بدون موضوع"}
+
+    for itv in intervals:
+        topic = getattr(itv, "macro_topic", None)
+        if not topic or topic in ignored:
+            continue
+        if topic not in topic_speaker_durations:
+            topic_speaker_durations[topic] = {}
+
+        spk_durs = getattr(itv, "speaker_durations", {})
+        if spk_durs:
+            for spk, dur in spk_durs.items():
+                topic_speaker_durations[topic][spk] = (
+                    topic_speaker_durations[topic].get(spk, 0.0) + dur
+                )
+        else:
+            spks = getattr(itv, "participating_speakers", set())
+            dur_per_spk = getattr(itv, "duration_seconds", 1.0) / max(1, len(spks))
+            for spk in spks:
+                topic_speaker_durations[topic][spk] = (
+                    topic_speaker_durations[topic].get(spk, 0.0) + dur_per_spk
+                )
+
+    mvps: Dict[str, Tuple[str, float]] = {}
+    for topic, spk_map in topic_speaker_durations.items():
+        tot = sum(spk_map.values())
+        if tot > 0 and len(spk_map) >= 2:
+            top_spk, spk_dur = max(spk_map.items(), key=lambda x: x[1])
+            share_pct = round((spk_dur / tot) * 100.0, 1)
+            mvps[topic] = (top_spk, share_pct)
+
+    return mvps
+
+
 
 @dataclass
 class SpeakerStats:
