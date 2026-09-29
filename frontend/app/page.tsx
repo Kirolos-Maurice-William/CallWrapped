@@ -199,6 +199,7 @@ export default function CallWrappedDashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionType, setConnectionType] = useState<"ws" | "poll">("poll");
   const [showRecapModal, setShowRecapModal] = useState(false);
+  const [leftTab, setLeftTab] = useState<"arbitration" | "transcript">("arbitration");
   const hasLoadedOnce = useRef(false);
 
   const [latency, setLatency] = useState<LatencyMetrics>({
@@ -241,6 +242,7 @@ export default function CallWrappedDashboard() {
   const [factCheckModeBadge, setFactCheckModeBadge] = useState<string>("Fact Check Mode: OFF");
 
   const applyGoldenDemo = () => {
+    setLeftTab("arbitration");
     setLatency(GOLDEN_DEMO_DATA.latency);
     setActiveDispute(GOLDEN_DEMO_DATA.activeDispute as DisputeInfo);
     setDisputes(GOLDEN_DEMO_DATA.disputes as DisputeCard[]);
@@ -484,6 +486,7 @@ export default function CallWrappedDashboard() {
   // Trigger Demo Replay
   const handleTriggerReplay = async () => {
     setIsSimulating(true);
+    setLeftTab("arbitration");
     const { http } = getBackendBase();
     try {
       await fetch(`${http}/api/demo/run`, { method: "POST" });
@@ -649,10 +652,56 @@ export default function CallWrappedDashboard() {
           {/* ======================================================== */}
           {/* LEFT COLUMN: LIVE ARBITRATION + DISPUTES + TRANSCRIPT (7 COLS) */}
           {/* ======================================================== */}
-          <div className="lg:col-span-7 flex flex-col space-y-6">
+          <div className="lg:col-span-7 flex flex-col space-y-4">
 
-            {/* HERO ACTIVE EVIDENCE ARBITRATION CARD */}
-            <div className={`relative rounded-2xl bg-[#2b2d31] shadow-xl shadow-black/40 p-5 md:p-6 overflow-hidden transition-all ${
+            {/* TAB SELECTOR HEADER */}
+            <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[#2b2d31] border border-[#383a40]">
+              <button
+                onClick={() => setLeftTab("arbitration")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  leftTab === "arbitration"
+                    ? "bg-[#5865F2] text-white shadow-md shadow-[#5865F2]/25"
+                    : "text-[#949BA4] hover:text-[#F2F3F5] hover:bg-[#313338]"
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>AI Voice Referee & Disputes</span>
+                {activeDispute && (
+                  <span className="w-2 h-2 rounded-full bg-[#23A55A] animate-pulse" />
+                )}
+                {disputes.length > 0 && (
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                    leftTab === "arbitration" ? "bg-white/20 text-white" : "bg-[#1e1f22] text-[#949BA4]"
+                  }`}>
+                    {disputes.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setLeftTab("transcript")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  leftTab === "transcript"
+                    ? "bg-[#5865F2] text-white shadow-md shadow-[#5865F2]/25"
+                    : "text-[#949BA4] hover:text-[#F2F3F5] hover:bg-[#313338]"
+                }`}
+              >
+                <Radio className="w-4 h-4 text-cyan-400" />
+                <span>Discord Voice Transcript</span>
+                {turns.length > 0 && (
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                    leftTab === "transcript" ? "bg-white/20 text-white" : "bg-[#1e1f22] text-[#949BA4]"
+                  }`}>
+                    {turns.length} turns
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {leftTab === "arbitration" ? (
+              <div className="space-y-4">
+                {/* HERO ACTIVE EVIDENCE ARBITRATION CARD */}
+                <div className={`relative rounded-2xl bg-[#2b2d31] shadow-xl shadow-black/40 p-5 md:p-6 overflow-hidden transition-all ${
               activeDispute ? "border-2 border-[#23A55A]/40 shadow-[#23A55A]/5" : "border border-[#383a40]"
             }`}>
               <div className="flex items-center justify-between gap-3 border-b border-[#383a40] pb-4 mb-5">
@@ -877,8 +926,44 @@ export default function CallWrappedDashboard() {
             {/* DISPUTES PANEL */}
             <DisputesPanel disputes={disputes} />
 
+            {/* LATEST VOICE UTTERANCE TICKER */}
+            {turns.length > 0 && (
+              <div className="p-3.5 rounded-xl bg-[#2b2d31] border border-[#383a40] flex items-center justify-between gap-3 text-xs shadow-md">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-[#23A55A] animate-pulse shrink-0" />
+                  <span className="text-[#949BA4] text-[11px] shrink-0 font-mono">Live Speech:</span>
+                  <span className="font-semibold text-[#F2F3F5] shrink-0" dir="auto">{turns[turns.length - 1].speaker_name}:</span>
+                  <span className="text-[#DBDEE1] truncate italic" dir="auto">"{turns[turns.length - 1].text}"</span>
+                </div>
+                <button
+                  onClick={() => setLeftTab("transcript")}
+                  className="shrink-0 text-[11px] font-bold text-[#5865F2] hover:text-[#5865F2]/80 transition-colors cursor-pointer"
+                >
+                  View in Transcript →
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* ACTIVE ARBITRATION BANNER (IF DISPUTE IN PROGRESS) */}
+            {activeDispute && (
+              <div className="p-3.5 rounded-xl bg-[#23A55A]/15 border border-[#23A55A]/30 flex items-center justify-between text-xs shadow-md animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#23A55A]" />
+                  <span className="font-bold text-[#23A55A]">Active Arbitration in Progress!</span>
+                </div>
+                <button
+                  onClick={() => setLeftTab("arbitration")}
+                  className="px-2.5 py-1 rounded-lg bg-[#23A55A] hover:bg-[#1f9450] text-white font-bold text-[11px] transition-colors cursor-pointer shadow"
+                >
+                  Switch to Referee Verdict →
+                </button>
+              </div>
+            )}
+
             {/* REAL-TIME DISCORD TRANSCRIPT STREAM (STYLED LIKE DISCORD CHAT) */}
-            <div className="flex flex-col h-[520px] rounded-2xl bg-[#2b2d31] border border-[#383a40] overflow-hidden">
+            <div className="flex flex-col h-[580px] rounded-2xl bg-[#2b2d31] border border-[#383a40] overflow-hidden shadow-lg">
               <div className="p-3.5 border-b border-[#383a40] bg-[#1e1f22] flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Radio className="w-4 h-4 text-[#F23F43] animate-pulse" />
@@ -947,6 +1032,8 @@ export default function CallWrappedDashboard() {
                 <span>Raw Verbatim Evidence</span>
               </div>
             </div>
+          </div>
+        )}
 
           </div>
 

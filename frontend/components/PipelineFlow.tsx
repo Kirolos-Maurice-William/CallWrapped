@@ -43,7 +43,7 @@ export function PipelineFlow({
 
   return (
     <section className="bg-[#2b2d31] border-b border-[#383a40] px-4 md:px-8 py-3">
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-3 text-xs">
+      <div className="max-w-7xl mx-auto flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3 text-xs">
         {/* Title & SLA Badge */}
         <div className="flex items-center gap-2.5 flex-shrink-0">
           <div className="p-1.5 rounded-lg bg-[#5865F2]/20 text-[#5865F2] border border-[#5865F2]/30">
@@ -77,8 +77,8 @@ export function PipelineFlow({
           </div>
         </div>
 
-        {/* Connected Node Flow (Locked to single horizontal row with smooth scroll) */}
-        <div className="flex items-center gap-1.5 sm:gap-2 justify-start lg:justify-end overflow-x-auto flex-nowrap scrollbar-none py-0.5 max-w-full">
+        {/* Connected Node Flow (Locked to single horizontal row starting with Node 1) */}
+        <div className="w-full xl:w-auto flex items-center gap-1.5 sm:gap-2 justify-start overflow-x-auto flex-nowrap scrollbar-none py-1 max-w-full">
           {/* Node 1: AssemblyAI STT */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#1e1f22] border border-[#383a40] text-cyan-200 shadow-sm flex-shrink-0">
             <Radio className="w-3.5 h-3.5 text-cyan-400" />
