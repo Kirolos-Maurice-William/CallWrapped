@@ -118,8 +118,9 @@ class AudioReceiver(voice_recv.AudioSink):
         except Exception:
             rms = 0.0
 
-        # Barge-in: immediately stop bot playback if ANY user crosses the speech threshold
-        if vc and vc.is_playing() and rms >= config.SILENCE_THRESHOLD_RMS:
+        # Barge-in: stop bot playback if user speaks above the barge-in threshold
+        barge_threshold = getattr(config, "BARGE_IN_THRESHOLD_RMS", 220)
+        if vc and vc.is_playing() and rms >= barge_threshold:
             user_label = display_name if display_name and display_name != "Speaker" else (
                 getattr(user, "display_name", None) or getattr(user, "name", None) or (str(user) if user else f"User_{user_id}")
             )

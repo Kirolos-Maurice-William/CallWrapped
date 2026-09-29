@@ -427,7 +427,7 @@ class InterventionSpeaker:
                     if hasattr(audio_source, "finish_writing"):
                         await asyncio.to_thread(audio_source.finish_writing)
 
-                tts_timeout = getattr(config, "TTS_TIMEOUT_SEC", 12.0)
+                tts_timeout = getattr(config, "TTS_TIMEOUT_SEC", 90.0)
                 try:
                     await asyncio.wait_for(feed_stream(), timeout=tts_timeout)
                 except asyncio.TimeoutError:
