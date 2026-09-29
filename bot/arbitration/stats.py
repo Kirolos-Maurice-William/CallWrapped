@@ -521,10 +521,11 @@ class SessionStatsTracker:
 
         sorted_by_talk = sorted(speakers_list, key=lambda s: s.total_speak_seconds)
         quietest = sorted_by_talk[0]
-        max_talk = max(s.total_speak_seconds for s in speakers_list)
+        second_quietest = sorted_by_talk[1]
 
-        # Honest tie guard: if difference between max and quietest is < 1.0s, no single quietest observer
-        if (max_talk - quietest.total_speak_seconds) < 1.0:
+        # Honest tie guard: second quietest speaker must have spoken at least 1.0s more than the quietest.
+        # This properly guards both 2-speaker calls (Alice vs Bob) and N-speaker calls where multiple speakers tie for least speech.
+        if (second_quietest.total_speak_seconds - quietest.total_speak_seconds) < 1.0:
             return None
 
         share_pct = round((quietest.total_speak_seconds / total_talk_sec) * 100.0, 1)

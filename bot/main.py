@@ -413,12 +413,12 @@ def render_recap(session_state: Any) -> str:
     else:
         lines.append("None")
 
-    # Silent Observer: speaker who spoke the least (requires >= 2 speakers)
+    # Silent Observer: speaker who spoke the least (requires >= 2 speakers and clear gap from runner-up)
     if len(speakers) >= 2 and total_talk_sec > 0:
         sorted_by_talk = sorted(speakers, key=lambda s: s.total_speak_seconds)
         quietest = sorted_by_talk[0]
-        max_talk = max(s.total_speak_seconds for s in speakers)
-        if (max_talk - quietest.total_speak_seconds) >= 1.0:
+        second_quietest = sorted_by_talk[1]
+        if (second_quietest.total_speak_seconds - quietest.total_speak_seconds) >= 1.0:
             q_name = quietest.speaker_name or quietest.speaker_id
             q_talk_sec = quietest.total_speak_seconds
             q_dur_str = f"{q_talk_sec / 60.0:.1f}m" if q_talk_sec >= 60.0 else f"{int(round(q_talk_sec))}s"

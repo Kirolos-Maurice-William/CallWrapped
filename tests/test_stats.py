@@ -532,6 +532,20 @@ class TestPhase1DurationAndSilentObserver(unittest.TestCase):
         self.assertAlmostEqual(obs_3[1], 10.0, places=1)
         self.assertAlmostEqual(obs_3[2], 5.6, places=1)  # 10 / 180 = 5.55% -> 5.6%
 
+        # Case 5: 3 speakers where the two quietest are tied (Alice 100s, Bob 10s, Charlie 10.3s) -> None
+        tracker_multi_tie = SessionStatsTracker("test_multi_tie")
+        tracker_multi_tie.record_utterance("alice", 0.0, 100.0, "Alice")
+        tracker_multi_tie.record_utterance("bob", 100.0, 110.0, "Bob")        # 10.0s
+        tracker_multi_tie.record_utterance("charlie", 110.0, 120.3, "Charlie") # 10.3s -> diff 0.3s < 1.0s
+        self.assertIsNone(tracker_multi_tie.get_silent_observer())
+
+        # Case 6: 3 speakers where two quietest spoke 0s (Alice 100s, Bob 0s, Charlie 0s) -> None
+        tracker_zero_tie = SessionStatsTracker("test_zero_tie")
+        tracker_zero_tie.record_utterance("alice", 0.0, 100.0, "Alice")
+        tracker_zero_tie.get_or_create_speaker("bob", "Bob")
+        tracker_zero_tie.get_or_create_speaker("charlie", "Charlie")
+        self.assertIsNone(tracker_zero_tie.get_silent_observer())
+
 
 if __name__ == "__main__":
     unittest.main()

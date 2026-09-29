@@ -383,8 +383,8 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                 {/* The Silent Observer (quietest in call, minimum 2 speakers) */}
                 {hasSpeakers && speakerEntries.length >= 2 && (() => {
                   const quietest = speakerEntries[speakerEntries.length - 1];
-                  const topSpeaker = speakerEntries[0];
-                  if (topSpeaker.talk_seconds - quietest.talk_seconds >= 1.0) {
+                  const secondQuietest = speakerEntries[speakerEntries.length - 2];
+                  if (secondQuietest.talk_seconds - quietest.talk_seconds >= 1.0) {
                     const qPct = total_talk_seconds > 0 ? (quietest.talk_seconds / total_talk_seconds) * 100 : 0;
                     return (
                       <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-950/30 to-slate-900 border border-indigo-500/30 flex items-center justify-between text-xs">

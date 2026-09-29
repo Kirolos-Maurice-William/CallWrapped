@@ -42,8 +42,9 @@ export function CallWrappedModal({
   const speakerList = Object.values(speakers || {}).sort((a, b) => b.talk_seconds - a.talk_seconds);
   const topTalker = speakerList[0];
   const silentObserver = speakerList.length >= 2 ? speakerList[speakerList.length - 1] : null;
+  const secondSilent = speakerList.length >= 2 ? speakerList[speakerList.length - 2] : null;
   const isObserverEligible = Boolean(
-    silentObserver && topTalker && (topTalker.talk_seconds - silentObserver.talk_seconds >= 1.0)
+    silentObserver && secondSilent && (secondSilent.talk_seconds - silentObserver.talk_seconds >= 1.0)
   );
 
   // Topics
@@ -59,7 +60,7 @@ export function CallWrappedModal({
       ? `🤫 **The Silent Observer:** ${silentObserver.speaker_name} (${formatDurationHuman(silentObserver.talk_seconds)})\n`
       : "";
     const summaryText = `🎙️ **CALLWRAPPED SESSION SUMMARY**\n` +
-      `👑 **Monologue King:** ${longest_streak.speaker_name || "N/A"} (${formatDurationHuman(longest_streak.streak_seconds)})\n` +
+      `👑 **Monologue King:** ${longest_streak?.speaker_name || "N/A"} (${formatDurationHuman(longest_streak?.streak_seconds || 0)})\n` +
       observerLine +
       `🎯 **Ground Truth:** ${verifiedCount} verified, ${disputedCount} refuted\n` +
       `📊 **Top Topic:** ${topTopicName}\n` +
@@ -117,10 +118,10 @@ export function CallWrappedModal({
                 <span>Monologue King</span>
               </div>
               <p className="text-base font-bold text-white truncate" dir="auto">
-                {longest_streak.speaker_name || "N/A"}
+                {longest_streak?.speaker_name || "N/A"}
               </p>
               <p className="text-[11px] font-mono text-amber-300 font-semibold">
-                {formatDurationHuman(longest_streak.streak_seconds)} unbroken
+                {formatDurationHuman(longest_streak?.streak_seconds || 0)} unbroken
               </p>
             </div>
 
