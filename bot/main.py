@@ -396,14 +396,14 @@ def render_recap(session_state: Any) -> str:
     for spk in sorted_speakers:
         name = spk.speaker_name or spk.speaker_id
         talk_sec = spk.total_speak_seconds
-        talk_min = talk_sec / 60.0
+        talk_str = f"{talk_sec / 60.0:.1f}m" if talk_sec >= 60.0 else f"{int(round(talk_sec))}s"
         pct = (talk_sec / total_talk_sec * 100.0) if total_talk_sec > 0 else 0.0
         filled_blocks = int(round(pct / 10.0))
         filled_blocks = max(0, min(10, filled_blocks))
         bar = "▰" * filled_blocks + "▱" * (10 - filled_blocks)
-        lines.append(f"• **{name}**: {talk_min:.1f}m {bar} ({pct:.1f}%)")
+        lines.append(f"• **{name}**: {talk_str} {bar} ({pct:.1f}%)")
 
-    # Section B: Longest streak record holder (formatted as m:ss)
+    # Section B: Longest streak record holder (formatted as m:ss) + Silent Observer
     lines.append("\n🔥 **صاحب أطول ريكورد كلام متواصل:**")
     streak_holder = max(speakers, key=lambda s: s.longest_streak_seconds)
     if streak_holder.longest_streak_seconds > 0:
@@ -412,6 +412,18 @@ def render_recap(session_state: Any) -> str:
         lines.append(f"👑 **{s_name}** ({streak_str})")
     else:
         lines.append("None")
+
+    # Silent Observer: speaker who spoke the least (requires >= 2 speakers)
+    if len(speakers) >= 2 and total_talk_sec > 0:
+        sorted_by_talk = sorted(speakers, key=lambda s: s.total_speak_seconds)
+        quietest = sorted_by_talk[0]
+        max_talk = max(s.total_speak_seconds for s in speakers)
+        if (max_talk - quietest.total_speak_seconds) >= 1.0:
+            q_name = quietest.speaker_name or quietest.speaker_id
+            q_talk_sec = quietest.total_speak_seconds
+            q_dur_str = f"{q_talk_sec / 60.0:.1f}m" if q_talk_sec >= 60.0 else f"{int(round(q_talk_sec))}s"
+            q_pct = (q_talk_sec / total_talk_sec * 100.0)
+            lines.append(f"🤫 **المستمع الهادئ (أقل مشاركة):** {q_name} ({q_dur_str} - {q_pct:.1f}%)")
 
     # Section C: Anger leaderboard (episode count + first anger quote as "receipts")
     # If zero angry episodes for everyone, replace with: "😡 Nobody got angry this call... suspicious."

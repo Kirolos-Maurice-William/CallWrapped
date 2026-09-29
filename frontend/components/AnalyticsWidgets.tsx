@@ -49,6 +49,20 @@ export function formatStreakMMSS(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+export function formatDurationHuman(seconds: number): string {
+  if (!seconds || seconds <= 0 || isNaN(seconds)) return "0s";
+  const totalSec = Math.round(seconds);
+  if (totalSec < 60) return `${totalSec}s`;
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  if (mins < 60) {
+    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+  }
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
+}
+
 const TOPIC_DISPLAY_NAMES: Record<string, string> = {
   food: "أكل",
   travel: "سفر",
@@ -198,7 +212,7 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
               </div>
               {total_talk_seconds > 0 && (
                 <span className="text-[10px] font-mono font-bold text-cyan-400">
-                  {total_talk_seconds.toFixed(1)}s total
+                  {formatDurationHuman(total_talk_seconds)} total
                 </span>
               )}
             </div>
@@ -214,7 +228,7 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                           {s.speaker_name}
                         </span>
                         <span className="font-mono text-cyan-300">
-                          {s.talk_seconds.toFixed(1)}s ({pct.toFixed(1)}%)
+                          {formatDurationHuman(s.talk_seconds)} ({pct.toFixed(1)}%)
                         </span>
                       </div>
                       <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
@@ -333,33 +347,67 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
           )}
         </div>
 
-        {/* WIDGET 4: STREAK RECORD CARD */}
+        {/* WIDGET 4: CALL BADGES & HIGHLIGHTS */}
         <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Award className="w-4 h-4 text-amber-400" />
               <h4 className="text-xs font-bold text-slate-200 tracking-wider uppercase">
-                Longest Streak Record
+                Call Badges & Records
               </h4>
             </div>
 
             {longest_streak && longest_streak.speaker_name && longest_streak.streak_seconds > 0 ? (
-              <div className="p-4 rounded-xl bg-gradient-to-br from-amber-950/30 to-slate-900 border border-amber-500/30 text-center space-y-2">
-                <div className="inline-flex p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
-                  <Award className="w-6 h-6" />
+              <div className="space-y-2.5">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-amber-950/30 to-slate-900 border border-amber-500/30 text-center space-y-1.5">
+                  <div className="inline-flex p-1.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                    <Award className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
+                      The Monologue King
+                    </div>
+                    <div className="text-sm font-bold text-white flex items-center justify-center gap-1.5" dir="auto">
+                      <span>👑</span>
+                      <span>{longest_streak.speaker_name}</span>
+                    </div>
+                    <div className="text-xl font-extrabold font-mono text-amber-300 mt-0.5">
+                      {formatStreakMMSS(longest_streak.streak_seconds)}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      ({formatDurationHuman(longest_streak.streak_seconds)} uninterrupted)
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-bold text-white flex items-center justify-center gap-1.5" dir="auto">
-                    <span>👑</span>
-                    <span>{longest_streak.speaker_name}</span>
-                  </div>
-                  <div className="text-2xl font-extrabold font-mono text-amber-300 mt-1">
-                    {formatStreakMMSS(longest_streak.streak_seconds)}
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-400 mt-0.5">
-                    ({longest_streak.streak_seconds.toFixed(1)}s uninterrupted)
-                  </div>
-                </div>
+
+                {/* The Silent Observer (quietest in call, minimum 2 speakers) */}
+                {hasSpeakers && speakerEntries.length >= 2 && (() => {
+                  const quietest = speakerEntries[speakerEntries.length - 1];
+                  const topSpeaker = speakerEntries[0];
+                  if (topSpeaker.talk_seconds - quietest.talk_seconds >= 1.0) {
+                    const qPct = total_talk_seconds > 0 ? (quietest.talk_seconds / total_talk_seconds) * 100 : 0;
+                    return (
+                      <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-950/30 to-slate-900 border border-indigo-500/30 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🤫</span>
+                          <div>
+                            <div className="text-[9px] uppercase font-bold text-indigo-300 tracking-wider">
+                              The Silent Observer
+                            </div>
+                            <div className="font-bold text-white truncate max-w-[110px]" dir="auto">
+                              {quietest.speaker_name}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right font-mono text-indigo-300">
+                          <div className="font-bold text-xs">{formatDurationHuman(quietest.talk_seconds)}</div>
+                          <div className="text-[9px] text-slate-400">({qPct.toFixed(1)}% airtime)</div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             ) : (
               <div className="py-6 text-center text-xs text-slate-500 italic">
@@ -369,7 +417,7 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
           </div>
           {longest_streak && longest_streak.streak_seconds > 0 && (
             <div className="mt-3 pt-2 border-t border-slate-800/60 text-[10px] font-mono text-amber-400/80 text-right">
-              Session Record
+              Session Highlights
             </div>
           )}
         </div>

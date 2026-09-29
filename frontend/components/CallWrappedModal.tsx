@@ -15,7 +15,7 @@ import {
   ShieldCheck,
   Sparkles
 } from "lucide-react";
-import { AnalyticsState, formatStreakMMSS } from "./AnalyticsWidgets";
+import { AnalyticsState, formatStreakMMSS, formatDurationHuman } from "./AnalyticsWidgets";
 
 interface Props {
   isOpen: boolean;
@@ -41,6 +41,10 @@ export function CallWrappedModal({
   // Speaker calculations
   const speakerList = Object.values(speakers || {}).sort((a, b) => b.talk_seconds - a.talk_seconds);
   const topTalker = speakerList[0];
+  const silentObserver = speakerList.length >= 2 ? speakerList[speakerList.length - 1] : null;
+  const isObserverEligible = Boolean(
+    silentObserver && topTalker && (topTalker.talk_seconds - silentObserver.talk_seconds >= 1.0)
+  );
 
   // Topics
   const topicalEntries = Object.entries(topic_totals || {})
@@ -51,8 +55,12 @@ export function CallWrappedModal({
   const topTopicName = topTopic ? topTopic[0].toUpperCase() : "GENERAL BANTER";
 
   const handleCopy = () => {
+    const observerLine = isObserverEligible && silentObserver
+      ? `🤫 **The Silent Observer:** ${silentObserver.speaker_name} (${formatDurationHuman(silentObserver.talk_seconds)})\n`
+      : "";
     const summaryText = `🎙️ **CALLWRAPPED SESSION SUMMARY**\n` +
-      `👑 **Monologue King:** ${longest_streak.speaker_name || "N/A"} (${formatStreakMMSS(longest_streak.streak_seconds)})\n` +
+      `👑 **Monologue King:** ${longest_streak.speaker_name || "N/A"} (${formatDurationHuman(longest_streak.streak_seconds)})\n` +
+      observerLine +
       `🎯 **Ground Truth:** ${verifiedCount} verified, ${disputedCount} refuted\n` +
       `📊 **Top Topic:** ${topTopicName}\n` +
       `🕊️ **Call Vibe:** ${total_angry_episodes === 0 ? "Civilized discussion (0 anger spikes)" : `${total_angry_episodes} heated episodes`}\n` +
@@ -96,7 +104,7 @@ export function CallWrappedModal({
               CALLWRAPPED #1
             </h3>
             <p className="text-xs text-slate-300">
-              Total airtime: {formatStreakMMSS(total_talk_seconds)} • {topicalEntries.length} topics explored
+              Total airtime: {formatDurationHuman(total_talk_seconds)} • {topicalEntries.length} topics explored
             </p>
           </div>
 
@@ -112,7 +120,7 @@ export function CallWrappedModal({
                 {longest_streak.speaker_name || "N/A"}
               </p>
               <p className="text-[11px] font-mono text-amber-300 font-semibold">
-                {formatStreakMMSS(longest_streak.streak_seconds)} unbroken
+                {formatDurationHuman(longest_streak.streak_seconds)} unbroken
               </p>
             </div>
 
@@ -159,6 +167,25 @@ export function CallWrappedModal({
             </div>
           </div>
 
+          {/* The Silent Observer Award */}
+          {isObserverEligible && silentObserver && (
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-indigo-500/30 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded-lg bg-indigo-500/20 text-indigo-300 font-bold text-xs">🤫</div>
+                <div>
+                  <div className="text-[10px] uppercase font-bold text-indigo-300 tracking-wider">The Silent Observer</div>
+                  <div className="font-bold text-white truncate max-w-[140px]" dir="auto">{silentObserver.speaker_name}</div>
+                </div>
+              </div>
+              <div className="text-right font-mono text-indigo-300">
+                <div className="font-bold text-xs">{formatDurationHuman(silentObserver.talk_seconds)}</div>
+                <div className="text-[10px] text-slate-400">
+                  ({total_talk_seconds > 0 ? ((silentObserver.talk_seconds / total_talk_seconds) * 100).toFixed(0) : 0}% airtime)
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Talk Time Breakdown Bar */}
           {speakerList.length > 0 && (
             <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
@@ -175,7 +202,7 @@ export function CallWrappedModal({
                     <div key={idx} className="space-y-0.5 text-xs">
                       <div className="flex justify-between text-[11px]">
                         <span className="font-semibold text-slate-200" dir="auto">{spk.speaker_name}</span>
-                        <span className="font-mono text-slate-400">{pct.toFixed(0)}%</span>
+                        <span className="font-mono text-slate-400">{formatDurationHuman(spk.talk_seconds)} ({pct.toFixed(0)}%)</span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                         <div

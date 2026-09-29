@@ -15,6 +15,8 @@ import collections
 import statistics
 
 sys.path.insert(0, r"G:\CallWrapper")
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 SESSION_LOG_PATH = r"G:\CallWrapper\recordings\test_session\2026-09-29_1406\session_log.jsonl"
 

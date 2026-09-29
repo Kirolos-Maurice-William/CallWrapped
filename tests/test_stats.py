@@ -433,6 +433,106 @@ class TestSpeakerTalkStatistics(unittest.TestCase):
         self.assertEqual(len(d["anger_episodes_history"]), 2)
 
 
+class TestPhase1DurationAndSilentObserver(unittest.TestCase):
+    """
+    Hostile unit tests for Phase 1:
+    - Deterministic duration formatting (format_duration_human).
+    - Zero-safe normalized talk share calculation.
+    - Honest 'The Silent Observer' detection & tie guards.
+    """
+
+    def test_format_duration_human_transitions(self):
+        from bot.arbitration.stats import format_duration_human
+
+        # Zero / negative / None edge cases
+        self.assertEqual(format_duration_human(0.0), "0s")
+        self.assertEqual(format_duration_human(-5.0), "0s")
+        self.assertEqual(format_duration_human(None), "0s")
+        self.assertEqual(format_duration_human(0.0, lang="ar"), "0ث")
+        self.assertEqual(format_duration_human(-1.0, lang="ar"), "0ث")
+
+        # Sub-minute values
+        self.assertEqual(format_duration_human(12.0), "12s")
+        self.assertEqual(format_duration_human(12.0, lang="ar"), "12ث")
+        self.assertEqual(format_duration_human(45.4), "45s")
+
+        # Rounding at 60s boundary
+        self.assertEqual(format_duration_human(59.4), "59s")
+        self.assertEqual(format_duration_human(59.6), "1m")
+        self.assertEqual(format_duration_human(59.6, lang="ar"), "1د")
+        self.assertEqual(format_duration_human(60.0), "1m")
+
+        # Minutes and seconds
+        self.assertEqual(format_duration_human(75.0), "1m 15s")
+        self.assertEqual(format_duration_human(75.0, lang="ar"), "1د 15ث")
+        self.assertEqual(format_duration_human(120.0), "2m")
+        self.assertEqual(format_duration_human(120.0, lang="ar"), "2د")
+
+        # Hour boundary transitions
+        self.assertEqual(format_duration_human(3599.6), "1h")
+        self.assertEqual(format_duration_human(3599.6, lang="ar"), "1س")
+        self.assertEqual(format_duration_human(3660.0), "1h 1m")
+        self.assertEqual(format_duration_human(3660.0, lang="ar"), "1س 1د")
+        self.assertEqual(format_duration_human(7200.0), "2h")
+        self.assertEqual(format_duration_human(7200.0, lang="ar"), "2س")
+
+    def test_speaker_talk_shares_zero_safe(self):
+        tracker = SessionStatsTracker("test_shares")
+
+        # Empty session
+        self.assertEqual(tracker.get_speaker_talk_shares(), {})
+
+        # Zero speech recorded
+        tracker.get_or_create_speaker("alice", "Alice")
+        tracker.get_or_create_speaker("bob", "Bob")
+        shares = tracker.get_speaker_talk_shares()
+        self.assertEqual(shares["alice"], 0.0)
+        self.assertEqual(shares["bob"], 0.0)
+
+        # Alice 60s, Bob 40s -> Alice 60%, Bob 40%
+        tracker.record_utterance("alice", 0.0, 60.0, "Alice")
+        tracker.record_utterance("bob", 60.0, 100.0, "Bob")
+        shares = tracker.get_speaker_talk_shares()
+        self.assertEqual(shares["alice"], 60.0)
+        self.assertEqual(shares["bob"], 40.0)
+        self.assertAlmostEqual(sum(shares.values()), 100.0, places=1)
+
+    def test_silent_observer_badge_logic(self):
+        tracker = SessionStatsTracker("test_observer")
+
+        # Case 1: Empty or 1 speaker -> None (solo caller cannot be silent observer)
+        self.assertIsNone(tracker.get_silent_observer())
+        tracker.record_utterance("alice", 0.0, 60.0, "Alice")
+        self.assertIsNone(tracker.get_silent_observer())
+
+        # Case 2: 2 speakers with clear disparity (Alice 90s, Bob 10s)
+        tracker.record_utterance("alice", 60.0, 90.0, "Alice")  # Alice total: 90s
+        tracker.record_utterance("bob", 95.0, 105.0, "Bob")     # Bob total: 10s
+        observer = tracker.get_silent_observer()
+        self.assertIsNotNone(observer)
+        spk_id, dur, pct = observer
+        self.assertEqual(spk_id, "bob")
+        self.assertAlmostEqual(dur, 10.0, places=1)
+        self.assertAlmostEqual(pct, 10.0, places=1)  # 10s / 100s = 10%
+
+        # Case 3: Honest tie guard (both spoke within 1.0s) -> None
+        tracker_tie = SessionStatsTracker("test_tie")
+        tracker_tie.record_utterance("alice", 0.0, 50.0, "Alice")
+        tracker_tie.record_utterance("bob", 50.0, 99.5, "Bob")  # Alice=50.0s, Bob=49.5s -> diff 0.5s < 1.0s
+        self.assertIsNone(tracker_tie.get_silent_observer())
+
+        # Case 4: 3 speakers (Mostafa 120s, Ali 50s, Tamer 10s) -> Tamer is Silent Observer
+        tracker_3 = SessionStatsTracker("test_3spk")
+        tracker_3.record_utterance("mostafa", 0.0, 120.0, "Mostafa")
+        tracker_3.record_utterance("ali", 120.0, 170.0, "Ali")
+        tracker_3.record_utterance("tamer", 170.0, 180.0, "Tamer")
+        obs_3 = tracker_3.get_silent_observer()
+        self.assertIsNotNone(obs_3)
+        self.assertEqual(obs_3[0], "tamer")
+        self.assertAlmostEqual(obs_3[1], 10.0, places=1)
+        self.assertAlmostEqual(obs_3[2], 5.6, places=1)  # 10 / 180 = 5.55% -> 5.6%
+
+
 if __name__ == "__main__":
     unittest.main()
 

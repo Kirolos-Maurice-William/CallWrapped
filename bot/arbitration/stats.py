@@ -15,6 +15,36 @@ TOPIC_DISPLAY_NAMES: Dict[str, str] = {
 }
 
 
+def format_duration_human(seconds: float, lang: str = "en") -> str:
+    """
+    Deterministically formats seconds into clean, human-readable strings.
+    Transitions:
+      <60s   -> 'Xs'   (en) or 'Xث'  (ar)
+      <3600s -> 'Xm Ys' or 'Xm' (en) or 'Xد Yث' or 'Xد' (ar)
+      >=3600s -> 'Xh Ym' or 'Xh' (en) or 'Xس Yد' or 'Xس' (ar)
+    Zero / negative values map safely to '0s' / '0ث'.
+    """
+    if seconds is None or seconds <= 0:
+        return "0ث" if lang == "ar" else "0s"
+
+    total_sec = int(round(seconds))
+    if total_sec < 60:
+        return f"{total_sec}ث" if lang == "ar" else f"{total_sec}s"
+
+    mins = total_sec // 60
+    secs = total_sec % 60
+    if mins < 60:
+        if secs == 0:
+            return f"{mins}د" if lang == "ar" else f"{mins}m"
+        return f"{mins}د {secs}ث" if lang == "ar" else f"{mins}m {secs}s"
+
+    hours = mins // 60
+    rem_mins = mins % 60
+    if rem_mins == 0:
+        return f"{hours}س" if lang == "ar" else f"{hours}h"
+    return f"{hours}س {rem_mins}د" if lang == "ar" else f"{hours}h {rem_mins}m"
+
+
 def compute_topic_importance(
     topic_durations: Dict[str, float],
     topic_counts: Dict[str, int],
@@ -458,6 +488,47 @@ class SessionStatsTracker:
             context=context
         )
         return stats
+
+    def get_speaker_talk_shares(self) -> Dict[str, float]:
+        """
+        Computes zero-division-safe normalized talk share percentage per speaker.
+        Formula: (speaker.total_speak_seconds / S_total) * 100.0 where S_total = sum(all speakers).
+        """
+        total_talk_sec = sum(s.total_speak_seconds for s in self.speakers.values())
+        if total_talk_sec <= 0:
+            return {spk_id: 0.0 for spk_id in self.speakers}
+        return {
+            spk_id: round((s.total_speak_seconds / total_talk_sec) * 100.0, 1)
+            for spk_id, s in self.speakers.items()
+        }
+
+    def get_silent_observer(self) -> Optional[Tuple[str, float, float]]:
+        """
+        Identifies 'The Silent Observer' (speaker who participated but talked the least).
+        Rules:
+        - Requires at least 2 active speakers in the session.
+        - Requires total call speech > 0.
+        - Disqualifies if all speakers spoke virtually identical duration (within 1.0s).
+        Returns (speaker_id, total_speak_seconds, talk_share_pct) or None.
+        """
+        if len(self.speakers) < 2:
+            return None
+
+        speakers_list = list(self.speakers.values())
+        total_talk_sec = sum(s.total_speak_seconds for s in speakers_list)
+        if total_talk_sec <= 0:
+            return None
+
+        sorted_by_talk = sorted(speakers_list, key=lambda s: s.total_speak_seconds)
+        quietest = sorted_by_talk[0]
+        max_talk = max(s.total_speak_seconds for s in speakers_list)
+
+        # Honest tie guard: if difference between max and quietest is < 1.0s, no single quietest observer
+        if (max_talk - quietest.total_speak_seconds) < 1.0:
+            return None
+
+        share_pct = round((quietest.total_speak_seconds / total_talk_sec) * 100.0, 1)
+        return (quietest.speaker_id, quietest.total_speak_seconds, share_pct)
 
     def reset(self):
         """Clears all session statistics."""

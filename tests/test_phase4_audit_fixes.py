@@ -174,15 +174,15 @@ class TestPhase4AuditFixes(unittest.TestCase):
     def test_g_speaker_loudness_lazy_recompute(self):
         """Phase 4 (f3-06): Verify baseline median/MAD are recomputed lazily every 50 frames."""
         baseline = SpeakerLoudnessBaseline(min_calibration_frames=30)
-        # Add 30 frames to reach calibrated state
+        # Add 30 frames to reach calibrated state (values above min_voiced_db=38.06)
         for i in range(30):
-            baseline.observe_eligible_frame(log_rms_db=-40.0 + (i % 5))
+            baseline.observe_eligible_frame(log_rms_db=50.0 + (i % 5))
 
         self.assertTrue(baseline.calibrated)
         self.assertEqual(baseline._frames_since_recompute, 30)
 
         # Calling score triggers recomputation if dirty
-        z1 = baseline.score(-38.0)
+        z1 = baseline.score(52.0)
         self.assertIsNotNone(z1)
         self.assertEqual(baseline._frames_since_recompute, 0)
         cached_med = baseline._cached_median
@@ -190,21 +190,21 @@ class TestPhase4AuditFixes(unittest.TestCase):
 
         # Observe 10 more frames (less than recompute_interval=50)
         for i in range(10):
-            baseline.observe_eligible_frame(log_rms_db=-39.0)
+            baseline.observe_eligible_frame(log_rms_db=51.0)
 
         self.assertEqual(baseline._frames_since_recompute, 10)
         # score() should reuse cached median and NOT recompute
-        baseline.score(-38.0)
+        baseline.score(52.0)
         self.assertEqual(baseline._cached_median, cached_med)
         self.assertEqual(baseline._frames_since_recompute, 10)
 
         # Observe 40 more frames to reach 50
         for i in range(40):
-            baseline.observe_eligible_frame(log_rms_db=-39.0)
+            baseline.observe_eligible_frame(log_rms_db=51.0)
 
         self.assertGreaterEqual(baseline._frames_since_recompute, 50)
         # Now score() will recompute stats and reset counter
-        baseline.score(-38.0)
+        baseline.score(52.0)
         self.assertEqual(baseline._frames_since_recompute, 0)
 
 
