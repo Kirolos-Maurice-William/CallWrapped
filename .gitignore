@@ -25,19 +25,28 @@ frontend/build/
 .DS_Store
 Thumbs.db
 
-# Audio & Temporary Recordings
+# Audio & Temporary Recordings (Privacy Protection)
+recordings/
 *.wav
 *.mp3
 discord_bot/debug_last_audio.wav
-recordings/test_session/
-recordings/test_session_unit_test/
 
 # User Data & Shadow Logs (Prevents PII Leak)
 audit/shadow/
 *.jsonl
 
+# Internal AI Traceback & Self-Check Logs
+audit/selfcheck/
+audit/final/
+audit/user_prompt.txt
+audit/quality/vulture_raw.txt
+
+# Build Artifacts
+*.tsbuildinfo
+
 # Editor / Tool Metadata
 .qwen/
 opencode.json
+
 
 

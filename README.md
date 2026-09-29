@@ -3,7 +3,7 @@
 # ⚖️ CallWrapped
 ### Epistemic Referee & Conversational Intelligence Engine for Voice Calls
 **Built for the [AssemblyAI Voice Agent Hackathon](https://lablab.ai/ai-hackathons/assemblyai-voice-agent-hackathon) (September 2026)**  
-**Engineered by Team Aang & Bumi (Mostafa Abdallah & Kirolos Maurice William)**
+**Engineered by Kirolos Maurice William**
 
 [![AssemblyAI Universal-3.5 Pro](https://img.shields.io/badge/AssemblyAI-Universal--3.5_Pro_Batch_STT-0052FF?style=for-the-badge&logo=assemblyai&logoColor=white)](https://www.assemblyai.com/)
 [![Groq LPU Inference](https://img.shields.io/badge/Groq-6--Key_LPU_Rotation_Pool-F55036?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com/)
@@ -26,7 +26,7 @@
 ---
 
 ## 📖 Table of Contents
-1. [The Problem: Why Traditional Voice Bots Fail in Group Calls](#-the-problem-why-traditional-voice-bots-fail-in-group-calls)
+1. [Executive Summary & Market Problem](#-executive-summary--market-problem)
 2. [The Core Innovation: Two-Stage Consent Invariant](#-the-core-innovation-two-stage-consent-invariant)
 3. [System Architecture](#-system-architecture)
 4. [Key Engineering Components](#-key-engineering-components)
@@ -52,24 +52,28 @@
 
 ---
 
-## 💥 The Problem: Why Traditional Voice Bots Fail in Group Calls
+## 🎯 Executive Summary & Market Problem
 
-In multiplayer gaming calls (Discord lounges, Counter-Strike, Valorant, FIFA), study groups, and podcasts, participants constantly make contradictory factual claims with absolute confidence:
-> **Ahmed:** *"يا جدعان كارت الـ RTX 5070 نازل بـ 16 جيجا VRAM رسمي من نفيديا!"*  
-> *(Bro, the RTX 5070 is officially launching with 16GB VRAM from Nvidia!)*  
-> **Karim:** *"لا يا عم 12 جيجا GDDR7 بس، مفيش 16 جيجا دي خالص."*  
-> *(No way man, it's only 12GB GDDR7, there is no 16GB at all!)*
+### The Core Problem: Epistemic Drift in Multi-Party Voice
+Across 200M+ active Discord voice users, multiplayer gaming lobbies, remote developer standups, podcasts, and community lounges, group voice conversations frequently suffer from **unverified factual disputes, epistemic drift, and escalating social friction**. When participants make conflicting, high-confidence factual assertions, conversations derail into circular debates or misinformation spirals.
 
-```
-Why Standard Voice Bots Fail Here:
-❌ Wake-words ("Hey Siri", "OK Google") are never spoken mid-argument.
-❌ Bots that barge in uninvited to contradict speakers create socially aggressive disruption and get kicked immediately ("Annoying Bot" syndrome).
-❌ Bilingual code-switching (Egyptian Arabic vernacular mixed with English technical specs) breaks standard models.
-❌ Verifying private friends' conversations ("محمد قال إنه اشترى عربية") leaks privacy and causes hallucinated searches.
-❌ Web search and synthesis delays cause bots to chime in long after the group has changed the subject.
-```
+### Why Existing Voice AI Fails in Multi-Party Human Calls
+1. **The Wake-Word Failure:** Conventional voice assistants (Siri, Alexa, Google Assistant) depend entirely on explicit wake-words ("Hey Siri"), which human participants never utter in the middle of a spontaneous group argument.
+2. **The "Annoying Bot" Dilemma:** Voice agents that interrupt or barge into conversations uninvited create socially disruptive, intrusive user experiences and are immediately kicked by server moderators.
+3. **Bilingual Code-Switching Breakdown:** Real-world multi-party dialogues (such as Egyptian Arabic vernacular mixed with English technical nomenclature) severely degrade standard single-language speech and reasoning models.
+4. **Epistemic & Privacy Boundary Leaks:** Naive bots attempt to fact-check private subjective claims ("Ahmed said he bought a new car"), causing hallucinated web queries and severe privacy violations.
+5. **Retrieval Latency Drift:** Slow multi-second search and synthesis pipelines cause delayed interjections long after the human participants have moved on to new topics.
 
-**CallWrapped solves this by acting as a respectful, culturally attuned epistemic referee and real-time conversation intelligence engine.**
+### The Solution: Respectful Epistemic Arbitration & Conversational Intelligence
+**CallWrapped** redefines the voice agent paradigm by introducing:
+- **The Two-Stage Consent Invariant:** A socially calibrated arbitration pipeline that detects factual disputes silently, performs background pre-warming, and offers non-intrusive text/dashboard verification, speaking into voice **only upon explicit human consent**.
+- **Spotify-Style "CallWrapped" Intelligence:** Continuous tracking of conversational health, talk shares, speaker streaks, topic distributions, and shareable cultural banter badges.
+
+### Business Value & Commercial Viability
+- **Total Addressable Market (TAM):** 200M+ monthly active voice users across Discord, gaming platforms, remote corporate teams, and community podcasting networks.
+- **Freemium Growth Model:** Free core refereeing and weekly community CallWrapped recap cards drive organic bottom-up Discord server adoption.
+- **Pro Server Subscription ($9.99/mo):** Unlocks custom bilingual lexicons, dedicated low-latency voice endpoints, extended audio evidence archiving, and deep community sentiment dashboards.
+- **B2B Enterprise Expansion:** White-label meeting arbitration and epistemic auditing APIs for corporate board meetings, remote standups, and customer support quality assurance.
 
 ---
 
@@ -366,6 +370,7 @@ In building CallWrapped, several intuitive design directions were explored, test
 
 ## 🗺️ Future Roadmap
 
+- [ ] **Sovereign Open-Weight SLM Inference:** Train and deploy a specialized, open-source fine-tuned Small Language Model (e.g. fine-tuned Llama-3-8B / Qwen-2.5 on multi-party bilingual Arabic/English dispute dialogue) running locally or via self-hosted vLLM inference. This eliminates dependency on third-party cloud LPU providers (Groq), guarantees complete data privacy sovereignty, and removes external rate limits.
 - [ ] **Streaming STT Rollout:** Deploy full-duplex WebSocket streaming STT using AssemblyAI Universal-3.5 Pro, gated on maintaining $\le 25\%$ WER on Egyptian dialect audio.
 - [ ] **Authoritative Dispute Tracker FSM:** Transition the pure Python Dispute Tracker from shadow mode to the primary arbitration controller following full multi-session replay validation.
 - [ ] **Acoustic Fusion v2:** Re-introduce acoustic emotion detection incorporating fundamental frequency ($F_0$) pitch tracking, vocal jitter, and room-relative energy baselines to accurately separate laughter from anger.
@@ -488,12 +493,11 @@ The CallWrapped codebase has undergone continuous verification through three com
 
 ## 👥 Team & Contact
 
-Developed by **Team Aang & Bumi** for the **AssemblyAI Voice Agent Hackathon 2026**:
+Developed for the **AssemblyAI Voice Agent Hackathon 2026**:
 
 | Member | Institution | Core Focus | Contact |
 | :--- | :--- | :--- | :--- |
-| **Mostafa Abdallah** | Faculty of AI, Egyptian Chinese University (ECU) | • Two-stage referee state machine & consent invariant<br>• AssemblyAI batch STT integration & silence trimming<br>• Discord voice DAVE E2EE audio demuxing & VAD | [![GitHub](https://img.shields.io/badge/GitHub-Mostafa23-181717?style=flat&logo=github)](https://github.com/Mostafa23) [![LinkedIn](https://img.shields.io/badge/LinkedIn-Mostafa_Abdallah-0A66C2?style=flat&logo=linkedin)](https://www.linkedin.com/in/mostafa%D9%90abdallah/) |
-| **Kirolos Maurice William** | Faculty of AI, Egyptian Chinese University (ECU) | • Groq LPU split classification & 6-key rotation pool<br>• Tavily search verification & private-entity gating<br>• Next.js 14 live judge dashboard & WebSocket hub | [![GitHub](https://img.shields.io/badge/GitHub-Kirolos--Maurice--William-181717?style=flat&logo=github)](https://github.com/Kirolos-Maurice-William) [![LinkedIn](https://img.shields.io/badge/LinkedIn-Kirolos_Maurice-0A66C2?style=flat&logo=linkedin)](https://www.linkedin.com/in/kirolos-maurice-william/) |
+| **Kirolos Maurice William** | Faculty of AI, Egyptian Chinese University (ECU) | • Lead System Architect & AI Engineer<br>• Groq LPU split classification & 6-key rotation pool<br>• Tavily search verification & private-entity gating<br>• Two-stage referee state machine & consent invariant<br>• Next.js 14 live judge dashboard & WebSocket hub | [![GitHub](https://img.shields.io/badge/GitHub-Kirolos--Maurice--William-181717?style=flat&logo=github)](https://github.com/Kirolos-Maurice-William) [![LinkedIn](https://img.shields.io/badge/LinkedIn-Kirolos_Maurice-0A66C2?style=flat&logo=linkedin)](https://www.linkedin.com/in/kirolos-maurice-william/) |
 
 ---
 
