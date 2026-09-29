@@ -175,6 +175,7 @@ Served locally at `http://localhost:8000` via FastAPI and Next.js 14:
 
 ## 🗺️ Future Roadmap
 
+- [ ] **Deeper Discord Profile & Asset Integration:** Connect directly with Discord's API to pull native user avatars, server badges, custom icons, and channel banners directly into CallWrapped recap cards and the live dashboard for a tailored community experience.
 - [ ] **Sovereign Open-Weight Model:** Train and fine-tune an open-source model (e.g., Llama-3-8B or Qwen-2.5 on multi-speaker bilingual dialogue) running locally via vLLM to eliminate dependency on third-party cloud APIs like Groq.
 - [ ] **Full-Duplex Streaming STT:** Migrate from batch audio polling to full WebSocket streaming once dialect accuracy on rapid multi-party conversational overlap matches batch performance.
 - [ ] **Community Hosted Bot:** Package as an authorized Discord application so community server moderators can add it with a single invite link.
