@@ -91,51 +91,51 @@ const GOLDEN_DEMO_DATA = {
   activeDispute: {
     event_id: "evt_golden_rtx5070",
     timestamp: Date.now() / 1000 - 45,
-    speaker_a: "Ahmed",
+    speaker_a: "2xDanger",
     claim_a: "Bro, I'm pretty sure the RTX 5070 has 16 gigs of VRAM.",
     speaker_a_status: "CONTRADICTED",
-    speaker_b: "Mohamed",
+    speaker_b: "Mostafa",
     claim_b: "No, the 5070 is 12 gigs. The Ti is 16.",
     speaker_b_status: "SUPPORTED",
-    winner: "Mohamed",
-    loser: "Ahmed",
+    winner: "Mostafa",
+    loser: "2xDanger",
     correct_fact: "NVIDIA GeForce RTX 5070 has 12GB GDDR7 memory (192-bit bus), while RTX 5070 Ti has 16GB GDDR7 (256-bit bus).",
     confidence: 99,
     evidence_strength: "HIGH",
     status: "resolved",
     source_url: "https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/rtx-5070-family/",
     source_title: "NVIDIA GeForce RTX 5070 Family Official Specifications",
-    spoken_intervention: "Correction: the RTX 5070 has 12GB of GDDR7 memory. The RTX 5070 Ti has 16GB. Source is on the dashboard.",
+    spoken_intervention: "توضيح: كارت RTX 5070 نازل بـ 12 جيجا GDDR7، والـ 5070 Ti هو اللي بـ 16 جيجا. المصدر الرسمي على الداشبورد.",
     why_i_spoke: [
       "Factual claim detected regarding GPU memory capacity",
-      "Direct contradiction between Ahmed (16GB) and Mohamed (12GB)",
+      "Direct contradiction between 2xDanger (16GB) and Mostafa (12GB)",
       "Tier-1 official manufacturer source verified (nvidia.com)",
-      "Evidence confidence high (99%) — Evidence strength: HIGH",
+      "Evidence confidence high (99%) - Evidence strength: HIGH",
       "Autonomous voice intervention triggered via Edge Neural ar-EG-Shakir"
     ]
   },
   disputes: [
     {
       dispute_id: "disp_golden_rtx5070",
-      speaker_a: "Ahmed",
+      speaker_a: "2xDanger",
       claim_a: "Bro, I'm pretty sure the RTX 5070 has 16 gigs of VRAM.",
-      speaker_b: "Mohamed",
+      speaker_b: "Mostafa",
       claim_b: "No, the 5070 is 12 gigs. The Ti is 16.",
       disputed_attribute: "RTX 5070 VRAM Capacity",
       status: "resolved",
       source_name: "NVIDIA GeForce Official Specifications",
       source_url: "https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/rtx-5070-family/",
-      evidence_excerpt: "GeForce RTX 5070 — 12GB GDDR7 memory (192-bit bus). GeForce RTX 5070 Ti — 16GB GDDR7 memory (256-bit bus).",
+      evidence_excerpt: "GeForce RTX 5070: 12GB GDDR7 memory (192-bit bus). GeForce RTX 5070 Ti: 16GB GDDR7 memory (256-bit bus).",
       t_perceived_ms: 1164
     }
   ],
   disputesHistory: [
     {
       timestamp: Date.now() / 1000 - 180,
-      speaker_a: "Ahmed",
+      speaker_a: "2xDanger",
       claim_a: "RTX 5070 has 16GB VRAM",
       speaker_a_status: "CONTRADICTED",
-      speaker_b: "Mohamed",
+      speaker_b: "Mostafa",
       claim_b: "RTX 5070 has 12GB VRAM",
       speaker_b_status: "SUPPORTED",
       correct_fact: "NVIDIA RTX 5070 has 12GB GDDR7, while 5070 Ti has 16GB GDDR7.",
@@ -146,52 +146,71 @@ const GOLDEN_DEMO_DATA = {
     "Verified Claims": 3,
     "Disputed Claims": 1,
     Speakers: {
-      "Mohamed": { turns: 14, verified: 2, refuted: 0 },
-      "Ahmed": { turns: 18, verified: 1, refuted: 1 },
-      "Kareem": { turns: 8, verified: 0, refuted: 0 }
+      "Mostafa": { turns: 14, verified: 2, refuted: 0 },
+      "2xDanger": { turns: 18, verified: 1, refuted: 1 },
+      "Remi": { turns: 8, verified: 0, refuted: 0 }
     }
   },
   analytics: {
     topic_totals: { tech: 14, gaming: 9, football: 4 },
     speakers: {
-      "Ahmed": {
-        speaker_name: "Ahmed",
-        talk_seconds: 52.4,
-        longest_streak_seconds: 14.8,
-        angry_episodes: 0,
-        anger_episodes_history: []
+      "2xDanger": {
+        speaker_name: "2xDanger",
+        talk_seconds: 96.0,
+        longest_streak_seconds: 15.0,
+        angry_episodes: 1,
+        first_anger_quote: "Fuck this game, I lost the rank match again!",
+        anger_episodes_history: [
+          {
+            timestamp: Date.now() / 1000 - 15,
+            intensity: "mild",
+            quote: "Fuck this game, I lost the rank match again!",
+            loudness: 245
+          }
+        ],
+        vulgarity_count: 2,
+        vulgarity_terms: ["f*", "f**"]
       },
-      "Mohamed": {
-        speaker_name: "Mohamed",
-        talk_seconds: 38.6,
-        longest_streak_seconds: 10.2,
+      "Mostafa": {
+        speaker_name: "Mostafa",
+        talk_seconds: 45.0,
+        longest_streak_seconds: 10.0,
         angry_episodes: 0,
-        anger_episodes_history: []
+        anger_episodes_history: [],
+        vulgarity_count: 0,
+        vulgarity_terms: []
       },
-      "Kareem": {
-        speaker_name: "Kareem",
-        talk_seconds: 24.1,
-        longest_streak_seconds: 6.8,
+      "Remi": {
+        speaker_name: "Remi",
+        talk_seconds: 31.0,
+        longest_streak_seconds: 8.0,
         angry_episodes: 0,
-        anger_episodes_history: []
+        anger_episodes_history: [],
+        vulgarity_count: 0,
+        vulgarity_terms: []
       }
     },
-    total_talk_seconds: 115.1,
-    total_angry_episodes: 0,
-    total_vulgarity_count: 0,
-    total_banter_count: 2,
+    total_talk_seconds: 172.0,
+    total_angry_episodes: 1,
+    total_vulgarity_count: 2,
+    total_banter_count: 3,
     longest_streak: {
-      speaker_name: "Ahmed",
-      streak_seconds: 14.8
+      speaker_name: "2xDanger",
+      streak_seconds: 15.0
     }
   },
   turns: [
-    { speaker_name: "Ahmed", text: "Bro, I'm pretty sure the RTX 5070 has 16 gigs of VRAM.", timestamp: Date.now() / 1000 - 45, stt_ms: 272 },
-    { speaker_name: "Mohamed", text: "No, the 5070 is 12 gigs. The Ti is 16.", timestamp: Date.now() / 1000 - 41, stt_ms: 258 },
-    { speaker_name: "Ahmed", text: "Nah, both are 16. Check the leak from yesterday.", timestamp: Date.now() / 1000 - 37, stt_ms: 265 },
-    { speaker_name: "CallWrapped (AI Referee)", text: "Correction: the RTX 5070 has 12GB of GDDR7 memory. The RTX 5070 Ti has 16GB. Source is on the dashboard.", timestamp: Date.now() / 1000 - 35, stt_ms: 0 },
-    { speaker_name: "Mohamed", text: "Told you bro! NVIDIA never gives 16GB on the non-Ti 70 class.", timestamp: Date.now() / 1000 - 28, stt_ms: 245 },
-    { speaker_name: "Ahmed", text: "Fair enough, my bad. What about League tonight?", timestamp: Date.now() / 1000 - 20, stt_ms: 260 }
+    { speaker_name: "Mostafa", text: "يا شباب حد شاف ماتش السوبر؟ الأهلي غلب الزمالك 2-0 إمبارح", timestamp: Date.now() / 1000 - 55, stt_ms: 270 },
+    { speaker_name: "2xDanger", text: "اه الماتش كان حريقة، إمام عاشور عمل ماتش عالي أوي", timestamp: Date.now() / 1000 - 50, stt_ms: 260 },
+    { speaker_name: "Remi", text: "Good match honestly, defense was very solid.", timestamp: Date.now() / 1000 - 46, stt_ms: 250 },
+    { speaker_name: "2xDanger", text: "Bro, I'm pretty sure the RTX 5070 has 16 gigs of VRAM.", timestamp: Date.now() / 1000 - 41, stt_ms: 272 },
+    { speaker_name: "Mostafa", text: "No, the 5070 is 12 gigs. The Ti is 16.", timestamp: Date.now() / 1000 - 37, stt_ms: 258 },
+    { speaker_name: "2xDanger", text: "Nah, both are 16. شوف التسريبات بتاعت أمس كلها بتقول كده!", timestamp: Date.now() / 1000 - 33, stt_ms: 265 },
+    { speaker_name: "CallWrapped (AI Referee)", text: "Correction: the RTX 5070 has 12GB of GDDR7 memory. The RTX 5070 Ti has 16GB. Source is on the dashboard.", timestamp: Date.now() / 1000 - 30, stt_ms: 0 },
+    { speaker_name: "Mostafa", text: "Told you bro! NVIDIA never gives 16GB on the non-Ti 70 class.", timestamp: Date.now() / 1000 - 24, stt_ms: 245 },
+    { speaker_name: "2xDanger", text: "Fuck this game, I lost the rank match again!", timestamp: Date.now() / 1000 - 18, stt_ms: 260 },
+    { speaker_name: "Remi", text: "Calm down bro, we can duo queue League tonight and fix your rank.", timestamp: Date.now() / 1000 - 12, stt_ms: 255 },
+    { speaker_name: "Mostafa", text: "يلا بينا نفتح ديسكورد بالليل ونلعب سوا", timestamp: Date.now() / 1000 - 6, stt_ms: 240 }
   ]
 };
 
