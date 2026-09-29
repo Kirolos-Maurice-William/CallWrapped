@@ -333,7 +333,7 @@ def render_recap(session_state: Any) -> str:
     # Flush any pending discourse trajectory candidates before rendering
     if hasattr(session_state, "discourse_tracker") and session_state.discourse_tracker:
         flushed = session_state.discourse_tracker.flush_pending()
-        tracker = getattr(session_state, "_stats_tracker", None)
+        tracker = getattr(session_state, "stats_tracker", None) or getattr(session_state, "_stats_tracker", None)
         if tracker:
             for d_res in flushed:
                 if d_res.resolution_type == "hostile_escalation":
@@ -349,11 +349,8 @@ def render_recap(session_state: Any) -> str:
                         audio_clip=d_res.audio_clip
                     )
                 elif d_res.resolution_type == "friendly_banter":
-                    p_ids = [d_res.speaker_id]
-                    if d_res.partner_id:
-                        p_ids.append(d_res.partner_id)
                     tracker.record_banter(
-                        speaker_ids=p_ids,
+                        speaker_ids=[d_res.speaker_id],
                         terms=d_res.terms
                     )
 

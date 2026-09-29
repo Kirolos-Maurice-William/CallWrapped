@@ -295,6 +295,77 @@ class TestDiscourseTrajectory(unittest.TestCase):
         self.assertEqual(flushed[1].resolution_type, "friendly_banter")
         self.assertEqual(len(self.tracker.pending_candidates), 0)
 
+    def test_flush_pending_hostile_escalation_with_defense(self):
+        """
+        Session disconnects right after an aggressive insult + victim defense:
+        Aggressor attacks ('أنت غبي وبتبوظ السيرفر') -> Victim defends ('مالك يا عم براحة') -> Call ends.
+        Must resolve as hostile_escalation, NOT suppressed!
+        """
+        self.tracker.observe_turn(
+            speaker_id="aggressor",
+            speaker_name="Aggressor",
+            text="أنت غبي وبتبوظ السيرفر",
+            timestamp=800.0,
+            audio_features={"was_loud": True, "peak_robust_z": 3.1},
+            raw_anger="mild",
+            anger_evidence="أنت غبي وبتبوظ السيرفر"
+        )
+        self.tracker.observe_turn(
+            speaker_id="victim",
+            speaker_name="Victim",
+            text="مالك يا عم براحة",
+            timestamp=802.0,
+            audio_features={"was_loud": False, "peak_robust_z": 1.2},
+            raw_anger="none"
+        )
+        flushed = self.tracker.flush_pending()
+        self.assertEqual(len(flushed), 1)
+        self.assertEqual(flushed[0].resolution_type, "hostile_escalation")
+        self.assertEqual(flushed[0].speaker_name, "Aggressor")
+        self.assertEqual(flushed[0].partner_name, "Victim")
+        self.assertEqual(self.tracker.resolved_escalation_count, 1)
+
+    def test_flush_pending_hostile_hangup(self):
+        """
+        Aggressor screams severe hostile friction token and immediately disconnects:
+        'مش طايقكم وغوروا في داهية' (raw_anger=high) -> Call disconnects.
+        Must resolve as hostile_escalation!
+        """
+        self.tracker.observe_turn(
+            speaker_id="quitter",
+            speaker_name="Quitter",
+            text="مش طايقكم وغوروا في داهية",
+            timestamp=850.0,
+            audio_features={"was_loud": True, "peak_robust_z": 3.5},
+            raw_anger="high",
+            anger_evidence="مش طايقكم وغوروا في داهية"
+        )
+        flushed = self.tracker.flush_pending()
+        self.assertEqual(len(flushed), 1)
+        self.assertEqual(flushed[0].resolution_type, "hostile_escalation")
+        self.assertEqual(flushed[0].speaker_name, "Quitter")
+        self.assertEqual(self.tracker.resolved_escalation_count, 1)
+
+    def test_flush_pending_isolated_shout_suppressed(self):
+        """
+        Speaker utters an isolated teasing/profane word with 0 anger and 0 victim defense:
+        'يا حمار' (calm, raw_anger=none) -> Call ends.
+        Must resolve as isolated_shout (suppressed from anger episodes).
+        """
+        self.tracker.observe_turn(
+            speaker_id="joker",
+            speaker_name="Joker",
+            text="يا حمار",
+            timestamp=900.0,
+            audio_features={"was_loud": False, "peak_robust_z": 1.0},
+            raw_anger="none"
+        )
+        flushed = self.tracker.flush_pending()
+        self.assertEqual(len(flushed), 1)
+        self.assertEqual(flushed[0].resolution_type, "isolated_shout")
+        self.assertEqual(self.tracker.resolved_escalation_count, 0)
+        self.assertEqual(self.tracker.resolved_banter_count, 0)
+
     def test_end_to_end_user_scenario_through_arbitration_engine(self):
         """
         End-to-End User Scenario via ArbitrationEngine:

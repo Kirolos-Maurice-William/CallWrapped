@@ -504,7 +504,9 @@ async def ingest_voice_event(event: VoiceEventPayload):
                     "timestamp": round(event.timestamp, 2),
                     "anger": str(anger).lower(),
                     "was_loud": bool(af.get("was_loud", False)),
-                    "peak_z": float(af.get("peak_robust_z", 0.0))
+                    "peak_z": float(af.get("peak_robust_z", 0.0)),
+                    "context": str(event.payload.get("context") or ""),
+                    "audio_clip": event.payload.get("audio_clip")
                 })
 
         ANALYTICS_STATE["total_talk_seconds"] = round(sum(s["talk_seconds"] for s in ANALYTICS_STATE["speakers"].values()), 2)
@@ -550,7 +552,7 @@ async def get_audio_evidence(filename: str):
     if not target_path.is_relative_to(recordings_root):
         return Response(status_code=403, content="Access denied")
 
-    return FileResponse(path=str(target_path), media_type="audio/wav", filename=safe_filename)
+    return FileResponse(path=str(target_path), media_type="audio/wav", filename=safe_filename, content_disposition_type="inline")
 
 
 @router.post("/reset")

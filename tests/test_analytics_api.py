@@ -101,6 +101,56 @@ class TestAnalyticsVulgarityApi(unittest.TestCase):
         res_bad = self.client.get("/api/audio-evidence/exploit.exe")
         self.assertEqual(res_bad.status_code, 400)
 
+        # 5. Test /api/audio-evidence with real WAV file
+        from bot.config import PROJECT_ROOT
+        test_rec_dir = PROJECT_ROOT / "recordings" / "test_session_unit_test"
+        test_rec_dir.mkdir(parents=True, exist_ok=True)
+        dummy_wav = test_rec_dir / "evidence_sample_999.wav"
+        dummy_wav.write_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00D\xac\x00\x00\x88X\x01\x00\x02\x00\x10\x00data\x00\x00\x00\x00")
+
+        try:
+            res_valid = self.client.get("/api/audio-evidence/evidence_sample_999.wav")
+            self.assertEqual(res_valid.status_code, 200)
+            self.assertEqual(res_valid.headers["content-type"], "audio/wav")
+            self.assertIn("inline", res_valid.headers.get("content-disposition", "") or "inline")
+        finally:
+            if dummy_wav.exists():
+                dummy_wav.unlink()
+
+        # 6. Test path traversal defense -> Path(filename).name strips directory separators
+        res_trav = self.client.get("/api/audio-evidence/..%2F..%2Fsecret.wav")
+        # Since safe_filename strips traversal, it searches for 'secret.wav' which doesn't exist -> 404 (safe)
+        self.assertIn(res_trav.status_code, (400, 404))
+
+        # 7. Test fallback anger_episodes_history preserving context and audio_clip
+        event_anger_fallback = {
+            "event_id": "evt_anger_fb",
+            "type": "analytics_update",
+            "speaker_name": "Bob",
+            "anger": "high",
+            "anger_evidence": "بقولك اخرس",
+            "payload": {
+                "anger": "high",
+                "anger_evidence": "بقولك اخرس",
+                "context": "hostile_escalation (sustained attack)",
+                "audio_clip": "1700000099_Bob.wav",
+                "audio_features": {"was_loud": True, "peak_robust_z": 3.5}
+            }
+        }
+        res_fb = self.client.post("/api/events", json=event_anger_fallback)
+        self.assertEqual(res_fb.status_code, 200)
+
+        res_analytics_fb = self.client.get("/api/analytics")
+        bob_stats = res_analytics_fb.json()["speakers"]["Bob"]
+        self.assertEqual(bob_stats["angry_episodes"], 1)
+        self.assertEqual(len(bob_stats["anger_episodes_history"]), 1)
+        ep = bob_stats["anger_episodes_history"][0]
+        self.assertEqual(ep["quote"], "بقولك اخرس")
+        self.assertEqual(ep["was_loud"], True)
+        self.assertEqual(ep["peak_z"], 3.5)
+        self.assertEqual(ep["context"], "hostile_escalation (sustained attack)")
+        self.assertEqual(ep["audio_clip"], "1700000099_Bob.wav")
+
 
 if __name__ == "__main__":
     unittest.main()

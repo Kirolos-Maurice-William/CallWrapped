@@ -270,6 +270,9 @@ class DiscourseTracker:
                 defense_cue = turn.has_defense_cue()
                 if defense_cue:
                     cand.has_victim_defense = True
+                    cand.responding_speaker_id = turn.speaker_id
+                    cand.responding_speaker_name = turn.speaker_name
+                    cand.responding_text = turn.text
 
             # C. Check Prosodic & Lexical Rebound
             rebound_cue = turn.has_rebound_cue()
@@ -406,6 +409,8 @@ class DiscourseTracker:
         is_banter_cue = turn.vulgarity_count > 0 or turn.has_playful_insult() is not None
         needs_candidate = (
             is_banter_cue or
+            turn.has_hostile_friction() is not None or
+            (turn.was_loud and turn.raw_anger in ("mild", "high")) or
             (turn.was_loud and any(t.speaker_id != turn.speaker_id for t in self.turns[-3:]))
         )
 
@@ -469,7 +474,7 @@ class DiscourseTracker:
             init_turn = cand.initial_turn
 
             # If it had confirmed victim defense, count as escalation
-            if cand.has_victim_defense and init_turn.has_hostile_friction():
+            if cand.has_victim_defense:
                 self.resolved_escalation_count += 1
                 res = DiscourseResolution(
                     resolution_type="hostile_escalation",
@@ -480,12 +485,14 @@ class DiscourseTracker:
                     was_loud=init_turn.was_loud,
                     peak_z=init_turn.peak_z,
                     trajectory_context="hostile_escalation_at_session_end",
+                    partner_id=cand.responding_speaker_id,
+                    partner_name=cand.responding_speaker_name,
                     audio_clip=init_turn.audio_clip,
                     terms=init_turn.vulgarity_terms
                 )
                 resolutions.append(res)
             elif cand.has_symmetrical_response:
-                # Symmetrical exchange without further escalation -> friendly banter
+                # Symmetrical exchange without victim defense -> friendly banter
                 self.resolved_banter_count += 1
                 res = DiscourseResolution(
                     resolution_type="friendly_banter",
@@ -496,6 +503,24 @@ class DiscourseTracker:
                     was_loud=init_turn.was_loud,
                     peak_z=init_turn.peak_z,
                     trajectory_context="symmetrical_banter_flushed_at_end",
+                    partner_id=cand.responding_speaker_id,
+                    partner_name=cand.responding_speaker_name,
+                    audio_clip=init_turn.audio_clip,
+                    terms=init_turn.vulgarity_terms
+                )
+                resolutions.append(res)
+            elif init_turn.has_hostile_friction() or init_turn.raw_anger in ("mild", "high"):
+                # Unresolved hostile friction or raw anger without partner response at session end
+                self.resolved_escalation_count += 1
+                res = DiscourseResolution(
+                    resolution_type="hostile_escalation",
+                    speaker_id=init_turn.speaker_id,
+                    speaker_name=init_turn.speaker_name,
+                    timestamp=init_turn.timestamp,
+                    quote=init_turn.anger_evidence or init_turn.text,
+                    was_loud=init_turn.was_loud,
+                    peak_z=init_turn.peak_z,
+                    trajectory_context="hostile_escalation_at_session_end",
                     partner_id=cand.responding_speaker_id,
                     partner_name=cand.responding_speaker_name,
                     audio_clip=init_turn.audio_clip,
