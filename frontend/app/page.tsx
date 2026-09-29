@@ -3,12 +3,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Scale,
-  Zap,
   CheckCircle2,
   XCircle,
   ExternalLink,
   Radio,
-  Activity,
   Volume2,
   Play,
   Users,
@@ -21,8 +19,7 @@ import {
   Clock,
   Flame,
   Smile,
-  PieChart,
-  Crown
+  PieChart
 } from "lucide-react";
 
 import {

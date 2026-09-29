@@ -5,17 +5,14 @@ import {
   X,
   Award,
   Crown,
-  Flame,
   PieChart,
   Smile,
-  Volume2,
   Copy,
   Check,
-  Share2,
   ShieldCheck,
   Sparkles
 } from "lucide-react";
-import { AnalyticsState, formatStreakMMSS, formatDurationHuman } from "./AnalyticsWidgets";
+import { AnalyticsState, formatDurationHuman } from "./AnalyticsWidgets";
 
 interface Props {
   isOpen: boolean;
