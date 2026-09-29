@@ -11,8 +11,9 @@
 [![Edge TTS Streaming](https://img.shields.io/badge/Edge--TTS-Two--Clause_Streaming-0078D7?style=for-the-badge&logo=microsoft&logoColor=white)](https://github.com/rany2/edge-tts)
 [![Discord.py Voice DAVE](https://img.shields.io/badge/Discord.py-Voice_DAVE_E2EE-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discordpy.readthedocs.io/)
 [![FastAPI + Next.js](https://img.shields.io/badge/Fullstack-FastAPI_+_Next.js_14-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![Test Suite](https://img.shields.io/badge/Tests-173%2F173_Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![No Mocks](https://img.shields.io/badge/Acceptance_Tests-Zero_Mocks-orange?style=for-the-badge)](tests/)
+[![Test Suite](https://img.shields.io/badge/Tests-291_Discovered_Cases-blue?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Acceptance Tests](https://img.shields.io/badge/Acceptance_Tests-Zero_Mocks-orange?style=for-the-badge)](tests/)
+[![Production Build](https://img.shields.io/badge/Frontend-Next.js_Static_Export_✓-success?style=for-the-badge&logo=nextdotjs&logoColor=white)](frontend/)
 
 ---
 
@@ -44,7 +45,7 @@
 11. [Rejected Alternatives (Evidence-Based Engineering)](#-rejected-alternatives-evidence-based-engineering)
 12. [Future Roadmap](#-future-roadmap)
 13. [Reproducibility & Quick Start](#-reproducibility--quick-start)
-14. [Test Suite Verification (173 / 173 Passing)](#-test-suite-verification-173--173-passing)
+14. [Test Suite Verification (291 Tests & Testing Taxonomy)](#-test-suite-verification-291-tests--testing-taxonomy)
 15. [Audits & Independent Quality Control](#-audits--independent-quality-control)
 16. [Team & Contact](#-team--contact)
 17. [License & Third-Party Notice](#-license--third-party-notice)
@@ -305,9 +306,25 @@ CallWrapped uses standard Discord `!` prefix commands (no slash commands):
 
 Served locally at `http://localhost:8000` via FastAPI backend and Next.js 14 frontend:
 - **CORS Access Control:** `CORS_ORIGINS` in `.env` controls dashboard access and defaults to `http://localhost:3000,http://127.0.0.1:3000`.
+- **Balanced Two-Column Dashboard Architecture:**
+  - **Left Column:** Stages the Hero Referee & Dispute Decision card (~420px) stacked vertically with the dedicated Real-Time Discord Voice Transcript Stream (`h-[520px]`). Eliminates empty void space and ensures judges see live transcription scrolling smoothly alongside arbitration status.
+  - **Right Column:** Houses live conversational telemetry, 15-category topic talk-share percentages, and the interactive CallWrapped session recap launcher.
+- **Compact Non-Scrollable Pipeline Flow (~740px):**
+  - Displays the 6 core pipeline stages (`AssemblyAI STT`, `Claim Extraction`, `Dispute FSM`, `Tavily Search`, `Two-Stage Gate`, `Edge-TTS Audio`) as compact cards (`w-[110px]` to `w-[124px]`) with bottom-centered latency badges, fitting standard viewports without horizontal scrollbars.
+- **CallWrapped Desktop Showcase Modal (`max-w-4xl` / 896px):**
+  - High-level 4-metric banner (`grid-cols-2 md:grid-cols-4`): Total Call Time, Active Speakers, Disputed Claims, and Frustration Index.
+  - 2-Column Achievement Awards Grid (`grid-cols-1 sm:grid-cols-2`): Highlights Egyptian Arabic cultural and behavioral badges with strict mutual exclusivity:
+    - 🕊️ **The Diplomat (سفير النوايا الحسنة):** Longest speaker with 0 anger, 0 vulgarity, and strictly 0 roasts/banter (`banter_count == 0`).
+    - 🤫 **The Silent Observer (المستمع الصامت):** Active listener with minimal talk share and zero interruptions (ties broken deterministically).
+    - 🔥 **The Instigator (مشعل الفتنة):** Speaker involved in the highest number of disputes.
+    - 🔍 **The Fact Checker (مفرقة الحق):** Most verified claims.
+    - 🎙️ **The Monopolist (محتكر المايك):** Highest talk-time percentage.
+    - 🤝 **The Peacekeeper (حمامة السلام):** De-escalated heated discussions.
+    - ⚡ **The Speed Demon (سريع الرد):** Lowest response latency.
+- **Native Audio Evidence Playback:**
+  - Interactive playback buttons directly inside dispute cards and recap widgets allowing judges to stream the original 16kHz WAV audio evidence via `/api/audio-evidence/{filename}` with animated `🔊 Playing...` feedback.
 - **Active Dispute Cards:** Displays real-time side-by-side claims, status badges (`OFFERED`, `CHECKING`, `RESOLVED`, `ABSTAINED`, `REFUSED_PRIVATE`), and direct source links.
 - **Live Latency Tickers:** Millisecond-accurate telemetry for STT poll duration, Groq LPU inference, Tavily search retrieval, and Edge-TTS synthesis.
-- **Conversational Analytics:** Real-time speaker talk-time distribution bar, Streak Champion indicator, frustration quote receipts, and 15-category topical share.
 
 ---
 
@@ -317,6 +334,9 @@ Served locally at `http://localhost:8000` via FastAPI backend and Next.js 14 fro
 2. **Mandatory Privacy Notice:** Upon connecting to a voice channel with `!start`, the bot posts an explicit transparency notice in the text channel outlining its operating policies.
 3. **Private-Entity Refusal:** Verified by `tests/test_phase_b_referee_gates.py` and `test_dispute_cards_api.py`. Statements concerning private non-public individuals are automatically refused to protect user privacy.
 4. **Admin-Only Audio Capture:** `TEST_CAPTURE_MODE` is strictly an opt-in developer/administrative tool for generating benchmark datasets. It is disabled by default in production.
+5. **Documented Security Boundary — Audio Evidence Endpoint:**
+   - **Path Traversal Protection:** The `/api/audio-evidence/{filename}` endpoint strictly validates that the requested file has a `.wav` extension, contains no path traversal sequences (`..`), and resides within the configured project recordings root. Attempts to traverse outside return `HTTP 400 Bad Request`.
+   - **Authentication Limitation (Hackathon Local Scope):** In this local evaluation release, the endpoint does not require user authentication (session JWT or Discord OAuth2). Anyone on the local network reaching port 8000 can request audio clips. In a production multi-tenant cloud environment, this endpoint must be gated behind Discord session OAuth2/JWT tokens with guild-membership verification to prevent unauthorized audio access.
 
 ---
 
@@ -327,7 +347,9 @@ Served locally at `http://localhost:8000` via FastAPI backend and Next.js 14 fro
 3. **Batch STT Latency Floor:** The current production pipeline uploads audio chunks and polls AssemblyAI's batch API. This introduces an inherent **2.6s–3.5s** latency floor from utterance completion to transcript delivery.
 4. **Taxonomy Frozen at v3:** The topic classification enum is strictly frozen at 15 categories. Unseen fringe topics fall back to `other`. Open-vocabulary dynamic clustering is not yet deployed.
 5. **Frontend Build Prerequisite:** The dashboard requires the frontend to be built before first use. start_all.bat does NOT build the frontend automatically.
-6. **Documented Testing Coverage Boundaries:** DAVE E2EE voice decryption, Next.js UI component rendering, auxiliary developer modes (`!mode assistant`, `!mode echo`), and undeployed streaming STT rely on manual or live integration testing rather than automated CI unit tests (detailed in [Documented Testing Coverage Gaps](#documented-testing-coverage-gaps)).
+6. **Audio Evidence Authorization:** As documented in Privacy & Epistemic Safety, `/api/audio-evidence` has strict path traversal protection but lacks per-user authorization tokens.
+7. **Sequential Live Suite Rate Limiting:** Executing all 291 unit and live-provider tests in a single continuous batch can hit Groq free-tier tokens-per-minute (TPM) limits across the rotation pool.
+8. **Documented Testing Coverage Boundaries:** DAVE E2EE voice decryption, Next.js UI component rendering, auxiliary developer modes (`!mode assistant`, `!mode echo`), and undeployed streaming STT rely on manual or live integration testing rather than automated CI unit tests (detailed in [Documented Testing Coverage Gaps](#documented-testing-coverage-gaps)).
 
 ---
 
@@ -366,8 +388,8 @@ In building CallWrapped, several intuitive design directions were explored, test
 
 ### 1. Installation
 ```bash
-git clone https://github.com/Mostafa23/call-agent.git
-cd call-agent
+git clone https://github.com/Kirolos-Maurice-William/CallsWrapped.git
+cd CallsWrapped
 python -m venv backend/venv
 backend/venv/Scripts/activate     # Windows
 # source backend/venv/bin/activate  # Linux
@@ -407,22 +429,41 @@ start_all.bat
 
 ---
 
-## 🧪 Test Suite Verification (173 / 173 Passing)
+## 🧪 Test Suite Verification (291 Tests & Testing Taxonomy)
 
-CallWrapped enforces an unyielding testing discipline: **acceptance tests run against live production APIs with zero mocks.**
+CallWrapped enforces an unyielding testing discipline with **291 discovered test cases across 65 test modules** in `tests/`.
 
-To run the complete test suite:
-```bash
-backend/venv/Scripts/python -m unittest discover tests
-```
+### 1. Honest Testing Taxonomy
+In accordance with production evidence standards, our test battery is strictly stratified into three verified tiers:
 
-```text
-Ran 173 tests in 125.700s
+1. **Unit & Deterministic Invariant Tests (Local, Mock-Free, Zero API Quota):**
+   - **Dispute FSM & Invariants:** [`tests/test_dispute_tracker.py`](file:///g:/CallWrapper/tests/test_dispute_tracker.py), [`tests/test_arbitration_lease.py`](file:///g:/CallWrapper/tests/test_arbitration_lease.py), [`tests/test_arbitrate_cooldown.py`](file:///g:/CallWrapper/tests/test_arbitrate_cooldown.py).
+   - **VAD Energy & Audio Preprocessing:** [`tests/test_vad.py`](file:///g:/CallWrapper/tests/test_vad.py), [`tests/test_rtcp_filter.py`](file:///g:/CallWrapper/tests/test_rtcp_filter.py).
+   - **Conversational Analytics & Metrics:** [`tests/test_stats.py`](file:///g:/CallWrapper/tests/test_stats.py) (deterministic Arabic duration humanization, zero-safe talk shares, N-speaker tie breaks).
+   - **CER Retrospective Discourse Tracking:** [`tests/test_cer_tracker.py`](file:///g:/CallWrapper/tests/test_cer_tracker.py) (claim-evidence-reasoning multi-turn tracking).
+   - **Classification Rules & Token Boundaries:** [`tests/test_classifier.py`](file:///g:/CallWrapper/tests/test_classifier.py), [`tests/test_two_stage_referee.py`](file:///g:/CallWrapper/tests/test_two_stage_referee.py).
 
-OK
-```
+2. **Live-Provider Acceptance Tests (Mock-Free against Real Production APIs):**
+   - **AssemblyAI Batch STT:** [`tests/test_assemblyai_poll.py`](file:///g:/CallWrapper/tests/test_assemblyai_poll.py), [`tests/test_assemblyai_capabilities.py`](file:///g:/CallWrapper/tests/test_assemblyai_capabilities.py) (real audio upload and polling).
+   - **Groq LPU Epistemic Reasoning:** [`tests/test_split_classifier.py`](file:///g:/CallWrapper/tests/test_split_classifier.py), [`tests/test_groq_rotation.py`](file:///g:/CallWrapper/tests/test_groq_rotation.py) (multi-key pool rotation, 429 cascades, sub-second latency).
+   - **Tavily Ground-Truth Search:** [`tests/test_tavily_search.py`](file:///g:/CallWrapper/tests/test_tavily_search.py) (real web domain indexing, private entity refusal).
+   - **Microsoft Edge-TTS:** [`tests/test_tts.py`](file:///g:/CallWrapper/tests/test_tts.py), [`tests/test_two_clause_prewarm.py`](file:///g:/CallWrapper/tests/test_two_clause_prewarm.py) (TLS pre-warming, two-clause synthesis).
+   - *Note on Live Test Suite Execution:* Running all live tests in a single continuous script can trigger Groq free-tier rate limits (TPM limits on single-batch runs). Tests should be executed per module or with quota pacing.
 
-Every commit and bug fix since base commit `701a7c0` is traced with a dedicated acceptance test in [`REGRESSION_LEDGER.md`](file:///g:/CallWrapper/REGRESSION_LEDGER.md).
+3. **Production-Path Verification (Full-Stack Entry Points):**
+   - Executed via [`audit/final_session_traceback_audit.py`](file:///g:/CallWrapper/audit/final_session_traceback_audit.py):
+     - **Import Cleanliness:** 0 unused or dead imports across frontend and backend.
+     - **Interactive Controls:** 11/11 dashboard `<button>` elements verified with active `onClick` handlers.
+     - **Static Compilation:** `npm run build` compiled 4/4 Next.js pages with 0 errors.
+     - **Resilient Audio Playback:** Decoupled audio route verified via HTTP 200, returning valid `audio/wav` with `RIFF WAVE` magic header.
+     - **Path Traversal Defense:** Directory traversal exploits (`../etc/passwd`) blocked with `HTTP 400 Bad Request`.
+     - **Banter Mutual Exclusivity:** The Diplomat badge verified to strictly reject roast-banter speakers.
+
+### 2. Session Verification Status
+- **`audit/final_session_traceback_audit.py`:** **VERIFIED** (6/6 checks passed in this session).
+- **`npm run build` (Next.js 14 Static Export):** **VERIFIED** (Compiled and exported to `frontend/out/` with 0 errors).
+- **Live Endpoint Health (`http://localhost:8000/health`):** **VERIFIED** (HTTP 200 `{"status": "online"}`).
+- **Full 291-Test Battery in Single Pass:** **NOT RUN** in this session to prevent Groq free-tier rate limit exhaustion during submission freeze.
 
 ### Documented Testing Coverage Gaps
 
