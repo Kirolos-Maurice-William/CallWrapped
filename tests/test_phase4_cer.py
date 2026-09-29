@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 from bot.config import PROJECT_ROOT, config
 from bot.arbitration.stats import SessionStatsTracker
-from bot.audio.capture import save_captured_utterance_sync
+from bot.audio.capture import save_captured_utterance_sync, prune_evidence_clips
 from bot.arbitration.engine import arbitration_engine, SessionState
 
 
@@ -130,6 +130,36 @@ class TestPhase4CER(unittest.TestCase):
         self.assertEqual(len(session.analytics_buffer), 1)
         item = session.analytics_buffer[0]
         self.assertEqual(item["audio_clip"], "200_Omar.wav")
+
+    def test_evidence_pruning_enforces_max_clip_ceiling(self):
+        """
+        Verifies that prune_evidence_clips prunes the oldest files when total clip count
+        exceeds max_clips, enforcing a hard bounded disk storage ceiling.
+        """
+        import tempfile
+        import os
+        with tempfile.TemporaryDirectory() as tmpdir:
+            p_tmp = Path(tmpdir)
+            # Create 8 dummy WAV files with staggered timestamps
+            created_files = []
+            for i in range(8):
+                f_path = p_tmp / f"clip_{i}.wav"
+                f_path.write_bytes(b"dummy_wav_data")
+                # Artificially space mtime
+                os.utime(f_path, (1000 + i * 10, 1000 + i * 10))
+                created_files.append(f_path)
+
+            self.assertEqual(len(list(p_tmp.glob("*.wav"))), 8)
+
+            # Prune down to ceiling of 5
+            pruned_count = prune_evidence_clips(p_tmp, max_clips=5)
+            self.assertEqual(pruned_count, 3)
+
+            remaining = sorted(p_tmp.glob("*.wav"))
+            self.assertEqual(len(remaining), 5)
+            # The remaining files must be clips 3, 4, 5, 6, 7 (the newest 5)
+            remaining_names = [f.name for f in remaining]
+            self.assertEqual(remaining_names, ["clip_3.wav", "clip_4.wav", "clip_5.wav", "clip_6.wav", "clip_7.wav"])
 
 
 if __name__ == "__main__":

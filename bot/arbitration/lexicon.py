@@ -6,7 +6,7 @@ Applies computational morphology to prevent false positives from Arabic agglutin
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional
+from typing import List
 
 
 @dataclass

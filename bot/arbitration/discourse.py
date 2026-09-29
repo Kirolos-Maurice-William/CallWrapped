@@ -11,7 +11,7 @@ import re
 import time
 import logging
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple, Set
+from typing import List, Any, Optional
 
 from bot.arbitration.lexicon import analyze_banter, normalize_bilingual_text
 

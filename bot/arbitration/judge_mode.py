@@ -1,4 +1,3 @@
-import os
 import sys
 import io
 import time
@@ -9,19 +8,15 @@ if sys.stdout and hasattr(sys.stdout, "buffer") and getattr(sys.stdout, "encodin
     except Exception:
         pass
 
-import uuid
 import asyncio
 import logging
-from pathlib import Path
 from typing import Dict, Any, List
 from unittest.mock import MagicMock
 import numpy as np
 
-from bot.config import config
 from bot.ai.assemblyai import assemblyai_client
 from bot.ai.tavily import tavily_client
-from bot.ai.groq import groq_client
-from bot.ai.tts import speaker, StreamFFmpegPCMAudio
+from bot.ai.tts import StreamFFmpegPCMAudio
 from bot.arbitration.claim_detector import claim_detector
 from bot.arbitration.conflict_detector import conflict_detector
 from bot.arbitration.verifier import arbitration_verifier

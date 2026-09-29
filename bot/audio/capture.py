@@ -99,6 +99,30 @@ def _clean_speaker_name(speaker_name: str) -> str:
     return cleaned.replace(" ", "_") or "speaker"
 
 
+def prune_evidence_clips(evidence_dir: Path, max_clips: int = 250) -> int:
+    """
+    Prunes oldest WAV clips in evidence_dir if total clip count exceeds max_clips.
+    Enforces a strict bounded storage ceiling to protect disk capacity.
+    """
+    if not evidence_dir.exists():
+        return 0
+    try:
+        wav_files = sorted(evidence_dir.glob("*.wav"), key=lambda p: p.stat().st_mtime)
+        if len(wav_files) <= max_clips:
+            return 0
+        to_delete = wav_files[:len(wav_files) - max_clips]
+        for f in to_delete:
+            try:
+                f.unlink(missing_ok=True)
+            except OSError:
+                pass
+        logger.info(f"🧹 [Storage Retention] Pruned {len(to_delete)} oldest evidence audio clips (cap: {max_clips}).")
+        return len(to_delete)
+    except Exception as e:
+        logger.warning(f"Failed to prune evidence clips: {e}")
+        return 0
+
+
 def save_captured_utterance_sync(
     speaker_name: str,
     wav_bytes: bytes,
@@ -163,6 +187,9 @@ def save_captured_utterance_sync(
         log_file = target_dir / "session_log.jsonl"
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+        if force_save:
+            prune_evidence_clips(target_dir, max_clips=250)
 
         logger.info(f"🎙️ [Capture] Saved utterance clip: {base_filename} ({ended_by}) in {target_dir.name}")
         return log_entry

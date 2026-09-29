@@ -66,11 +66,6 @@ async def health_check():
     }
 
 
-# Mount recordings directory for audio evidence playback
-recordings_dir = Path(__file__).resolve().parent.parent.parent / "recordings"
-if recordings_dir.exists():
-    app.mount("/recordings", StaticFiles(directory=str(recordings_dir)), name="recordings")
-
 # Mount Next.js static export directly so whole app runs on single port (8000)
 frontend_out = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend/out"))
 if os.path.exists(frontend_out):

@@ -226,7 +226,11 @@ We built a complete acoustic loudness pipeline (`SpeakerLoudnessBaseline` tracki
 2. **Unreachable Mathematical Slope:** For utterances classified as text-neutral ($p_{\text{text}} = 0.0$), the late fusion formula required $z \ge 4.375$ to reach the mild anger threshold ($p_{\text{fused}} \ge 0.45$), making it mathematically impossible to boost natural shouting clips ($z \in [2.8, 3.5]$).
 3. **Session-Wide Baseline Absorption:** When a dispute escalated and all participants raised their voices simultaneously, running per-speaker baselines absorbed the volume increase, collapsing relative $z$-scores back to $1.0\text{--}2.2$.
 
-**Production Decision:** In accordance with empirical evidence, acoustic fusion is **disabled by default in production** (`ACOUSTIC_FUSION_ENABLED=0`). All acoustic telemetry is retained in shadow mode (`audit/shadow/loudness_shadow.jsonl`) for dataset collection.
+**Production Decision & v2 Redesign:** The naive linear volume boost was originally disabled. In Phase 1, it was re-architected into **Multimodal Context Fusion** (`bot/audio/fusion.py`):
+1. **Two-Way Acoustic Context Veto:** Shouted banter without lexical frustration is suppressed as natural gaming excitement (`peak_z` spikes from laughing or hype do not trigger anger).
+2. **Active Argument Gating:** Mild anger requires active multi-speaker friction or dispute context to confirm hostility.
+3. **Dual Verbal Evidence Requirement:** Anger episodes require explicit captured verbal evidence.
+As verified in `audit/benchmark_multimodal_anger_ab.py`, this re-architecture eliminated false positives on laughing and banter while accurately catching hostile escalation. It is enabled by default (`ACOUSTIC_FUSION_ENABLED=1`).
 
 ---
 
@@ -319,7 +323,7 @@ Served locally at `http://localhost:8000` via FastAPI backend and Next.js 14 fro
 ## ⚠️ Known Limitations
 
 1. **Spontaneous Conversational Overlap WER:** While AssemblyAI Universal-3.5 Pro achieves **22.15%** WER on clean Egyptian Arabic benchmark clips, spontaneous Discord gaming voice chat with frequent interruptions, background game sounds, and overlapping speech yields **36.9%–44.7%** micro WER.
-2. **Acoustic Loudness Fusion Disabled:** Volume magnitude alone proved unviable for emotion classification in group calls (causing a **-5.7%** net accuracy degradation). It is disabled in production pending pitch/F0 contour modeling.
+2. **Single-Turn Arousal Ambiguity:** Acoustic volume magnitude alone cannot distinguish excited laughing/banter from anger on an isolated turn. While Multimodal Context Fusion (`ACOUSTIC_FUSION_ENABLED=1`) and CER Retrospective Tracking resolve this over multi-turn conversational trajectories, isolated shouts without surrounding context default to non-anger to prevent false alarms.
 3. **Batch STT Latency Floor:** The current production pipeline uploads audio chunks and polls AssemblyAI's batch API. This introduces an inherent **2.6s–3.5s** latency floor from utterance completion to transcript delivery.
 4. **Taxonomy Frozen at v3:** The topic classification enum is strictly frozen at 15 categories. Unseen fringe topics fall back to `other`. Open-vocabulary dynamic clustering is not yet deployed.
 5. **Frontend Build Prerequisite:** The dashboard requires the frontend to be built before first use. start_all.bat does NOT build the frontend automatically.
@@ -374,7 +378,7 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 ```
-Populate your API keys in `.env`. Ensure `ACOUSTIC_FUSION_ENABLED=0` remains set. `CORS_ORIGINS` in `.env` controls dashboard access and defaults to `http://localhost:3000,http://127.0.0.1:3000`.
+Populate your API keys in `.env`. `ACOUSTIC_FUSION_ENABLED=1` enables multimodal acoustic fusion. `CORS_ORIGINS` in `.env` controls dashboard access and defaults to `http://localhost:3000,http://127.0.0.1:3000`.
 
 ### 3. Build Frontend Dashboard
 ```bash
