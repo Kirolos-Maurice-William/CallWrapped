@@ -114,55 +114,30 @@ stateDiagram-v2
 
 ## 🏗️ System Architecture
 
-```text
-                               Discord Voice Channel (Multi-Party Audio)
-                                                  │
-                                   [Discord DAVE E2EE MLS Decryption]
-                                                  │
-                                      AudioReceiver (RMS Energy VAD)
-                                 (Lock-protected per-speaker 16kHz PCM)
-                                                  │
-                                                  ▼
-                                 AssemblyAI Universal-3.5 Pro Batch
-                                   (Chunk Upload & Poll STT Pipeline)
-                                                  │
-                  ┌───────────────────────────────┴───────────────────────────────┐
-                  ▼                                                               ▼
-        [Instant Claim Path]                                            [Batched Analytics Path]
-       Slim Prompt (<400 tokens)                                          75s Aggregation Window
-        Groq LPU (Qwen 3.8-27b)                                           Groq LPU (Qwen 3.8-27b)
-                  │                                                               │
-                  ▼                                                               ▼
-        DisputeTracker Core FSM                                           15-Topic Classifier &
-       (SHADOW MODE: Decay/Eviction)                                       Anger Episode Counter
-                  │                                                               │
-                  ├───────────────────────────────┐                               ▼
-                  │ [Contradiction Detected]      │ [Casual Banter]      SessionStatsTracker
-                  ▼                               ▼                     (Talk Share / Streaks /
-          Two-Stage Referee                 Ignored (Silent)              Arabic Recap Generator)
-                  │                                                               │
-                  ▼                                                               │
-       Stage 1: Text Channel Offer                                                │
-      ("أتحقق؟ قول «شوفها» أو !check")                                             │
-      (Pre-warm Edge-TTS DNS/TLS +                                                │
-      Background Tavily Evidence Search)                                          │
-                  │                                                               │
-       [Speaker Confirms: "شوفها" / !check]                                       │
-                  │                                                               │
-                  ▼                                                               │
-       Stage 2: Spoken Two-Clause TTS                                             │
-       Clause 1: Fact ("المصدر بيقول...")                                         │
-       Clause 2: Hedge ("ممكن في سياق فاتني...")                                   │
-                  │                                                               │
-                  ├───────────────────────────────────────────────────────────────┘
-                  ▼
-         FastAPI Event Hub (WebSocket: /api/ws)
-                  │
-                  ▼
-     Next.js 14 Live Judge Dashboard
-    (Dispute Cards, Latency Ticker,
-     Topical Share %, Anger Receipts)
-```
+CallWrapped is engineered as an asynchronous, distributed event-driven system organized into five decoupled layers:
+
+### 1. Ingestion & Secure Audio Demuxing Layer
+- **Discord DAVE E2EE Integration:** Ingests multi-party voice streams with end-to-end MLS decryption via a custom native DAVE adapter (`bot/audio/dave_adapter.py`).
+- **Thread-Safe AudioReceiver:** Isolates individual speaker audio into lock-protected ring buffers at 16kHz 16-bit linear PCM (`bot/audio/receiver.py`).
+- **Energy-Adaptive VAD:** Detects speech boundaries using root-mean-square (RMS) energy thresholding, trimming trailing silence frames to optimize transcription accuracy.
+
+### 2. Speech-to-Text Pipeline (AssemblyAI Universal-3.5 Pro)
+- **Chunked Processing:** Finalized speech utterances (0.5s–15.0s) are uploaded and polled via AssemblyAI's Universal-3.5 Pro batch API.
+- **Dialect Biasing:** Evaluated on Egyptian Arabic with customized domain vocabulary and spelling rules, achieving a benchmark WER of **22.15%** on clean speech segments.
+
+### 3. Dual-Stream Epistemic Reasoning Engine (Groq LPU)
+- **Instant Claim Extraction Path (<400 tokens):** Executes on Groq LPU with sub-second inference to extract entities, numerical claims, and disagreement polarity in real time.
+- **Batched Analytics Path (75s rolling window):** Aggregates multi-speaker turns to calculate 15-category topic talk shares, speaker streak dynamics, and Claim-Evidence-Reasoning (CER) discourse trajectories.
+- **6-Key Autonomous Rotation Pool:** Dynamically rotates across up to 6 Groq API keys with automatic HTTP 429 cascade recovery and 401/403 eviction to guarantee zero interruption during high-traffic sessions.
+
+### 4. Non-Intrusive Arbitration & Verification Engine
+- **Dispute Tracker State Machine (FSM):** Pure-Python state machine tracking proposition clusters (`TRACKING → CONFLICT_DETECTED → OFFERED → RESOLVED / ABSTAINED`) with FIFO memory eviction.
+- **Two-Stage Consent Gate:** Posts a silent offer to Discord chat and the dashboard; initiates background DNS/TLS pre-warming and Tavily ground-truth pre-fetching while awaiting explicit user confirmation (`!check` or *"شوفها"*).
+- **Two-Clause Streaming TTS:** Microsoft Edge-TTS delivers a factual finding (Clause 1) followed by a contextual social hedge (Clause 2) over pre-warmed connections with instant barge-in cancellation.
+
+### 5. Live Dashboard & Telemetry Hub (FastAPI + Next.js 14)
+- **FastAPI Event Hub (`/api/ws`):** Broadcasts real-time dispute cards, latency telemetry, and speaker statistics over persistent WebSockets.
+- **Next.js 14 Live Judge Dashboard:** Displays live dispute resolution lifecycles, balanced transcript streams, compact non-scrollable pipeline flow, and Spotify-style CallWrapped session showcases.
 
 ---
 
