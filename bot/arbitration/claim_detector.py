@@ -92,10 +92,22 @@ null_topic examples:
 - "البوت ده ما عنده بولز" -> null_topic
 
 ANGER RULE (check in order):
-1. Joking markers present: "هههه", "LOL", "😂", playful teasing, exaggeration for laughs -> anger: none
-2. No joking markers AND negative/frustrated words: ranting, complaining, "زهقت", "بيعصب", cursing at the game/server/situation -> anger: mild (high if intense, e.g. "أووووي", CAPS)
-3. Calm neutral talk -> none
-When unsure: laughter present = none. No laughter + negative words = mild.
+1. AUDIO CONTEXT: Voice ASR transcripts rarely contain textual laughter markers ("هههه" or "😂"). Therefore, never assume lack of "هههه" implies genuine hostility!
+2. CASUAL PROFANITY, TESTING BANTER & DISCORD CHATTER ARE NOT ANGER:
+   - Callers playfully bantering, swearing at the bot, avatars, software, or each other ("fuck that bot", "fucking Mustafa", "حيوان ليه حطت الصورة دي", "I hate X", "غبي", "يا عم انت حمار") -> anger: none (anger_evidence: "").
+   - Technical explanations, troubleshooting, or discussing software/API bugs ("الـ API بيفهم غلط وبحاول أصلحه", "there is a bug in the code") are neutral engineering statements -> anger: none.
+   - Gaming banter ("يا نوب وبتضيع علينا الجيم" -> gaming, anger: none); general banter ("بطل هبد وروح نام" -> other, anger: none).
+3. Joking markers present: "هههه", "LOL", "😂", playful teasing, friendly sarcasm -> anger: none.
+4. GENUINE ANGER & FRUSTRATION:
+   - Only classify anger: mild or high when there is GENUINE personal hostility, heated interpersonal arguments, or explicit verbal despair / severe complaints with emotional friction.
+   - Examples of genuine anger:
+     - "الكول أوف ديوتي زبالة والرانك بيعصب أوي" -> mild (rant: "زبالة والرانك بيعصب أوي")
+     - "زهقت من السيرفر ده بجد" -> mild (despair: "زهقت من السيرفر ده بجد")
+     - "الشغل عاملني زهقت من الصبح" -> mild (burnout: "زهقت من الصبح")
+     - "العربية دي بـ مليون جنيه وزهقت من السواقة والزحمة" -> mild (frustration: "زهقت من السواقة والزحمة")
+     - "للسط مرتين علطول يا خسارة الدبيل ده زهقت خلاص" -> mild (gaming rage: "زهقت خلاص")
+     - "الفيلم الجديد ده دمه تقيل وممل وميستاهلش تدفع فيه فلوس" -> mild (annoyed review: "دمه تقيل وممل وميستاهلش تدفع فيه فلوس")
+   - High anger is strictly reserved for screaming, aggressive hostile shouting, or intense enraged shouting.
 
 Twin-pair examples:
 "الكول أوف ديوتي زبالة والرانك بيعصب أوي" -> mild (rant, no laughter)
