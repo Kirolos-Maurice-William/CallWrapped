@@ -233,7 +233,7 @@ class SessionState:
         """Returns session-discovered entities for upstream ASR keyterm biasing."""
         return list(reversed(self.discovered_entities))[:max_terms]
 
-    def get_active_custom_spelling(self) -> List[Dict[str, Any]]:
+    def get_active_custom_spelling(self, max_rules: int = 50) -> List[Dict[str, Any]]:
         """
         Extracts session-discovered aliases whose canonical target is a single word.
         Format: [{'from': [alias], 'to': canonical_single_word}]
@@ -246,7 +246,8 @@ class SessionState:
             if len(clean_canonical.split()) == 1:
                 spelling_map.setdefault(clean_canonical, []).append(alias.strip())
 
-        return [{"from": aliases, "to": canonical} for canonical, aliases in spelling_map.items()]
+        rules = [{"from": aliases, "to": canonical} for canonical, aliases in spelling_map.items()]
+        return rules[:max_rules]
 
     def resolve_entity(self, text: str, threshold: float = 0.68) -> Optional[Tuple[str, str, float]]:
         """
@@ -265,6 +266,9 @@ class SessionState:
             canonical, surface, sim = match
             if surface not in self.entity_aliases:
                 self.entity_aliases[surface] = canonical
+                if len(self.entity_aliases) > 500:
+                    oldest_key = next(iter(self.entity_aliases))
+                    del self.entity_aliases[oldest_key]
         return match
 
     def record_topic_turn(

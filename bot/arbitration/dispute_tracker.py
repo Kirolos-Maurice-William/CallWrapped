@@ -1,4 +1,3 @@
-import time
 from typing import Callable, Optional, Dict, List, Any
 from bot.arbitration.dispute_models import (
     ThreadState,

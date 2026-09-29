@@ -1,8 +1,5 @@
-import time
-import json
-import asyncio
 import logging
-from typing import Optional, Dict, Any, Tuple, List
+from typing import Optional, Dict, Any, Tuple
 from bot.config import config
 from bot.ai.groq import groq_client
 

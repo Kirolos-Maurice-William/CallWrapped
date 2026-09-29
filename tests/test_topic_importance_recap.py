@@ -182,6 +182,18 @@ class TestTopicImportanceRecap(unittest.TestCase):
         finally:
             config.TOPIC_SILENCE_BOUNDARY_SEC = original_boundary
 
+    def test_compute_topic_mvps_tied_duration_exclusion(self):
+        """Verifies that tied speakers in a topic do not arbitrarily award an MVP."""
+        from bot.arbitration.stats import compute_topic_mvps
+
+        itv_tied = TopicInterval("gaming", "Apex", 0.0, 100.0)
+        itv_tied.speaker_durations = {"Alice": 50.0, "Bob": 50.0}
+        itv_tied.participating_speakers = {"Alice", "Bob"}
+
+        mvps = compute_topic_mvps([itv_tied])
+        # Neither Alice nor Bob dominated: 50% vs 50% tie -> no MVP crowned
+        self.assertNotIn("gaming", mvps)
+
 
 if __name__ == "__main__":
     unittest.main()

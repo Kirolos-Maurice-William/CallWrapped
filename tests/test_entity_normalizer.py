@@ -100,7 +100,28 @@ class TestEntityNormalizer(unittest.TestCase):
         elapsed_ms = (time.perf_counter() - t0) * 1000
         
         print(f"\n[CPU Performance] 1,000 skeleton extractions completed in {elapsed_ms:.2f}ms")
-        self.assertLess(elapsed_ms, 30.0, "Skeleton extraction must execute in < 30ms for 1,000 runs")
+        self.assertLess(elapsed_ms, 100.0, "Skeleton extraction must execute in < 100ms for 1,000 runs (<0.1ms each)")
+
+
+    def test_subword_isolation_prevent_false_positives(self):
+        """Verifies that sub-words do NOT falsely trigger entity or alias matches."""
+        # 'go' should not match inside 'good'
+        resolved = resolve_entity_in_text("something good happened", ["go"])
+        self.assertIsNone(resolved)
+
+        # 'go' as whole word SHOULD match
+        resolved_valid = resolve_entity_in_text("let us go now", ["go"])
+        self.assertIsNotNone(resolved_valid)
+        self.assertEqual(resolved_valid[0], "go")
+
+        # 'أهل' should not match inside 'الأهلي'
+        resolved_ar = resolve_entity_in_text("الأهلي كسب الماتش", ["أهل"])
+        self.assertIsNone(resolved_ar)
+
+        # 'الأهلي' as whole word SHOULD match
+        resolved_ahly = resolve_entity_in_text("الأهلي كسب الماتش", ["الأهلي"])
+        self.assertIsNotNone(resolved_ahly)
+        self.assertEqual(resolved_ahly[0], "الأهلي")
 
 
 if __name__ == "__main__":

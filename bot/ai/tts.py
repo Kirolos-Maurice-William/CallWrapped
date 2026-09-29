@@ -1,9 +1,7 @@
 import time
 import asyncio
 import logging
-import threading
 import subprocess
-from pathlib import Path
 from typing import Optional, Any
 import aiohttp
 import discord

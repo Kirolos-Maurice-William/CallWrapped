@@ -92,31 +92,38 @@ def compute_topic_mvps(intervals: Optional[list] = None) -> Dict[str, Tuple[str,
 
     for itv in intervals:
         topic = getattr(itv, "macro_topic", None)
-        if not topic or topic in ignored:
+        if not topic or not str(topic).strip() or str(topic).strip().lower() in ignored:
             continue
-        if topic not in topic_speaker_durations:
-            topic_speaker_durations[topic] = {}
+        clean_topic = str(topic).strip()
+        if clean_topic not in topic_speaker_durations:
+            topic_speaker_durations[clean_topic] = {}
 
         spk_durs = getattr(itv, "speaker_durations", {})
         if spk_durs:
             for spk, dur in spk_durs.items():
-                topic_speaker_durations[topic][spk] = (
-                    topic_speaker_durations[topic].get(spk, 0.0) + dur
-                )
+                if spk and dur > 0:
+                    topic_speaker_durations[clean_topic][spk] = (
+                        topic_speaker_durations[clean_topic].get(spk, 0.0) + dur
+                    )
         else:
             spks = getattr(itv, "participating_speakers", set())
-            dur_per_spk = getattr(itv, "duration_seconds", 1.0) / max(1, len(spks))
-            for spk in spks:
-                topic_speaker_durations[topic][spk] = (
-                    topic_speaker_durations[topic].get(spk, 0.0) + dur_per_spk
+            valid_spks = [s for s in spks if s]
+            dur_per_spk = getattr(itv, "duration_seconds", 1.0) / max(1, len(valid_spks))
+            for spk in valid_spks:
+                topic_speaker_durations[clean_topic][spk] = (
+                    topic_speaker_durations[clean_topic].get(spk, 0.0) + dur_per_spk
                 )
 
     mvps: Dict[str, Tuple[str, float]] = {}
     for topic, spk_map in topic_speaker_durations.items():
         tot = sum(spk_map.values())
         if tot > 0 and len(spk_map) >= 2:
-            top_spk, spk_dur = max(spk_map.items(), key=lambda x: x[1])
-            share_pct = round((spk_dur / tot) * 100.0, 1)
+            sorted_spks = sorted(spk_map.items(), key=lambda x: x[1], reverse=True)
+            top_spk, top_dur = sorted_spks[0]
+            # Honest tie guard: if top two speakers contributed equally (within 0.2s), no solo MVP
+            if len(sorted_spks) >= 2 and abs(top_dur - sorted_spks[1][1]) < 0.2:
+                continue
+            share_pct = round((top_dur / tot) * 100.0, 1)
             mvps[topic] = (top_spk, share_pct)
 
     return mvps

@@ -152,6 +152,14 @@ def skeleton_similarity(a: str, b: str) -> float:
     if skel_a == skel_b:
         return 1.0
         
+    raw_a = skel_a.replace(" ", "")
+    raw_b = skel_b.replace(" ", "")
+
+    # Short consonant length guard: words with <= 2 consonants are too short for fuzzy matching;
+    # fuzzy matching on <= 2 chars causes severe false positives with common verbs/nouns (e.g. 'CS' vs 'كسب', 'أهل' vs 'الأهلي').
+    if min(len(raw_a), len(raw_b)) <= 2:
+        return 0.0
+
     words_a = skel_a.split()
     words_b = skel_b.split()
     
@@ -190,16 +198,19 @@ def resolve_entity_in_text(
         
     normalized = normalize_surface_text(text)
     norm_lower = normalized.lower()
+    padded_norm = f" {norm_lower} "
     
-    # 1. Direct Alias Lookup (Fastest path)
+    # 1. Direct Alias Lookup (Fastest path with word-boundary isolation)
     if aliases:
         for alias_surface, canonical in aliases.items():
-            if alias_surface.lower() in norm_lower:
+            alias_clean = normalize_surface_text(alias_surface).lower()
+            if alias_clean and f" {alias_clean} " in padded_norm:
                 return canonical, alias_surface, 1.0
                 
-    # 2. Check direct substring match against canonical entities
+    # 2. Check direct token match against canonical entities (word-boundary isolated)
     for entity in canonical_entities:
-        if entity.lower() in norm_lower:
+        ent_clean = normalize_surface_text(entity).lower()
+        if ent_clean and f" {ent_clean} " in padded_norm:
             return entity, entity, 1.0
             
     # 3. N-gram Window Scanning for Phonetic Variants

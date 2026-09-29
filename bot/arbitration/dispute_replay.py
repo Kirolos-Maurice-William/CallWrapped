@@ -2,7 +2,7 @@ import csv
 import json
 import logging
 from pathlib import Path
-from typing import Optional, Dict, List, Any, Tuple
+from typing import Optional, Dict, List, Tuple
 
 from bot.arbitration.dispute_models import (
     PropositionFamily,
