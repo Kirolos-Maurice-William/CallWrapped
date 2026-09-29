@@ -639,9 +639,8 @@ class SessionStatsTracker:
     def record_banter(self, speaker_ids: List[str], terms: Optional[List[str]] = None) -> None:
         """Records a resolved friendly banter exchange for the participating speakers."""
         for spk_id in speaker_ids:
-            spk = self.speakers.get(str(spk_id))
-            if spk:
-                spk.record_banter(terms)
+            spk = self.get_or_create_speaker(str(spk_id))
+            spk.record_banter(terms)
 
     def get_total_banter_count(self) -> int:
         """Returns the total number of friendly banter interactions across all speakers."""

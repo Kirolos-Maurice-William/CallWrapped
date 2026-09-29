@@ -619,7 +619,8 @@ class ArbitrationEngine:
         speech_start: float,
         speech_end: float,
         correlation_id: str,
-        audio_features: Optional[Any] = None
+        audio_features: Optional[Any] = None,
+        audio_clip: Optional[str] = None
     ):
         """Records talk-time and appends to the session analytics buffer for batched topic/anger classification."""
         t_fanout_start = time.perf_counter()
@@ -657,7 +658,8 @@ class ArbitrationEngine:
                 "talk_delta_seconds": talk_delta_seconds,
                 "streak_seconds": streak_seconds,
                 "correlation_id": correlation_id,
-                "audio_features": audio_features
+                "audio_features": audio_features,
+                "audio_clip": audio_clip
             })
 
             # Check if buffer overflow, analytics window expired, or schedule timer flush
@@ -914,7 +916,8 @@ class ArbitrationEngine:
         mode: str = "referee",
         speech_start: float = 0.0,
         speech_end: float = 0.0,
-        audio_features: Optional[Any] = None
+        audio_features: Optional[Any] = None,
+        audio_clip: Optional[str] = None
     ):
         t_start = time.monotonic()
         correlation_id = f"arb_{uuid.uuid4().hex[:8]}"
@@ -1008,6 +1011,7 @@ class ArbitrationEngine:
                 "speech_start": speech_start,
                 "speech_end": speech_end,
                 "audio_features": audio_features,
+                "audio_clip": audio_clip,
             })
             logger.info(
                 f"📥 [Queued Utterance] Session {guild_id} is arbitrating. "
@@ -1025,7 +1029,8 @@ class ArbitrationEngine:
             speech_start=speech_start,
             speech_end=speech_end,
             correlation_id=correlation_id,
-            audio_features=audio_features
+            audio_features=audio_features,
+            audio_clip=audio_clip
         )
 
         await self._run_pipeline(
@@ -1825,7 +1830,8 @@ class ArbitrationEngine:
                         speech_start=queued.get("speech_start", 0.0),
                         speech_end=queued.get("speech_end", 0.0),
                         correlation_id=queued.get("correlation_id", f"arb_{uuid.uuid4().hex[:8]}"),
-                        audio_features=queued.get("audio_features")
+                        audio_features=queued.get("audio_features"),
+                        audio_clip=queued.get("audio_clip")
                     )
 
                     # 2. Arbitration pipeline path

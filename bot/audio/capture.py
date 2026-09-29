@@ -107,15 +107,16 @@ def save_captured_utterance_sync(
     ended_by: str = "silence",
     timestamp: Optional[float] = None,
     recordings_dir: Optional[Path] = None,
-    audio_features: Optional[Any] = None
+    audio_features: Optional[Any] = None,
+    force_save: bool = False
 ) -> Optional[Dict[str, Any]]:
     """
     Synchronous filesystem save for a finalized utterance:
     - Writes 16kHz mono WAV to <session_dir>/<timestamp>_<speaker>.wav
     - Appends metadata JSON line to <session_dir>/session_log.jsonl
-    Returns metadata dict if saved, None if TEST_CAPTURE_MODE is off.
+    Returns metadata dict if saved, None if TEST_CAPTURE_MODE is off and force_save is False.
     """
-    if not getattr(config, "TEST_CAPTURE_MODE", 0):
+    if not getattr(config, "TEST_CAPTURE_MODE", 0) and not force_save:
         return None
 
     # Priority: explicit recordings_dir > active session dir > auto-created session dir
@@ -123,6 +124,8 @@ def save_captured_utterance_sync(
         target_dir = Path(recordings_dir)
     elif _active_session_dir:
         target_dir = _active_session_dir
+    elif force_save:
+        target_dir = DEFAULT_RECORDINGS_ROOT / "evidence"
     else:
         target_dir = start_capture_session()
 
@@ -186,13 +189,14 @@ async def save_captured_utterance_async(
     ended_by: str = "silence",
     timestamp: Optional[float] = None,
     recordings_dir: Optional[Path] = None,
-    audio_features: Optional[Any] = None
+    audio_features: Optional[Any] = None,
+    force_save: bool = False
 ) -> Optional[Dict[str, Any]]:
     """
     Non-blocking async wrapper that delegates disk writes to a worker thread
     via asyncio.to_thread, ensuring no event loop or audio stream stalls.
     """
-    if not getattr(config, "TEST_CAPTURE_MODE", 0):
+    if not getattr(config, "TEST_CAPTURE_MODE", 0) and not force_save:
         return None
 
     return await asyncio.to_thread(
@@ -204,7 +208,8 @@ async def save_captured_utterance_async(
         ended_by=ended_by,
         timestamp=timestamp,
         recordings_dir=recordings_dir,
-        audio_features=audio_features
+        audio_features=audio_features,
+        force_save=force_save
     )
 
 

@@ -132,9 +132,19 @@ async def on_user_utterance(
     if not raw_text or len(raw_text.strip()) < 2:
         return
 
-    # Test-Mode Capture: asynchronously save utterance audio and metadata
-    if getattr(config, "TEST_CAPTURE_MODE", 0):
-        from bot.audio.capture import save_captured_utterance_async
+    # Test-Mode Capture or High-Arousal Audio Evidence
+    audio_clip_filename: Optional[str] = None
+    is_high_arousal = audio_features and (
+        getattr(audio_features, "was_loud", False) or
+        getattr(audio_features, "peak_robust_z", 0.0) >= 2.2
+    )
+
+    if getattr(config, "TEST_CAPTURE_MODE", 0) or is_high_arousal:
+        from bot.audio.capture import save_captured_utterance_async, _clean_speaker_name
+        ts = speech_start if speech_start > 0 else time.time()
+        safe_spk = _clean_speaker_name(speaker_name)
+        audio_clip_filename = f"{int(ts)}_{safe_spk}.wav"
+        force_save = not bool(getattr(config, "TEST_CAPTURE_MODE", 0)) and is_high_arousal
         asyncio.create_task(
             save_captured_utterance_async(
                 speaker_name=speaker_name,
@@ -142,8 +152,9 @@ async def on_user_utterance(
                 asr_text=raw_text,
                 stt_latency_ms=stt_ms,
                 ended_by=ended_by,
-                timestamp=time.time(),
-                audio_features=audio_features
+                timestamp=ts,
+                audio_features=audio_features,
+                force_save=force_save
             )
         )
 
@@ -159,7 +170,8 @@ async def on_user_utterance(
         mode=ctx.mode,
         speech_start=speech_start,
         speech_end=speech_end,
-        audio_features=audio_features
+        audio_features=audio_features,
+        audio_clip=audio_clip_filename
     )
 
 
