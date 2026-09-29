@@ -187,9 +187,9 @@ class GroqClient:
                 resp = await client.post(self.url, headers=headers, json=payload)
                 self.pool.update_headers(k, resp.headers, resp.status_code)
 
-                # HTTP 429 / 401 / 403: Immediately retry with other keys in pool
+                # HTTP 429 / 401 / 403 / 5xx: Immediately retry with other keys in pool
                 attempted_ids = {k["id"]}
-                while resp.status_code in (401, 403, 429):
+                while resp.status_code in (401, 403, 429, 500, 502, 503, 504):
                     if resp.status_code == 429:
                         wait_sec = parse_reset_duration(
                             resp.headers.get("retry-after") or
@@ -329,9 +329,9 @@ class GroqClient:
                 resp = client.post(self.url, headers=headers, json=payload)
                 self.pool.update_headers(k, resp.headers, resp.status_code)
 
-                # HTTP 429 / 401 / 403: Immediately retry with other keys in pool
+                # HTTP 429 / 401 / 403 / 5xx: Immediately retry with other keys in pool
                 attempted_ids = {k["id"]}
-                while resp.status_code in (401, 403, 429):
+                while resp.status_code in (401, 403, 429, 500, 502, 503, 504):
                     if resp.status_code == 429:
                         wait_sec = parse_reset_duration(
                             resp.headers.get("retry-after") or

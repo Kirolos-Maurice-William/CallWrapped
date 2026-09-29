@@ -1343,6 +1343,12 @@ class ArbitrationEngine:
             except Exception as e:
                 logger.debug(f"Could not post dispute offer to text channel: {e}")
 
+        # Speak concise offer in voice
+        if voice_client and voice_client.is_connected() and not voice_client.is_playing():
+            is_arabic = any('\u0600' <= char <= '\u06FF' for char in (prior_claim.claim_text + claim_stmt))
+            spoken_offer = "شفتكم اختلفتوا، أشوفها؟" if is_arabic else "Heard a disagreement, want me to check?"
+            asyncio.create_task(speaker.speak(voice_client, spoken_offer))
+
         # Publish VoiceEvent(type="dispute_check_offered")
         offer_event = VoiceEvent(
             session_id=str(guild_id),

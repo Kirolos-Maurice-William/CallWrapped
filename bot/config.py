@@ -73,7 +73,7 @@ class BotConfig:
     TTS_VOICE: str = os.getenv("TTS_VOICE_AR", os.getenv("TTS_VOICE", "ar-EG-ShakirNeural"))
     TTS_RATE: str = os.getenv("TTS_RATE", "-3%")
     TTS_PITCH: str = os.getenv("TTS_PITCH", "+0Hz")
-    TTS_TIMEOUT_SEC: float = float(os.getenv("TTS_TIMEOUT_SEC", "10.0"))
+    TTS_TIMEOUT_SEC: float = float(os.getenv("TTS_TIMEOUT_SEC", "25.0"))
 
     # Discord Embed Styling
     EMBED_COLOR_INFO: int = int(str(os.getenv("EMBED_COLOR_INFO", "0x5865F2")), 16)
