@@ -139,7 +139,7 @@ class TestTwoStageReferee(unittest.IsolatedAsyncioTestCase):
             # 2. Assert offer message sent to text channel (call 1 is transcript mirror, call 2 is offer)
             self.assertEqual(mock_text_channel.send.call_count, 2)
             offer_msg = mock_text_channel.send.call_args_list[1][0][0]
-            self.assertIn("🤖 شفت اتنين بيقولوا نفس المعلومة بشكل مختلف — أتحقق؟ قول «شوفها» أو اكتب !check", offer_msg)
+            self.assertIn("🤖 شفت اتنين بيقولوا نفس المعلومة بشكل مختلف: أشوفها؟ قول «شوفها» أو اكتب !check", offer_msg)
 
             # 3. Assert VoiceEvent(dispute_check_offered) was published
             offer_events = [e for e in published_events if e.type == "dispute_check_offered"]

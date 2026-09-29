@@ -424,28 +424,30 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
               </h4>
             </div>
 
-            {longest_streak && longest_streak.speaker_name && longest_streak.streak_seconds > 0 ? (
+            {(longest_streak?.streak_seconds > 0) || hasSpeakers ? (
               <div className="space-y-2.5">
-                <div className="p-3 rounded-xl bg-[#313338] border border-[#F0B232]/30 text-center space-y-1.5">
-                  <div className="inline-flex p-1.5 rounded-xl bg-[#F0B232]/20 text-[#F0B232] border border-[#F0B232]/40">
-                    <Award className="w-5 h-5" />
+                {longest_streak && longest_streak.speaker_name && longest_streak.streak_seconds > 0 && (
+                  <div className="p-3 rounded-xl bg-[#313338] border border-[#F0B232]/30 text-center space-y-1.5">
+                    <div className="inline-flex p-1.5 rounded-xl bg-[#F0B232]/20 text-[#F0B232] border border-[#F0B232]/40">
+                      <Award className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase font-bold text-[#F0B232] tracking-wider">
+                        The Monologue King
+                      </div>
+                      <div className="text-sm font-bold text-white flex items-center justify-center gap-1.5" dir="auto">
+                        <span>👑</span>
+                        <span>{longest_streak.speaker_name}</span>
+                      </div>
+                      <div className="text-xl font-extrabold font-mono text-[#F0B232] mt-0.5">
+                        {formatStreakMMSS(longest_streak.streak_seconds)}
+                      </div>
+                      <div className="text-[10px] font-mono text-[#949BA4]">
+                        ({formatDurationHuman(longest_streak.streak_seconds)} uninterrupted)
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-[10px] uppercase font-bold text-[#F0B232] tracking-wider">
-                      The Monologue King
-                    </div>
-                    <div className="text-sm font-bold text-white flex items-center justify-center gap-1.5" dir="auto">
-                      <span>👑</span>
-                      <span>{longest_streak.speaker_name}</span>
-                    </div>
-                    <div className="text-xl font-extrabold font-mono text-[#F0B232] mt-0.5">
-                      {formatStreakMMSS(longest_streak.streak_seconds)}
-                    </div>
-                    <div className="text-[10px] font-mono text-[#949BA4]">
-                      ({formatDurationHuman(longest_streak.streak_seconds)} uninterrupted)
-                    </div>
-                  </div>
-                </div>
+                )}
 
                 {/* The Silent Observer (quietest in call, minimum 2 speakers) */}
                 {hasSpeakers && speakerEntries.length >= 2 && (() => {
@@ -462,7 +464,7 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                               The Silent Observer
                             </div>
                             <div className="font-bold text-white truncate max-w-[110px]" dir="auto">
-                              {quietest.speaker_name}
+                              {quietest.speaker_name || "Speaker"}
                             </div>
                           </div>
                         </div>

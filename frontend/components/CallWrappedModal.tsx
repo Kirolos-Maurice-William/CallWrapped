@@ -214,7 +214,7 @@ export function CallWrappedModal({
                     <div className="p-1.5 rounded-lg bg-[#5865F2]/20 text-[#5865F2] font-bold text-sm shrink-0">🤫</div>
                     <div className="min-w-0">
                       <div className="text-[10px] uppercase font-bold text-[#5865F2] tracking-wider">The Silent Observer</div>
-                      <div className="font-bold text-white truncate" dir="auto">{silentObserver.speaker_name}</div>
+                      <div className="font-bold text-white truncate" dir="auto">{silentObserver.speaker_name || "Speaker"}</div>
                     </div>
                   </div>
                   <div className="text-right font-mono text-[#5865F2] shrink-0 ml-2">

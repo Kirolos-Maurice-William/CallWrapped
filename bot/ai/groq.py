@@ -389,6 +389,8 @@ class GroqClient:
             latency_ms = int((time.perf_counter() - t0) * 1000)
             return None, {}, latency_ms
 
+        latency_ms = int((time.perf_counter() - t0) * 1000)
+
         if not resp or resp.status_code != 200:
             return None, {}, latency_ms
 
