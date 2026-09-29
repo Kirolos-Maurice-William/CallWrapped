@@ -36,7 +36,7 @@
 
 ## 💡 What is CallWrapped?
 
-In voice calls with friendswhether in multiplayer gaming lobbies, study groups, tech debates, or podcastspeople constantly make contradictory factual claims with absolute confidence:
+In voice calls with friends (multiplayer gaming lobbies, study groups, tech debates, or podcasts), people constantly make contradictory factual claims with absolute confidence:
 - *"Did the RTX 5070 launch with 12GB or 16GB VRAM?"*
 - *"Who won the 2022 World Cup Golden Boot?"*
 - *"Is that company acquisition real or a rumor?"*
@@ -46,7 +46,7 @@ Traditional voice assistants (Siri, Alexa) don't work in group calls because nob
 **CallWrapped solves this by acting as a polite, on-demand voice referee:**
 1. **Silent Listening:** The bot transcribes multi-speaker audio in real time using **AssemblyAI Universal-3.5 Pro**.
 2. **Background Fact-Checking:** When participants state conflicting facts, the bot extracts the claims using **Groq LPU**, queries **Tavily** for authoritative sources, and sends a discreet, silent offer in Discord text and on the live dashboard:  
-   *"🤖 I noticed a disagreement on this fact  want me to check? Say 'check it' or type `!check`."*
+   *"🤖 I noticed a disagreement on this fact. Want me to check? Say 'check it' or type `!check`."*
 3. **Consensual Voice Verdict:** The bot **never interrupts voice uninvited**. It only delivers a spoken resolution via **Edge-TTS** if someone explicitly confirms.
 4. **Spotify-Style "Call Wrapped":** When the call wraps up (`!recap`), the bot generates a shareable visual summary showing who talked the most, topics discussed, and fun community badges like *The Diplomat* (spoke the most without arguing) or *The Monopolist* (hogged the microphone).
 
@@ -157,7 +157,7 @@ Served locally at `http://localhost:8000` via FastAPI and Next.js 14:
    - **Speaker 1:** *"The RTX 5070 launched with 16GB VRAM from Nvidia."*
    - **Speaker 2:** *"No way, it only launched with 12GB GDDR7, there is no 16GB version."*
 5. **Stage 1 (Silent Text Offer):** The bot posts an offer in the text channel and dashboard:  
-   *"🤖 I noticed a disagreement on this fact  want me to check? Say 'check it' or type `!check`."*  
+   *"🤖 I noticed a disagreement on this fact. Want me to check? Say 'check it' or type `!check`."*  
    *(Notice: The bot remains completely silent in voice).*
 6. **Stage 2 (Confirmation):** Say *"check it"* in voice (or type `!check` in chat).
 7. **Spoken Verdict:** The bot speaks the verified answer with Nvidia source citations, while the dashboard highlights the dispute card with verified badges.
@@ -229,5 +229,5 @@ start_all.bat
 This project is licensed under the [MIT License](LICENSE).
 
 <div align="center">
-<b>CallWrapped  Respectful Factual Grounding & Conversational Intelligence for Voice Calls.</b>
+<b>CallWrapped: Respectful Factual Grounding & Conversational Intelligence for Voice Calls.</b>
 </div>
