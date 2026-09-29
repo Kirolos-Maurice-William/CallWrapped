@@ -61,6 +61,12 @@ export function CallWrappedModal({
     speakerList.length >= 2 && topDiplomat && (diplomatCandidates.length < 2 || (topDiplomat.talk_seconds - diplomatCandidates[1].talk_seconds >= 1.0))
   );
 
+  const banterSpeakers = speakerList.filter(s => (s.banter_count || 0) > 0).sort((a, b) => (b.banter_count || 0) - (a.banter_count || 0));
+  const topBanter = banterSpeakers[0];
+  const isBanterEligible = Boolean(
+    speakerList.length >= 2 && topBanter && (banterSpeakers.length < 2 || (topBanter.banter_count || 0) > (banterSpeakers[1].banter_count || 0))
+  );
+
   // Topics
   const topicalEntries = Object.entries(topic_totals || {})
     .filter(([t]) => t !== "null_topic" && t !== "null" && t !== "بدون موضوع" && t !== "none")
@@ -79,14 +85,21 @@ export function CallWrappedModal({
     const diplomatLine = isDiplomatEligible && topDiplomat
       ? `🕊️ **The Diplomat:** ${topDiplomat.speaker_name} (${formatDurationHuman(topDiplomat.talk_seconds)} peaceful)\n`
       : "";
+    const roastLine = isBanterEligible && topBanter
+      ? `🎭 **The Roast Master:** ${topBanter.speaker_name} (${topBanter.banter_count} mutual roasts)\n`
+      : "";
+    const vibeText = total_angry_episodes === 0
+      ? ((analytics.total_banter_count || 0) > 0 ? `Friendly banter (${analytics.total_banter_count} roasts, 0 anger spikes)` : "Civilized discussion (0 anger spikes)")
+      : `${total_angry_episodes} heated episodes`;
     const summaryText = `🎙️ **CALLWRAPPED SESSION SUMMARY**\n` +
       `👑 **Monologue King:** ${longest_streak?.speaker_name || "N/A"} (${formatDurationHuman(longest_streak?.streak_seconds || 0)})\n` +
       observerLine +
       spicyLine +
       diplomatLine +
+      roastLine +
       `🎯 **Ground Truth:** ${verifiedCount} verified, ${disputedCount} refuted\n` +
       `📊 **Top Topic:** ${topTopicName}\n` +
-      `🎭 **Call Vibe:** ${total_angry_episodes === 0 ? "Civilized discussion (0 anger spikes)" : `${total_angry_episodes} heated episodes`}\n` +
+      `🎭 **Call Vibe:** ${vibeText}\n` +
       `⚡ *Arbitrated live by CallWrapped AI Referee (AssemblyAI + Groq)*`;
 
     navigator.clipboard.writeText(summaryText);
@@ -182,10 +195,10 @@ export function CallWrappedModal({
                 <span>Call Vibe</span>
               </div>
               <p className="text-base font-bold text-white">
-                {total_angry_episodes === 0 ? "Civilized 🕊️" : "Spicy 🌶️"}
+                {total_angry_episodes === 0 ? ((analytics.total_banter_count || 0) > 0 ? "Friendly Banter 😂" : "Civilized 🕊️") : "Spicy 🌶️"}
               </p>
               <p className="text-[11px] font-mono text-pink-300 font-semibold">
-                {total_angry_episodes === 0 ? "0 anger spikes" : `${total_angry_episodes} heated receipts`}
+                {total_angry_episodes === 0 ? ((analytics.total_banter_count || 0) > 0 ? `${analytics.total_banter_count} mutual roasts (0 anger)` : "0 anger spikes") : `${total_angry_episodes} heated receipts`}
               </p>
             </div>
           </div>
@@ -239,6 +252,23 @@ export function CallWrappedModal({
               <div className="text-right font-mono text-emerald-300">
                 <div className="font-bold text-xs">{formatDurationHuman(topDiplomat.talk_seconds)}</div>
                 <div className="text-[10px] text-slate-400">100% peaceful</div>
+              </div>
+            </div>
+          )}
+
+          {/* The Roast Master Award */}
+          {isBanterEligible && topBanter && (
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-purple-500/30 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded-lg bg-purple-500/20 text-purple-300 font-bold text-xs">🎭</div>
+                <div>
+                  <div className="text-[10px] uppercase font-bold text-purple-300 tracking-wider">The Roast Master</div>
+                  <div className="font-bold text-white truncate max-w-[140px]" dir="auto">{topBanter.speaker_name}</div>
+                </div>
+              </div>
+              <div className="text-right font-mono text-purple-300">
+                <div className="font-bold text-xs">{topBanter.banter_count} {topBanter.banter_count === 1 ? "roast turn" : "roast turns"}</div>
+                <div className="text-[10px] text-slate-400">friendly teasing</div>
               </div>
             </div>
           )}

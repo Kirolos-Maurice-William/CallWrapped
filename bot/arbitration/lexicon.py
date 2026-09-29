@@ -145,3 +145,8 @@ def analyze_banter(text: str) -> BanterAnalysisResult:
         matched_terms=matched_terms,
         masked_text=masked
     )
+
+
+# Backward-compatible alias
+detect_vulgarity = analyze_banter
+

@@ -628,8 +628,72 @@ class TestPhase1DurationAndSilentObserver(unittest.TestCase):
         self.assertEqual(diplomat_charlie[0], "charlie")
         self.assertAlmostEqual(diplomat_charlie[1], 40.4, places=1)
 
+    def test_banter_tracking_and_roast_master_badge(self):
+        # Case 0: Solo call (1 speaker only) -> None
+        tracker_solo = SessionStatsTracker("test_solo_banter")
+        tracker_solo.record_utterance("alice", 0.0, 10.0, "Alice")
+        tracker_solo.record_banter(["alice"], ["teasing"])
+        self.assertIsNone(tracker_solo.get_roast_master())
+
+        tracker = SessionStatsTracker("test_roast_master")
+        tracker.record_utterance("alice", 0.0, 20.0, "Alice")
+        tracker.record_utterance("bob", 20.0, 40.0, "Bob")
+
+        # Case 1: No banter -> None
+        self.assertIsNone(tracker.get_roast_master())
+        self.assertEqual(tracker.get_total_banter_count(), 0)
+
+        # Case 2: Banter recorded for Alice and Bob
+        tracker.record_banter(["alice", "bob"], ["roast1"])
+        self.assertEqual(tracker.speakers["alice"].banter_count, 1)
+        self.assertEqual(tracker.speakers["bob"].banter_count, 1)
+        self.assertEqual(tracker.get_total_banter_count(), 2)
+
+        # Honest tie guard: Alice=1, Bob=1 tie -> None!
+        self.assertIsNone(tracker.get_roast_master())
+
+        # Case 3: Alice participates in another banter exchange with Charlie
+        tracker.record_utterance("charlie", 40.0, 60.0, "Charlie")
+        tracker.record_banter(["alice", "charlie"], ["roast2"])
+        self.assertEqual(tracker.speakers["alice"].banter_count, 2)
+        self.assertEqual(tracker.speakers["bob"].banter_count, 1)
+        self.assertEqual(tracker.speakers["charlie"].banter_count, 1)
+
+        roast_master = tracker.get_roast_master()
+        self.assertIsNotNone(roast_master)
+        spk_id, count, terms = roast_master
+        self.assertEqual(spk_id, "alice")
+        self.assertEqual(count, 2)
+        self.assertIn("roast1", terms)
+        self.assertIn("roast2", terms)
+
+    def test_audio_clip_evidence_in_anger_episodes(self):
+        tracker = SessionStatsTracker("test_audio_evidence")
+        tracker.record_utterance("alice", 0.0, 10.0, "Alice")
+        tracker.record_anger(
+            speaker_id="alice",
+            timestamp=12.0,
+            anger="high",
+            anger_quote="زهقت خلاص من السيرفر ده",
+            speaker_name="Alice",
+            was_loud=True,
+            peak_z=3.4,
+            context="hostile_escalation (sustained 3 turns, z=3.4σ)",
+            audio_clip="1790682512_Alice.wav"
+        )
+        spk = tracker.speakers["alice"]
+        self.assertEqual(spk.angry_episodes, 1)
+        self.assertEqual(len(spk.anger_episodes_history), 1)
+        ep = spk.anger_episodes_history[0]
+        self.assertEqual(ep["quote"], "زهقت خلاص من السيرفر ده")
+        self.assertEqual(ep["was_loud"], True)
+        self.assertEqual(ep["peak_z"], 3.4)
+        self.assertEqual(ep["context"], "hostile_escalation (sustained 3 turns, z=3.4σ)")
+        self.assertEqual(ep["audio_clip"], "1790682512_Alice.wav")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

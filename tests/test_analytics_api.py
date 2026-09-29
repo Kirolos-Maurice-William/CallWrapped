@@ -68,6 +68,40 @@ class TestAnalyticsVulgarityApi(unittest.TestCase):
         self.assertEqual(reset_analytics.get("total_vulgarity_count"), 0)
         self.assertEqual(len(reset_analytics.get("speakers", {})), 0)
 
+    def test_banter_telemetry_and_audio_evidence_api(self):
+        # 1. Post analytics_update with banter metrics
+        event_banter = {
+            "event_id": "evt_banter_01",
+            "type": "analytics_update",
+            "speaker_name": "Alice",
+            "talk_delta_seconds": 10.0,
+            "banter_count": 3,
+            "banter_terms": ["roast1", "roast2"],
+            "payload": {
+                "banter_count": 3,
+                "banter_terms": ["roast1", "roast2"]
+            }
+        }
+        res1 = self.client.post("/api/events", json=event_banter)
+        self.assertEqual(res1.status_code, 200)
+
+        # 2. Check /api/analytics
+        res_analytics = self.client.get("/api/analytics")
+        self.assertEqual(res_analytics.status_code, 200)
+        data = res_analytics.json()
+        self.assertEqual(data.get("total_banter_count"), 3)
+        self.assertEqual(data["speakers"]["Alice"]["banter_count"], 3)
+        self.assertEqual(data["speakers"]["Alice"]["banter_terms"], ["roast1", "roast2"])
+
+        # 3. Test /api/audio-evidence with non-existent file -> 404
+        res_audio = self.client.get("/api/audio-evidence/non_existent_clip_123.wav")
+        self.assertEqual(res_audio.status_code, 404)
+
+        # 4. Test /api/audio-evidence with invalid extension -> 400
+        res_bad = self.client.get("/api/audio-evidence/exploit.exe")
+        self.assertEqual(res_bad.status_code, 400)
+
 
 if __name__ == "__main__":
     unittest.main()
+

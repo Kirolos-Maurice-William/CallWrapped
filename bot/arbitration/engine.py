@@ -19,6 +19,8 @@ from bot.events.models import VoiceEvent, LatencyBreakdown
 from bot.events.publisher import publisher
 from bot.config import config
 from bot.audio.fusion import fuse_anger
+from bot.arbitration.lexicon import analyze_banter, normalize_bilingual_text
+from bot.arbitration.discourse import DiscourseTracker, PLAYFUL_INSULT_TOKENS
 import asyncio
 from cachetools import TTLCache
 
@@ -194,6 +196,7 @@ class SessionState:
         self.pending_utterances: List[Dict[str, Any]] = []
         self.is_draining: bool = False
         self._stats_tracker = SessionStatsTracker(session_id=str(guild_id))
+        self.discourse_tracker = DiscourseTracker(session_id=str(guild_id))
         self.analyzed_utterances: FifoSet = FifoSet(maxlen=500)
         self.analytics_buffer: List[Dict[str, Any]] = []
         self.last_analytics_flush: float = time.time()
@@ -488,6 +491,7 @@ class SessionState:
         self.pending_utterances.clear()
         self.is_draining = False
         self._stats_tracker.reset()
+        self.discourse_tracker = DiscourseTracker(session_id=str(self.guild_id))
         self.analyzed_utterances.clear()
         if hasattr(self, "claim_memory") and hasattr(self.claim_memory, "clear"):
             self.claim_memory.clear()
@@ -781,30 +785,70 @@ class ArbitrationEngine:
                     if raw_tag.lower() not in ("none", "null", "other", "null_topic"):
                         session.micro_tags[raw_tag] = session.micro_tags.get(raw_tag, 0) + 1
 
-            # 2. Update anger with 90s debounce (record_anger ONLY when anger is mild or high AND has verbal quote)
+            # 2. Conversational Pragmatics & Discourse Trajectory Evaluation
             spk_key = str(item["user_id"])
             quote_candidate = (anger_evidence or "").strip()
             if not quote_candidate and anger and str(anger).lower() in ("mild", "high") and boost_val > 0:
                 quote_candidate = (item.get("text") or "").strip()
 
-            if anger and str(anger).lower() in ("mild", "high") and quote_candidate:
-                stats = session._stats_tracker.record_anger(
+            banter_res = analyze_banter(item["text"])
+            norm_text = normalize_bilingual_text(item["text"])
+            is_banter_cue = bool(
+                banter_res.vulgarity_count > 0 or
+                any(tok in norm_text for tok in PLAYFUL_INSULT_TOKENS)
+            )
+
+            # Direct anger recording for genuine non-banter anger/frustration
+            if str(anger).lower() in ("mild", "high") and not is_banter_cue:
+                session._stats_tracker.record_anger(
                     speaker_id=spk_key,
-                    timestamp=item["timestamp"],
+                    timestamp=turn_end,
                     anger=anger,
                     anger_quote=quote_candidate,
                     speaker_name=item["speaker_name"],
                     was_loud=was_loud_val,
                     peak_z=peak_z_val,
-                    context=gate_reason
+                    context="acoustic_spike" if boost_val > 0 else "vocal_friction",
+                    audio_clip=item.get("audio_clip")
                 )
-            else:
-                stats = session._stats_tracker.get_or_create_speaker(spk_key, item["speaker_name"])
+
+            discourse_resolutions = session.discourse_tracker.observe_turn(
+                speaker_id=spk_key,
+                speaker_name=item["speaker_name"],
+                text=item["text"],
+                timestamp=turn_end,
+                duration=turn_dur,
+                audio_features=audio_feat,
+                raw_anger=anger,
+                anger_evidence=quote_candidate,
+                audio_clip=item.get("audio_clip")
+            )
+
+            for d_res in discourse_resolutions:
+                if d_res.resolution_type == "hostile_escalation":
+                    session._stats_tracker.record_anger(
+                        speaker_id=d_res.speaker_id,
+                        timestamp=d_res.timestamp,
+                        anger="high" if d_res.peak_z >= 3.0 else "mild",
+                        anger_quote=d_res.quote,
+                        speaker_name=d_res.speaker_name,
+                        was_loud=d_res.was_loud,
+                        peak_z=d_res.peak_z,
+                        context=d_res.trajectory_context,
+                        audio_clip=d_res.audio_clip
+                    )
+                elif d_res.resolution_type == "friendly_banter":
+                    session._stats_tracker.record_banter(
+                        speaker_ids=[d_res.speaker_id],
+                        terms=d_res.terms
+                    )
+
+            stats = session._stats_tracker.get_or_create_speaker(spk_key, item["speaker_name"])
 
             logger.info(
                 f"📈 [Batched Analytics Line] {item['speaker_name']}: topic={topic} (tag={raw_tag}) | "
                 f"anger={anger} (raw={raw_anger}, boost={boost_val:.2f}, gate={gate_reason}) | "
-                f"episodes={stats.angry_episodes} | quote='{anger_evidence}'"
+                f"episodes={stats.angry_episodes} | banter={stats.banter_count} | quote='{anger_evidence}'"
             )
 
             # 3. Publish VoiceEvent(type="analytics_update")
@@ -825,6 +869,8 @@ class ArbitrationEngine:
                 audio_features=af_dict,
                 vulgarity_count=getattr(stats, "vulgarity_count", 0),
                 vulgarity_terms=list(getattr(stats, "vulgarity_terms", [])),
+                banter_count=getattr(stats, "banter_count", 0),
+                banter_terms=list(getattr(stats, "banter_terms", [])),
                 payload={
                     "topic": topic,
                     "tag": raw_tag,
@@ -843,6 +889,9 @@ class ArbitrationEngine:
                     "vulgarity_count": getattr(stats, "vulgarity_count", 0),
                     "vulgarity_terms": list(getattr(stats, "vulgarity_terms", [])),
                     "total_vulgarity_count": session._stats_tracker.get_total_vulgarity_count(),
+                    "banter_count": getattr(stats, "banter_count", 0),
+                    "banter_terms": list(getattr(stats, "banter_terms", [])),
+                    "total_banter_count": session._stats_tracker.get_total_banter_count(),
                     "classification": {
                         "topic": topic,
                         "tag": raw_tag,

@@ -56,3 +56,5 @@ class VoiceEvent(BaseModel):
     audio_features: Optional[Dict[str, Any]] = None
     vulgarity_count: Optional[int] = None
     vulgarity_terms: Optional[list] = None
+    banter_count: Optional[int] = None
+    banter_terms: Optional[list] = None

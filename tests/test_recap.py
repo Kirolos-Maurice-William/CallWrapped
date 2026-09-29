@@ -167,7 +167,28 @@ class TestSessionRecapRenderer(unittest.TestCase):
         # Verify The Diplomat badge
         self.assertIn("🕊️ **الدبلوماسي (أكتر مشاركة هادية ونظيفة):** Bob (45s كلام راقي بدون أي عصبية)", recap_text)
 
+    def test_render_recap_roast_master_and_friendly_banter(self):
+        """Phase 3: Verify The Roast Master badge and friendly banter call vibe."""
+        session = SessionState(guild_id=555)
+        session.stats_tracker.record_utterance("alice", 0.0, 30.0, "Alice")
+        session.stats_tracker.record_utterance("bob", 30.0, 60.0, "Bob")
+        session.stats_tracker.record_banter(["alice", "bob"], ["roast1"])
+        session.stats_tracker.record_banter(["alice"], ["roast2", "roast3"])
+        session.stats_tracker.record_banter(["alice"], ["roast4"])
+        session.topic_counts = {"gaming": 2}
+
+        recap_text = render_recap(session)
+        print("\n" + "=" * 60)
+        print("=== PHASE 3 ROAST MASTER RECAP ===")
+        print("=" * 60)
+        print(recap_text)
+        print("=" * 60 + "\n")
+
+        self.assertIn("🎭 **ملك الضحك والمناوشات:** Alice (3 مناوشات ودية بدون أي زعل)", recap_text)
+        self.assertIn("أجواء ضحك ومناوشات (4 مناوشات ودية، 0 عصبية) 😂", recap_text)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

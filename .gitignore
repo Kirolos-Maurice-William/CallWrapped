@@ -36,4 +36,8 @@ recordings/test_session_unit_test/
 audit/shadow/
 *.jsonl
 
+# Editor / Tool Metadata
+.qwen/
+opencode.json
+
 

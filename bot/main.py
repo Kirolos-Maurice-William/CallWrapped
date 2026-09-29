@@ -330,6 +330,33 @@ def render_recap(session_state: Any) -> str:
     if not session_state:
         return "مفيش بيانات في المكالمة دي لسه."
 
+    # Flush any pending discourse trajectory candidates before rendering
+    if hasattr(session_state, "discourse_tracker") and session_state.discourse_tracker:
+        flushed = session_state.discourse_tracker.flush_pending()
+        tracker = getattr(session_state, "_stats_tracker", None)
+        if tracker:
+            for d_res in flushed:
+                if d_res.resolution_type == "hostile_escalation":
+                    tracker.record_anger(
+                        speaker_id=d_res.speaker_id,
+                        timestamp=d_res.timestamp,
+                        anger="high" if d_res.peak_z >= 3.0 else "mild",
+                        anger_quote=d_res.quote,
+                        speaker_name=d_res.speaker_name,
+                        was_loud=d_res.was_loud,
+                        peak_z=d_res.peak_z,
+                        context=d_res.trajectory_context,
+                        audio_clip=d_res.audio_clip
+                    )
+                elif d_res.resolution_type == "friendly_banter":
+                    p_ids = [d_res.speaker_id]
+                    if d_res.partner_id:
+                        p_ids.append(d_res.partner_id)
+                    tracker.record_banter(
+                        speaker_ids=p_ids,
+                        terms=d_res.terms
+                    )
+
     # 1. Extract speakers from session_state
     speakers = []
     stats_tracker = getattr(session_state, "stats_tracker", None)
@@ -456,6 +483,19 @@ def render_recap(session_state: Any) -> str:
                 d_dur_str = f"{d_sec / 60.0:.1f}m" if d_sec >= 60.0 else f"{int(round(d_sec))}s"
                 lines.append(f"🕊️ **الدبلوماسي (أكتر مشاركة هادية ونظيفة):** {d_name} ({d_dur_str} كلام راقي بدون أي عصبية)")
 
+    # The Roast Master: speaker who participated most in friendly banter (requires >= 2 speakers with honest tie guard)
+    if len(speakers) >= 2:
+        roast_candidates = [s for s in speakers if getattr(s, "banter_count", 0) > 0]
+        if roast_candidates:
+            roast_candidates.sort(key=lambda s: s.banter_count, reverse=True)
+            top_roast = roast_candidates[0]
+            is_roast_tie = len(roast_candidates) >= 2 and roast_candidates[1].banter_count == top_roast.banter_count
+            if not is_roast_tie:
+                r_name = top_roast.speaker_name or top_roast.speaker_id
+                r_cnt = top_roast.banter_count
+                r_str = "مناوشة ودية واحدة" if r_cnt == 1 else ("مناوشتين وديتين" if r_cnt == 2 else (f"{r_cnt} مناوشات ودية" if 3 <= r_cnt <= 10 else f"{r_cnt} مناوشة ودية"))
+                lines.append(f"🎭 **ملك الضحك والمناوشات:** {r_name} ({r_str} بدون أي زعل)")
+
     # Section C: Anger leaderboard (episode count + first anger quote as "receipts")
     # If zero angry episodes for everyone, replace with: "😡 Nobody got angry this call... suspicious."
     angry_speakers = [s for s in sorted_speakers if s.angry_episodes > 0]
@@ -468,7 +508,12 @@ def render_recap(session_state: Any) -> str:
             ep_word = "moment" if s.angry_episodes == 1 else "moments"
             lines.append(f"• **{name}**: {s.angry_episodes} {ep_word}{quote_str}")
     else:
-        lines.append("\n😡 محدش عصب في المكالمة دي... كده مش طبيعي 😂")
+        total_banter = sum(getattr(s, "banter_count", 0) for s in speakers)
+        if total_banter > 0:
+            b_word = "مناوشة ودية واحدة" if total_banter == 1 else ("مناوشتين وديتين" if total_banter == 2 else (f"{total_banter} مناوشات ودية" if 3 <= total_banter <= 10 else f"{total_banter} مناوشة ودية"))
+            lines.append(f"\n😡 محدش عصب في المكالمة دي... أجواء ضحك ومناوشات ({b_word}، 0 عصبية) 😂")
+        else:
+            lines.append("\n😡 محدش عصب في المكالمة دي... كده مش طبيعي 😂")
 
     # Section D: Top-3 topics with % (Taxonomy v3: TOPICAL only, null_topic excluded)
     lines.append("\n🏷️ **أكتر مواضيع اتكلمتوا فيها:**")

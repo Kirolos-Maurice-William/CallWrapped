@@ -19,6 +19,7 @@ export interface AngerEpisodeItem {
   was_loud?: boolean;
   peak_z?: number;
   context?: string;
+  audio_clip?: string;
 }
 
 export interface SpeakerAnalytics {
@@ -31,6 +32,8 @@ export interface SpeakerAnalytics {
   anger_episodes_history?: AngerEpisodeItem[];
   vulgarity_count?: number;
   vulgarity_terms?: string[];
+  banter_count?: number;
+  banter_terms?: string[];
 }
 
 export interface AnalyticsState {
@@ -39,6 +42,7 @@ export interface AnalyticsState {
   total_talk_seconds: number;
   total_angry_episodes: number;
   total_vulgarity_count?: number;
+  total_banter_count?: number;
   longest_streak: {
     speaker_name: string | null;
     streak_seconds: number;
@@ -306,6 +310,8 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                       </div>
                       {history.map((ep, eIdx) => {
                         const isLoud = Boolean(ep.was_loud || (ep.peak_z && ep.peak_z >= 2.5));
+                        const isHostile = ep.context && ep.context.includes("escalation");
+                        const isRant = ep.context && (ep.context.includes("rant") || ep.context.includes("monologue"));
                         const isArg = ep.context && (ep.context.includes("argument") || ep.context.includes("dispute"));
                         const clampedZ = ep.peak_z ? Math.min(10.0, ep.peak_z).toFixed(1) : "2.8";
                         return (
@@ -317,7 +323,17 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                               <span className="text-amber-400 font-semibold">
                                 {ep.episode_number ? `Ep #${ep.episode_number}` : "Receipt"}
                               </span>
-                              {isLoud ? (
+                              {isHostile ? (
+                                <span className="text-rose-400 font-bold flex items-center gap-0.5">
+                                  <span>🔥</span>
+                                  <span>hostile escalation</span>
+                                </span>
+                              ) : isRant ? (
+                                <span className="text-orange-400 font-bold flex items-center gap-0.5">
+                                  <span>📢</span>
+                                  <span>monologue rant</span>
+                                </span>
+                              ) : isLoud ? (
                                 <span className="text-rose-400 font-bold flex items-center gap-0.5">
                                   <span>🔊</span>
                                   <span>+{clampedZ}σ spike</span>
@@ -334,6 +350,24 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                             <div className="italic" dir="auto">
                               "{ep.quote}"
                             </div>
+                            {ep.audio_clip && (
+                              <div className="pt-1 mt-1 border-t border-slate-800/60 flex items-center justify-between text-[10px]">
+                                <button
+                                  onClick={() => {
+                                    const audio = new Audio(`/api/audio-evidence/${ep.audio_clip}`);
+                                    audio.play().catch(e => console.error("Playback error:", e));
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-900/40 hover:bg-rose-800/60 text-rose-300 font-mono border border-rose-700/40 transition-colors cursor-pointer"
+                                  title={`Play audio evidence: ${ep.audio_clip}`}
+                                >
+                                  <span>▶️</span>
+                                  <span>Play Audio Evidence</span>
+                                </button>
+                                <span className="font-mono text-[9px] text-slate-500 truncate max-w-[110px]" title={ep.audio_clip}>
+                                  {ep.audio_clip}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -471,6 +505,38 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                       <div className="text-right font-mono text-emerald-300">
                         <div className="font-bold text-xs">{formatDurationHuman(topDiplomat.talk_seconds)}</div>
                         <div className="text-[9px] text-slate-400">100% peaceful</div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* The Roast Master (The Banter King / ملك الضحك والمناوشات, min 2 speakers) */}
+                {hasSpeakers && speakerEntries.length >= 2 && (() => {
+                  const withBanter = speakerEntries.filter(s => (s.banter_count || 0) > 0);
+                  if (withBanter.length === 0) return null;
+                  const sortedBanter = [...withBanter].sort((a, b) => (b.banter_count || 0) - (a.banter_count || 0));
+                  const topBanter = sortedBanter[0];
+                  if (sortedBanter.length >= 2 && (sortedBanter[1].banter_count || 0) === (topBanter.banter_count || 0)) {
+                    return null;
+                  }
+                  return (
+                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-950/30 to-slate-900 border border-purple-500/30 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🎭</span>
+                        <div>
+                          <div className="text-[9px] uppercase font-bold text-purple-300 tracking-wider">
+                            The Roast Master
+                          </div>
+                          <div className="font-bold text-white truncate max-w-[110px]" dir="auto">
+                            {topBanter.speaker_name}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right font-mono text-purple-300">
+                        <div className="font-bold text-xs">{topBanter.banter_count} {topBanter.banter_count === 1 ? "banter turn" : "banter turns"}</div>
+                        <div className="text-[9px] text-slate-400">
+                          {topBanter.banter_terms && topBanter.banter_terms.length > 0 ? topBanter.banter_terms.slice(0, 2).join(", ") : "friendly teasing"}
+                        </div>
                       </div>
                     </div>
                   );

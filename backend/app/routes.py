@@ -21,6 +21,7 @@ ANALYTICS_STATE: Dict[str, Any] = {
     "total_talk_seconds": 0.0,
     "total_angry_episodes": 0,
     "total_vulgarity_count": 0,
+    "total_banter_count": 0,
     "longest_streak": {
         "speaker_name": None,
         "streak_seconds": 0.0
@@ -81,6 +82,9 @@ class VoiceEventPayload(BaseModel):
     vulgarity_count: Optional[int] = None
     vulgarity_terms: Optional[List[str]] = None
     total_vulgarity_count: Optional[int] = None
+    banter_count: Optional[int] = None
+    banter_terms: Optional[List[str]] = None
+    total_banter_count: Optional[int] = None
 
 
 async def broadcast_event(event_data: dict):
@@ -416,7 +420,9 @@ async def ingest_voice_event(event: VoiceEventPayload):
                 "anger_evidence": None,
                 "anger_episodes_history": [],
                 "vulgarity_count": 0,
-                "vulgarity_terms": []
+                "vulgarity_terms": [],
+                "banter_count": 0,
+                "banter_terms": []
             }
         spk_stats = ANALYTICS_STATE["speakers"][spk]
 
@@ -425,6 +431,9 @@ async def ingest_voice_event(event: VoiceEventPayload):
 
         if "vulgarity_terms" not in spk_stats:
             spk_stats["vulgarity_terms"] = []
+
+        if "banter_terms" not in spk_stats:
+            spk_stats["banter_terms"] = []
 
         if topic:
             ANALYTICS_STATE["topic_totals"][topic] = ANALYTICS_STATE["topic_totals"].get(topic, 0) + 1
@@ -445,7 +454,7 @@ async def ingest_voice_event(event: VoiceEventPayload):
         elif anger in ("mild", "high"):
             spk_stats["angry_episodes"] += 1
 
-        # Banter & vulgarity tracking (Phase 2)
+        # Banter & vulgarity tracking (Phase 2 & 3)
         vulgarity_cnt = event.vulgarity_count if event.vulgarity_count is not None else event.payload.get("vulgarity_count")
         if vulgarity_cnt is not None:
             spk_stats["vulgarity_count"] = max(spk_stats.get("vulgarity_count", 0), int(vulgarity_cnt))
@@ -457,6 +466,18 @@ async def ingest_voice_event(event: VoiceEventPayload):
                 if t not in existing_terms:
                     spk_stats.setdefault("vulgarity_terms", []).append(t)
                     existing_terms.add(t)
+
+        banter_cnt = event.banter_count if event.banter_count is not None else event.payload.get("banter_count")
+        if banter_cnt is not None:
+            spk_stats["banter_count"] = max(spk_stats.get("banter_count", 0), int(banter_cnt))
+
+        b_terms = event.banter_terms or event.payload.get("banter_terms")
+        if b_terms and isinstance(b_terms, list):
+            existing_b_terms = set(spk_stats.get("banter_terms", []))
+            for t in b_terms:
+                if t not in existing_b_terms:
+                    spk_stats.setdefault("banter_terms", []).append(t)
+                    existing_b_terms.add(t)
 
         # Preserve quotes and receipts
         first_q = event.first_anger_quote or event.payload.get("first_anger_quote")
@@ -489,6 +510,7 @@ async def ingest_voice_event(event: VoiceEventPayload):
         ANALYTICS_STATE["total_talk_seconds"] = round(sum(s["talk_seconds"] for s in ANALYTICS_STATE["speakers"].values()), 2)
         ANALYTICS_STATE["total_angry_episodes"] = sum(s["angry_episodes"] for s in ANALYTICS_STATE["speakers"].values())
         ANALYTICS_STATE["total_vulgarity_count"] = sum(s.get("vulgarity_count", 0) for s in ANALYTICS_STATE["speakers"].values())
+        ANALYTICS_STATE["total_banter_count"] = sum(s.get("banter_count", 0) for s in ANALYTICS_STATE["speakers"].values())
 
     await broadcast_event({"type": event.type, "event": event.dict(), "live_state": LIVE_STATE, "analytics": ANALYTICS_STATE})
     return {"status": "ok", "event_id": event.event_id}
@@ -504,6 +526,31 @@ async def get_live_state():
 async def get_analytics():
     """Returns aggregated session analytics (topics, speaker talk time, streaks, anger)."""
     return ANALYTICS_STATE
+
+
+@router.get("/audio-evidence/{filename:path}")
+async def get_audio_evidence(filename: str):
+    """
+    Safely serves recorded audio evidence clips for dashboard inspection.
+    Guards strictly against directory traversal attacks.
+    """
+    from fastapi.responses import FileResponse, Response
+    from bot.config import PROJECT_ROOT
+
+    recordings_root = (PROJECT_ROOT / "recordings").resolve()
+    safe_filename = Path(filename).name
+    if not safe_filename.endswith(".wav"):
+        return Response(status_code=400, content="Invalid audio format")
+
+    candidate_paths = list(recordings_root.rglob(safe_filename))
+    if not candidate_paths:
+        return Response(status_code=404, content="Audio clip not found")
+
+    target_path = candidate_paths[0].resolve()
+    if not target_path.is_relative_to(recordings_root):
+        return Response(status_code=403, content="Access denied")
+
+    return FileResponse(path=str(target_path), media_type="audio/wav", filename=safe_filename)
 
 
 @router.post("/reset")
@@ -534,6 +581,7 @@ async def reset_live_state():
     ANALYTICS_STATE["total_talk_seconds"] = 0.0
     ANALYTICS_STATE["total_angry_episodes"] = 0
     ANALYTICS_STATE["total_vulgarity_count"] = 0
+    ANALYTICS_STATE["total_banter_count"] = 0
     ANALYTICS_STATE["longest_streak"] = {
         "speaker_name": None,
         "streak_seconds": 0.0

@@ -185,9 +185,11 @@ class SpeakerStats:
     longest_topic_streak_seconds: float = 0.0
     longest_topic: Optional[str] = None
     topic_streak_count: int = 0
-    # Banter & vulgarity tracking (Phase 2)
+    # Banter & vulgarity tracking (Phase 2 & 3)
     vulgarity_count: int = 0
     vulgarity_terms: List[str] = field(default_factory=list)
+    banter_count: int = 0
+    banter_terms: List[str] = field(default_factory=list)
 
     @property
     def current_streak_seconds(self) -> float:
@@ -199,6 +201,14 @@ class SpeakerStats:
         """Alias for current_topic_streak in seconds."""
         return self.current_topic_streak
 
+    def record_banter(self, terms: Optional[List[str]] = None) -> None:
+        """Increments friendly banter interaction count and tracks unique terms."""
+        self.banter_count += 1
+        if terms:
+            for term in terms:
+                if term not in self.banter_terms and len(self.banter_terms) < 20:
+                    self.banter_terms.append(term)
+
     def record_anger(
         self,
         timestamp: float,
@@ -206,7 +216,8 @@ class SpeakerStats:
         quote: Optional[str] = None,
         was_loud: bool = False,
         peak_z: float = 0.0,
-        context: str = ""
+        context: str = "",
+        audio_clip: Optional[str] = None
     ) -> bool:
         """
         Pure Python anger episode counter on top of classifier output.
@@ -256,7 +267,8 @@ class SpeakerStats:
                 "anger": str(anger).lower(),
                 "was_loud": bool(was_loud),
                 "peak_z": round(float(peak_z), 2),
-                "context": str(context)
+                "context": str(context),
+                "audio_clip": str(audio_clip) if audio_clip else None
             })
             if len(self.anger_episodes_history) > 20:
                 self.anger_episodes_history.pop(0)
@@ -282,7 +294,9 @@ class SpeakerStats:
             "longest_topic": self.longest_topic,
             "topic_streak_count": self.topic_streak_count,
             "vulgarity_count": self.vulgarity_count,
-            "vulgarity_terms": list(self.vulgarity_terms)
+            "vulgarity_terms": list(self.vulgarity_terms),
+            "banter_count": self.banter_count,
+            "banter_terms": list(self.banter_terms)
         }
 
 
@@ -493,7 +507,8 @@ class SessionStatsTracker:
         speaker_name: Optional[str] = None,
         was_loud: bool = False,
         peak_z: float = 0.0,
-        context: str = ""
+        context: str = "",
+        audio_clip: Optional[str] = None
     ) -> SpeakerStats:
         """
         Records an anger classification for a speaker.
@@ -507,7 +522,8 @@ class SessionStatsTracker:
             quote=anger_quote,
             was_loud=was_loud,
             peak_z=peak_z,
-            context=context
+            context=context,
+            audio_clip=audio_clip
         )
         return stats
 
@@ -619,6 +635,40 @@ class SessionStatsTracker:
     def get_total_vulgarity_count(self) -> int:
         """Returns the total number of banter/vulgarity tokens recorded across all speakers."""
         return sum(s.vulgarity_count for s in self.speakers.values())
+
+    def record_banter(self, speaker_ids: List[str], terms: Optional[List[str]] = None) -> None:
+        """Records a resolved friendly banter exchange for the participating speakers."""
+        for spk_id in speaker_ids:
+            spk = self.speakers.get(str(spk_id))
+            if spk:
+                spk.record_banter(terms)
+
+    def get_total_banter_count(self) -> int:
+        """Returns the total number of friendly banter interactions across all speakers."""
+        return sum(s.banter_count for s in self.speakers.values())
+
+    def get_roast_master(self) -> Optional[Tuple[str, int, List[str]]]:
+        """
+        Identifies 'The Roast Master' (ملك الضحك والمناوشات):
+        Speaker with highest banter_count (>0), requiring >= 2 speakers in call,
+        with honest tie breaking guard.
+        Returns (speaker_id, banter_count, banter_terms) or None.
+        """
+        if len(self.speakers) < 2:
+            return None
+
+        speakers_with_banter = [s for s in self.speakers.values() if s.banter_count > 0]
+        if not speakers_with_banter:
+            return None
+
+        speakers_with_banter.sort(key=lambda s: s.banter_count, reverse=True)
+        top_speaker = speakers_with_banter[0]
+
+        # Honest tie guard: If top 2 tied, refuse to crown a fake winner
+        if len(speakers_with_banter) >= 2 and speakers_with_banter[1].banter_count == top_speaker.banter_count:
+            return None
+
+        return (top_speaker.speaker_id, top_speaker.banter_count, list(top_speaker.banter_terms))
 
     def reset(self):
         """Clears all session statistics."""
