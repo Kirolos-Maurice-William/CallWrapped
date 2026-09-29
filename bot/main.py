@@ -72,6 +72,7 @@ for _h in logging.root.handlers:
     _h.addFilter(_rtcp_filter)
 
 logger = logging.getLogger("CallWrappedBot")
+_background_tasks = set()
 
 # Bot Setup
 intents = discord.Intents.default()
@@ -145,7 +146,7 @@ async def on_user_utterance(
         safe_spk = _clean_speaker_name(speaker_name)
         audio_clip_filename = f"{int(ts)}_{safe_spk}.wav"
         force_save = not bool(getattr(config, "TEST_CAPTURE_MODE", 0)) and is_high_arousal
-        asyncio.create_task(
+        capture_task = asyncio.create_task(
             save_captured_utterance_async(
                 speaker_name=speaker_name,
                 wav_bytes=wav_bytes,
@@ -157,6 +158,8 @@ async def on_user_utterance(
                 force_save=force_save
             )
         )
+        _background_tasks.add(capture_task)
+        capture_task.add_done_callback(_background_tasks.discard)
 
     # 2. Feed into Arbitration Engine State Machine
     await arbitration_engine.process_utterance(

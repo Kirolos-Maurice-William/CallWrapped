@@ -232,8 +232,8 @@ class AudioReceiver(voice_recv.AudioSink):
     ):
         logger.info(f"🎙️ [Speech Finished] {user_name} ({duration:.1f}s, {len(chunks)} frames, window={speech_start:.2f}-{speech_end:.2f}, ended_by={ended_by}). Processing...")
 
-        # Shadow logging: log was_loud events
-        if audio_features and audio_features.was_loud:
+        # Shadow logging: log was_loud events only if capture mode is active to strictly honor privacy policy
+        if audio_features and audio_features.was_loud and getattr(config, "TEST_CAPTURE_MODE", 0):
             log_loudness_shadow(user_name, audio_features)
 
         wav_bytes = await asyncio.to_thread(convert_discord_pcm_to_wav, chunks)

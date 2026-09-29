@@ -1,9 +1,10 @@
+import os
 import time
 import json
 import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request, Response
 from pydantic import BaseModel, Field
 from app.config import settings
 
@@ -544,11 +545,21 @@ async def get_audio_evidence(filename: str):
     if not safe_filename.endswith(".wav"):
         return Response(status_code=400, content="Invalid audio format")
 
-    candidate_paths = list(recordings_root.rglob(safe_filename))
-    if not candidate_paths:
-        return Response(status_code=404, content="Audio clip not found")
+    # Priority 1: dedicated active evidence directory
+    evidence_path = recordings_root / "test_session" / "evidence" / safe_filename
+    if evidence_path.is_file():
+        target_path = evidence_path.resolve()
+    else:
+        # Priority 2: newest matching session clip across recordings
+        candidate_paths = sorted(
+            [p for p in recordings_root.rglob(safe_filename) if p.is_file()],
+            key=lambda p: p.stat().st_mtime,
+            reverse=True
+        )
+        if not candidate_paths:
+            return Response(status_code=404, content="Audio clip not found")
+        target_path = candidate_paths[0].resolve()
 
-    target_path = candidate_paths[0].resolve()
     if not target_path.is_relative_to(recordings_root):
         return Response(status_code=403, content="Access denied")
 
@@ -556,8 +567,13 @@ async def get_audio_evidence(filename: str):
 
 
 @router.post("/reset")
-async def reset_live_state():
+async def reset_live_state(request: Request):
     """Resets dashboard state for a fresh run."""
+    control_key = os.getenv("CONTROL_PLANE_KEY")
+    if control_key:
+        auth_header = request.headers.get("x-control-key")
+        if auth_header != control_key:
+            return Response(status_code=401, content="Unauthorized control-plane reset")
     LIVE_STATE["last_updated"] = 0.0
     LIVE_STATE["latency"] = {
         "stt_ms": 0,

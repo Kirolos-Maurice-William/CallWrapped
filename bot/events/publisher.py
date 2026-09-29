@@ -20,7 +20,8 @@ class EventPublisher:
         endpoint = f"{self.api_url}/api/events"
         try:
             async with httpx.AsyncClient(timeout=1.5) as client:
-                await client.post(endpoint, json=event.dict())
+                payload = event.model_dump() if hasattr(event, "model_dump") else event.dict()
+                await client.post(endpoint, json=payload)
         except Exception as e:
             logger.debug(f"[EventPublisher] Notice: could not post event to {endpoint} ({e})")
 

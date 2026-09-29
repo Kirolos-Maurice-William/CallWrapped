@@ -31,5 +31,6 @@ async def get_db():
             await session.close()
 
 async def init_db():
+    import app.models as _models  # Ensures all ORM models are registered with Base.metadata
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

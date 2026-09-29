@@ -257,7 +257,12 @@ class GroqClient:
             logger.warning(f"⚠️ [GroqClient] {k['id']} returned HTTP {resp.status_code if resp else 'N/A'}: {err_msg}")
             return None, {}, latency_ms
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except Exception as e:
+            logger.warning(f"⚠️ [GroqClient] {k['id']} returned HTTP 200 with invalid JSON body: {e}")
+            return None, {}, latency_ms
+
         usage = data.get("usage", {})
         prompt_tokens = usage.get("prompt_tokens", 0)
         completion_tokens = usage.get("completion_tokens", 0)
@@ -384,12 +389,15 @@ class GroqClient:
             latency_ms = int((time.perf_counter() - t0) * 1000)
             return None, {}, latency_ms
 
-        latency_ms = int((time.perf_counter() - t0) * 1000)
-
         if not resp or resp.status_code != 200:
             return None, {}, latency_ms
 
-        data = resp.json()
+        try:
+            data = resp.json()
+        except Exception as e:
+            logger.warning(f"⚠️ [GroqClient] Sync call returned HTTP 200 with invalid JSON body: {e}")
+            return None, {}, latency_ms
+
         usage = data.get("usage", {})
         prompt_tokens = usage.get("prompt_tokens", 0)
         completion_tokens = usage.get("completion_tokens", 0)
