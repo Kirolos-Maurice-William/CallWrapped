@@ -29,6 +29,8 @@ export interface SpeakerAnalytics {
   first_anger_quote?: string;
   anger_evidence?: string;
   anger_episodes_history?: AngerEpisodeItem[];
+  vulgarity_count?: number;
+  vulgarity_terms?: string[];
 }
 
 export interface AnalyticsState {
@@ -36,6 +38,7 @@ export interface AnalyticsState {
   speakers: Record<string, SpeakerAnalytics>;
   total_talk_seconds: number;
   total_angry_episodes: number;
+  total_vulgarity_count?: number;
   longest_streak: {
     speaker_name: string | null;
     streak_seconds: number;
@@ -407,6 +410,70 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                     );
                   }
                   return null;
+                })()}
+
+                {/* The Most Unfiltered / Spicy Tongue */}
+                {hasSpeakers && (() => {
+                  const withVulgarity = speakerEntries.filter(s => (s.vulgarity_count || 0) > 0);
+                  if (withVulgarity.length === 0) return null;
+                  const sortedVulgar = [...withVulgarity].sort((a, b) => (b.vulgarity_count || 0) - (a.vulgarity_count || 0));
+                  const top = sortedVulgar[0];
+                  if (sortedVulgar.length >= 2 && (sortedVulgar[1].vulgarity_count || 0) === (top.vulgarity_count || 0)) {
+                    return null;
+                  }
+                  return (
+                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-950/30 to-slate-900 border border-rose-500/30 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🌶️</span>
+                        <div>
+                          <div className="text-[9px] uppercase font-bold text-rose-300 tracking-wider">
+                            The Most Unfiltered
+                          </div>
+                          <div className="font-bold text-white truncate max-w-[110px]" dir="auto">
+                            {top.speaker_name}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right font-mono text-rose-300">
+                        <div className="font-bold text-xs">{top.vulgarity_count} raw tokens</div>
+                        <div className="text-[9px] text-slate-400">
+                          {top.vulgarity_terms && top.vulgarity_terms.length > 0 ? top.vulgarity_terms.slice(0, 2).join(", ") : "uncensored"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* The Diplomat (0 anger, 0 vulgarity, >= 15s talk time, min 2 speakers) */}
+                {hasSpeakers && speakerEntries.length >= 2 && (() => {
+                  const diplomatCandidates = speakerEntries.filter(
+                    s => (s.vulgarity_count || 0) === 0 && s.angry_episodes === 0 && s.talk_seconds >= 15.0
+                  );
+                  if (diplomatCandidates.length === 0) return null;
+                  const sortedDiplomats = [...diplomatCandidates].sort((a, b) => b.talk_seconds - a.talk_seconds);
+                  const topDiplomat = sortedDiplomats[0];
+                  if (sortedDiplomats.length >= 2 && (topDiplomat.talk_seconds - sortedDiplomats[1].talk_seconds) < 1.0) {
+                    return null;
+                  }
+                  return (
+                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-950/30 to-slate-900 border border-emerald-500/30 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🕊️</span>
+                        <div>
+                          <div className="text-[9px] uppercase font-bold text-emerald-300 tracking-wider">
+                            The Diplomat
+                          </div>
+                          <div className="font-bold text-white truncate max-w-[110px]" dir="auto">
+                            {topDiplomat.speaker_name}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right font-mono text-emerald-300">
+                        <div className="font-bold text-xs">{formatDurationHuman(topDiplomat.talk_seconds)}</div>
+                        <div className="text-[9px] text-slate-400">100% peaceful</div>
+                      </div>
+                    </div>
+                  );
                 })()}
               </div>
             ) : (

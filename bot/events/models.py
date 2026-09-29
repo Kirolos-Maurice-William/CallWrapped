@@ -54,3 +54,5 @@ class VoiceEvent(BaseModel):
     streak_seconds: Optional[float] = None
     angry_episodes: Optional[int] = None
     audio_features: Optional[Dict[str, Any]] = None
+    vulgarity_count: Optional[int] = None
+    vulgarity_terms: Optional[list] = None

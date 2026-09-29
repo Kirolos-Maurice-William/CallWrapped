@@ -638,7 +638,8 @@ class ArbitrationEngine:
                 speaker_id=spk_key,
                 speech_start=speech_start,
                 speech_end=speech_end,
-                speaker_name=speaker_name
+                speaker_name=speaker_name,
+                text=raw_text
             )
             talk_delta_seconds = round(stats.total_speak_seconds - prev_total, 3)
             streak_seconds = round(stats.current_streak, 3)
@@ -822,6 +823,8 @@ class ArbitrationEngine:
                 streak_seconds=item["streak_seconds"],
                 angry_episodes=stats.angry_episodes,
                 audio_features=af_dict,
+                vulgarity_count=getattr(stats, "vulgarity_count", 0),
+                vulgarity_terms=list(getattr(stats, "vulgarity_terms", [])),
                 payload={
                     "topic": topic,
                     "tag": raw_tag,
@@ -837,6 +840,9 @@ class ArbitrationEngine:
                     "audio_features": af_dict,
                     "tokens": tokens,
                     "batch_reason": reason,
+                    "vulgarity_count": getattr(stats, "vulgarity_count", 0),
+                    "vulgarity_terms": list(getattr(stats, "vulgarity_terms", [])),
+                    "total_vulgarity_count": session._stats_tracker.get_total_vulgarity_count(),
                     "classification": {
                         "topic": topic,
                         "tag": raw_tag,

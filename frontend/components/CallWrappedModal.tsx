@@ -47,6 +47,20 @@ export function CallWrappedModal({
     silentObserver && secondSilent && (secondSilent.talk_seconds - silentObserver.talk_seconds >= 1.0)
   );
 
+  const spicySpeakers = speakerList.filter(s => (s.vulgarity_count || 0) > 0).sort((a, b) => (b.vulgarity_count || 0) - (a.vulgarity_count || 0));
+  const topSpicy = spicySpeakers[0];
+  const isSpicyEligible = Boolean(
+    topSpicy && (spicySpeakers.length < 2 || (topSpicy.vulgarity_count || 0) > (spicySpeakers[1].vulgarity_count || 0))
+  );
+
+  const diplomatCandidates = speakerList.filter(
+    s => (s.vulgarity_count || 0) === 0 && s.angry_episodes === 0 && s.talk_seconds >= 15.0
+  ).sort((a, b) => b.talk_seconds - a.talk_seconds);
+  const topDiplomat = diplomatCandidates[0];
+  const isDiplomatEligible = Boolean(
+    speakerList.length >= 2 && topDiplomat && (diplomatCandidates.length < 2 || (topDiplomat.talk_seconds - diplomatCandidates[1].talk_seconds >= 1.0))
+  );
+
   // Topics
   const topicalEntries = Object.entries(topic_totals || {})
     .filter(([t]) => t !== "null_topic" && t !== "null" && t !== "بدون موضوع" && t !== "none")
@@ -59,9 +73,17 @@ export function CallWrappedModal({
     const observerLine = isObserverEligible && silentObserver
       ? `🤫 **The Silent Observer:** ${silentObserver.speaker_name} (${formatDurationHuman(silentObserver.talk_seconds)})\n`
       : "";
+    const spicyLine = isSpicyEligible && topSpicy
+      ? `🌶️ **The Most Unfiltered:** ${topSpicy.speaker_name} (${topSpicy.vulgarity_count} raw tokens)\n`
+      : "";
+    const diplomatLine = isDiplomatEligible && topDiplomat
+      ? `🕊️ **The Diplomat:** ${topDiplomat.speaker_name} (${formatDurationHuman(topDiplomat.talk_seconds)} peaceful)\n`
+      : "";
     const summaryText = `🎙️ **CALLWRAPPED SESSION SUMMARY**\n` +
       `👑 **Monologue King:** ${longest_streak?.speaker_name || "N/A"} (${formatDurationHuman(longest_streak?.streak_seconds || 0)})\n` +
       observerLine +
+      spicyLine +
+      diplomatLine +
       `🎯 **Ground Truth:** ${verifiedCount} verified, ${disputedCount} refuted\n` +
       `📊 **Top Topic:** ${topTopicName}\n` +
       `🕊️ **Call Vibe:** ${total_angry_episodes === 0 ? "Civilized discussion (0 anger spikes)" : `${total_angry_episodes} heated episodes`}\n` +
@@ -183,6 +205,40 @@ export function CallWrappedModal({
                 <div className="text-[10px] text-slate-400">
                   ({total_talk_seconds > 0 ? ((silentObserver.talk_seconds / total_talk_seconds) * 100).toFixed(0) : 0}% airtime)
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* The Most Unfiltered Award */}
+          {isSpicyEligible && topSpicy && (
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-rose-500/30 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded-lg bg-rose-500/20 text-rose-300 font-bold text-xs">🌶️</div>
+                <div>
+                  <div className="text-[10px] uppercase font-bold text-rose-300 tracking-wider">The Most Unfiltered</div>
+                  <div className="font-bold text-white truncate max-w-[140px]" dir="auto">{topSpicy.speaker_name}</div>
+                </div>
+              </div>
+              <div className="text-right font-mono text-rose-300">
+                <div className="font-bold text-xs">{topSpicy.vulgarity_count} raw tokens</div>
+                <div className="text-[10px] text-slate-400">uncensored banter</div>
+              </div>
+            </div>
+          )}
+
+          {/* The Diplomat Award */}
+          {isDiplomatEligible && topDiplomat && (
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-emerald-500/30 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold text-xs">🕊️</div>
+                <div>
+                  <div className="text-[10px] uppercase font-bold text-emerald-300 tracking-wider">The Diplomat</div>
+                  <div className="font-bold text-white truncate max-w-[140px]" dir="auto">{topDiplomat.speaker_name}</div>
+                </div>
+              </div>
+              <div className="text-right font-mono text-emerald-300">
+                <div className="font-bold text-xs">{formatDurationHuman(topDiplomat.talk_seconds)}</div>
+                <div className="text-[10px] text-slate-400">100% peaceful</div>
               </div>
             </div>
           )}

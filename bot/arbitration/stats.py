@@ -2,6 +2,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Any, List, Set, Tuple
 
+from bot.arbitration.lexicon import analyze_banter, mask_term
+
 logger = logging.getLogger("TalkStats")
 
 # Taxonomy v3 display name mappings (colloquial Egyptian Arabic)
@@ -183,6 +185,9 @@ class SpeakerStats:
     longest_topic_streak_seconds: float = 0.0
     longest_topic: Optional[str] = None
     topic_streak_count: int = 0
+    # Banter & vulgarity tracking (Phase 2)
+    vulgarity_count: int = 0
+    vulgarity_terms: List[str] = field(default_factory=list)
 
     @property
     def current_streak_seconds(self) -> float:
@@ -275,7 +280,9 @@ class SpeakerStats:
             "current_topic_streak": round(self.current_topic_streak, 3),
             "longest_topic_streak_seconds": round(self.longest_topic_streak_seconds, 3),
             "longest_topic": self.longest_topic,
-            "topic_streak_count": self.topic_streak_count
+            "topic_streak_count": self.topic_streak_count,
+            "vulgarity_count": self.vulgarity_count,
+            "vulgarity_terms": list(self.vulgarity_terms)
         }
 
 
@@ -318,7 +325,8 @@ class SessionStatsTracker:
         anger: Optional[Any] = None,
         anger_quote: Optional[str] = None,
         classification: Optional[Dict[str, Any]] = None,
-        topic: Optional[str] = None
+        topic: Optional[str] = None,
+        text: Optional[str] = None
     ) -> SpeakerStats:
         """
         Records an utterance derived strictly from RMS speech-window timestamps.
@@ -419,6 +427,20 @@ class SessionStatsTracker:
             stats.record_anger(timestamp=speech_end, anger=classification)
         elif anger is not None:
             stats.record_anger(timestamp=speech_end, anger=anger, quote=anger_quote)
+
+        # Banter & vulgarity tracking (Phase 2)
+        utterance_text = text
+        if utterance_text is None and classification is not None and isinstance(classification, dict):
+            utterance_text = classification.get("text")
+
+        if utterance_text:
+            banter_res = analyze_banter(utterance_text)
+            if banter_res.has_vulgarity:
+                stats.vulgarity_count += banter_res.vulgarity_count
+                for term in banter_res.matched_terms:
+                    masked = mask_term(term)
+                    if masked not in stats.vulgarity_terms:
+                        stats.vulgarity_terms.append(masked)
 
         logger.debug(
             f"[TalkStats] Speaker {spk_key} ({speaker_name}): dur={duration:.2f}s, "
@@ -530,6 +552,70 @@ class SessionStatsTracker:
 
         share_pct = round((quietest.total_speak_seconds / total_talk_sec) * 100.0, 1)
         return (quietest.speaker_id, quietest.total_speak_seconds, share_pct)
+
+    def get_most_unfiltered(self) -> Optional[Tuple[str, int, List[str]]]:
+        """
+        Identifies 'The Most Unfiltered / Spicy Tongue' (speaker with highest vulgarity count > 0).
+        Rules:
+        - Requires at least 1 speaker with vulgarity_count > 0.
+        - Disqualifies if the top two speakers tie for vulgarity count.
+        Returns (speaker_id, vulgarity_count, vulgarity_terms) or None.
+        """
+        speakers_with_vulgarity = [s for s in self.speakers.values() if s.vulgarity_count > 0]
+        if not speakers_with_vulgarity:
+            return None
+
+        sorted_by_vulgarity = sorted(speakers_with_vulgarity, key=lambda s: s.vulgarity_count, reverse=True)
+        top_speaker = sorted_by_vulgarity[0]
+
+        # Honest tie guard: if 2+ speakers have vulgarity and top 2 are tied, refuse false crown
+        if len(sorted_by_vulgarity) >= 2:
+            runner_up = sorted_by_vulgarity[1]
+            if runner_up.vulgarity_count == top_speaker.vulgarity_count:
+                return None
+
+        return (top_speaker.speaker_id, top_speaker.vulgarity_count, list(top_speaker.vulgarity_terms))
+
+    def get_diplomat(self) -> Optional[Tuple[str, float]]:
+        """
+        Identifies 'The Diplomat' (speaker who participated meaningfully with 0 vulgarity and 0 anger).
+        Rules:
+        - Requires at least 2 active speakers in the session.
+        - Requires total call speech > 0.
+        - Speaker must have vulgarity_count == 0 and angry_episodes == 0.
+        - Speaker must have substantial talk time (>= 15.0 seconds).
+        - If multiple qualify, crowns the one with the most speech.
+        - Disqualifies if the top two candidates tie within 1.0 second.
+        Returns (speaker_id, total_speak_seconds) or None.
+        """
+        if len(self.speakers) < 2:
+            return None
+
+        total_talk_sec = sum(s.total_speak_seconds for s in self.speakers.values())
+        if total_talk_sec <= 0:
+            return None
+
+        candidates = [
+            s for s in self.speakers.values()
+            if s.vulgarity_count == 0 and s.angry_episodes == 0 and s.total_speak_seconds >= 15.0
+        ]
+        if not candidates:
+            return None
+
+        sorted_candidates = sorted(candidates, key=lambda s: s.total_speak_seconds, reverse=True)
+        best = sorted_candidates[0]
+
+        # Honest tie guard: if top 2 candidates are within 1.0s of each other, refuse false crown
+        if len(candidates) >= 2:
+            runner_up = sorted_candidates[1]
+            if (best.total_speak_seconds - runner_up.total_speak_seconds) < 1.0:
+                return None
+
+        return (best.speaker_id, best.total_speak_seconds)
+
+    def get_total_vulgarity_count(self) -> int:
+        """Returns the total number of banter/vulgarity tokens recorded across all speakers."""
+        return sum(s.vulgarity_count for s in self.speakers.values())
 
     def reset(self):
         """Clears all session statistics."""

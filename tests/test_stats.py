@@ -546,6 +546,83 @@ class TestPhase1DurationAndSilentObserver(unittest.TestCase):
         tracker_zero_tie.get_or_create_speaker("charlie", "Charlie")
         self.assertIsNone(tracker_zero_tie.get_silent_observer())
 
+    def test_record_utterance_tracks_vulgarity_and_masked_terms(self):
+        tracker = SessionStatsTracker("test_vulgarity_tracking")
+        s = tracker.record_utterance("alice", 0.0, 10.0, "Alice", text="احا يا عم ده bullshit خالص")
+        self.assertEqual(s.vulgarity_count, 2)
+        self.assertIn("ا**", s.vulgarity_terms)
+        self.assertIn("b*******", s.vulgarity_terms)
+        self.assertEqual(tracker.get_total_vulgarity_count(), 2)
+
+        # Non-vulgar utterance does not increase count
+        tracker.record_utterance("alice", 10.0, 20.0, "Alice", text="تمام يا باشا كل الاحترام")
+        self.assertEqual(s.vulgarity_count, 2)
+        self.assertEqual(tracker.get_total_vulgarity_count(), 2)
+
+    def test_most_unfiltered_badge_logic(self):
+        tracker = SessionStatsTracker("test_most_unfiltered")
+
+        # Case 1: No vulgarity -> None
+        tracker.record_utterance("alice", 0.0, 20.0, "Alice", text="صباح الخير")
+        tracker.record_utterance("bob", 20.0, 40.0, "Bob", text="صباح النور")
+        self.assertIsNone(tracker.get_most_unfiltered())
+
+        # Case 2: Alice drops 2 slurs, Bob drops 0 -> Alice wins
+        tracker.record_utterance("alice", 40.0, 50.0, "Alice", text="احا يا خول")
+        unfiltered = tracker.get_most_unfiltered()
+        self.assertIsNotNone(unfiltered)
+        spk_id, count, terms = unfiltered
+        self.assertEqual(spk_id, "alice")
+        self.assertEqual(count, 2)
+        self.assertEqual(len(terms), 2)
+
+        # Case 3: Honest tie guard (Bob also drops 2 slurs -> 2 vs 2 tie) -> None!
+        tracker.record_utterance("bob", 50.0, 60.0, "Bob", text="stfu bitch")
+        self.assertIsNone(tracker.get_most_unfiltered())
+
+        # Case 4: Alice drops 1 more slur (Alice=3, Bob=2) -> Alice breaks tie and wins!
+        tracker.record_utterance("alice", 60.0, 70.0, "Alice", text="fuck off")
+        unfiltered_again = tracker.get_most_unfiltered()
+        self.assertIsNotNone(unfiltered_again)
+        self.assertEqual(unfiltered_again[0], "alice")
+        self.assertEqual(unfiltered_again[1], 3)
+
+    def test_diplomat_badge_logic(self):
+        tracker = SessionStatsTracker("test_diplomat")
+
+        # Case 1: 1 speaker only -> None (cannot be diplomat in solo call)
+        tracker.record_utterance("alice", 0.0, 30.0, "Alice", text="سلام عليكم")
+        self.assertIsNone(tracker.get_diplomat())
+
+        # Case 2: Bob joins but only talks for 5s (< 15s threshold) -> Bob ineligible, Alice is candidate
+        tracker.record_utterance("bob", 30.0, 35.0, "Bob", text="وعليكم السلام")
+        diplomat = tracker.get_diplomat()
+        self.assertIsNotNone(diplomat)
+        self.assertEqual(diplomat[0], "alice")
+        self.assertAlmostEqual(diplomat[1], 30.0, places=1)
+
+        # Case 3: Alice gets angry -> Alice disqualified! Bob < 15s so also ineligible -> None
+        tracker.record_anger("alice", timestamp=40.0, anger="mild", anger_quote="زهقت منكم")
+        self.assertIsNone(tracker.get_diplomat())
+
+        # Case 4: Bob speaks up to 25s clean (0 anger, 0 vulgarity) -> Bob becomes Diplomat!
+        tracker.record_utterance("bob", 40.0, 60.0, "Bob", text="يا جماعة نهدى شوية ونتفاهم بالراحة")
+        diplomat_bob = tracker.get_diplomat()
+        self.assertIsNotNone(diplomat_bob)
+        self.assertEqual(diplomat_bob[0], "bob")
+        self.assertAlmostEqual(diplomat_bob[1], 25.0, places=1)
+
+        # Case 5: Charlie joins and ties Bob's talk time within 1.0s (25.0s vs 25.4s) -> Honest tie guard returns None!
+        tracker.record_utterance("charlie", 60.0, 85.4, "Charlie", text="أنا متفق مع كلام بوب كله كلام محترم")
+        self.assertIsNone(tracker.get_diplomat())
+
+        # Case 6: Charlie speaks more to clearly exceed 1.0s gap (Bob=25s, Charlie=40.4s) -> Charlie is Diplomat!
+        tracker.record_utterance("charlie", 85.4, 100.4, "Charlie", text="خلينا نكمل شغلنا بهدوء وبدون مشاكل")
+        diplomat_charlie = tracker.get_diplomat()
+        self.assertIsNotNone(diplomat_charlie)
+        self.assertEqual(diplomat_charlie[0], "charlie")
+        self.assertAlmostEqual(diplomat_charlie[1], 40.4, places=1)
+
 
 if __name__ == "__main__":
     unittest.main()

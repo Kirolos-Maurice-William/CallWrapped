@@ -425,6 +425,35 @@ def render_recap(session_state: Any) -> str:
             q_pct = (q_talk_sec / total_talk_sec * 100.0)
             lines.append(f"🤫 **المستمع الهادئ (أقل مشاركة):** {q_name} ({q_dur_str} - {q_pct:.1f}%)")
 
+    # Most Unfiltered: speaker with most banter/vulgarity tokens (>0 with honest tie guard)
+    spicy_speakers = [s for s in speakers if getattr(s, "vulgarity_count", 0) > 0]
+    if spicy_speakers:
+        spicy_speakers.sort(key=lambda s: s.vulgarity_count, reverse=True)
+        top_spicy = spicy_speakers[0]
+        is_spicy_tie = len(spicy_speakers) >= 2 and spicy_speakers[1].vulgarity_count == top_spicy.vulgarity_count
+        if not is_spicy_tie:
+            u_name = top_spicy.speaker_name or top_spicy.speaker_id
+            v_cnt = top_spicy.vulgarity_count
+            sample_terms = top_spicy.vulgarity_terms[:2] if getattr(top_spicy, "vulgarity_terms", None) else []
+            sample_str = f" ({', '.join(sample_terms)})" if sample_terms else ""
+            lines.append(f"🌶️ **الأكثر صراحة / أنفلترد:** {u_name} ({v_cnt} كلمة بدون فلتر){sample_str}")
+
+    # The Diplomat: speaker with 0 vulgarity, 0 anger, >= 15s talk time, in >= 2 speaker calls
+    if len(speakers) >= 2 and total_talk_sec > 0:
+        diplomat_candidates = [
+            s for s in speakers
+            if getattr(s, "vulgarity_count", 0) == 0 and s.angry_episodes == 0 and s.total_speak_seconds >= 15.0
+        ]
+        if diplomat_candidates:
+            diplomat_candidates.sort(key=lambda s: s.total_speak_seconds, reverse=True)
+            best_diplomat = diplomat_candidates[0]
+            is_diplomat_tie = len(diplomat_candidates) >= 2 and (best_diplomat.total_speak_seconds - diplomat_candidates[1].total_speak_seconds) < 1.0
+            if not is_diplomat_tie:
+                d_name = best_diplomat.speaker_name or best_diplomat.speaker_id
+                d_sec = best_diplomat.total_speak_seconds
+                d_dur_str = f"{d_sec / 60.0:.1f}m" if d_sec >= 60.0 else f"{int(round(d_sec))}s"
+                lines.append(f"🕊️ **الدبلوماسي (أكتر مشاركة هادية ونظيفة):** {d_name} ({d_dur_str} كلام راقي بدون أي عصبية)")
+
     # Section C: Anger leaderboard (episode count + first anger quote as "receipts")
     # If zero angry episodes for everyone, replace with: "😡 Nobody got angry this call... suspicious."
     angry_speakers = [s for s in sorted_speakers if s.angry_episodes > 0]

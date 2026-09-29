@@ -20,6 +20,7 @@ ANALYTICS_STATE: Dict[str, Any] = {
     "speakers": {},
     "total_talk_seconds": 0.0,
     "total_angry_episodes": 0,
+    "total_vulgarity_count": 0,
     "longest_streak": {
         "speaker_name": None,
         "streak_seconds": 0.0
@@ -77,6 +78,9 @@ class VoiceEventPayload(BaseModel):
     talk_delta_seconds: Optional[float] = None
     streak_seconds: Optional[float] = None
     angry_episodes: Optional[int] = None
+    vulgarity_count: Optional[int] = None
+    vulgarity_terms: Optional[List[str]] = None
+    total_vulgarity_count: Optional[int] = None
 
 
 async def broadcast_event(event_data: dict):
@@ -410,12 +414,17 @@ async def ingest_voice_event(event: VoiceEventPayload):
                 "angry_episodes": 0,
                 "first_anger_quote": None,
                 "anger_evidence": None,
-                "anger_episodes_history": []
+                "anger_episodes_history": [],
+                "vulgarity_count": 0,
+                "vulgarity_terms": []
             }
         spk_stats = ANALYTICS_STATE["speakers"][spk]
 
         if "anger_episodes_history" not in spk_stats:
             spk_stats["anger_episodes_history"] = []
+
+        if "vulgarity_terms" not in spk_stats:
+            spk_stats["vulgarity_terms"] = []
 
         if topic:
             ANALYTICS_STATE["topic_totals"][topic] = ANALYTICS_STATE["topic_totals"].get(topic, 0) + 1
@@ -435,6 +444,19 @@ async def ingest_voice_event(event: VoiceEventPayload):
             spk_stats["angry_episodes"] = max(spk_stats["angry_episodes"], int(episodes))
         elif anger in ("mild", "high"):
             spk_stats["angry_episodes"] += 1
+
+        # Banter & vulgarity tracking (Phase 2)
+        vulgarity_cnt = event.vulgarity_count if event.vulgarity_count is not None else event.payload.get("vulgarity_count")
+        if vulgarity_cnt is not None:
+            spk_stats["vulgarity_count"] = max(spk_stats.get("vulgarity_count", 0), int(vulgarity_cnt))
+
+        v_terms = event.vulgarity_terms or event.payload.get("vulgarity_terms")
+        if v_terms and isinstance(v_terms, list):
+            existing_terms = set(spk_stats.get("vulgarity_terms", []))
+            for t in v_terms:
+                if t not in existing_terms:
+                    spk_stats.setdefault("vulgarity_terms", []).append(t)
+                    existing_terms.add(t)
 
         # Preserve quotes and receipts
         first_q = event.first_anger_quote or event.payload.get("first_anger_quote")
@@ -466,6 +488,7 @@ async def ingest_voice_event(event: VoiceEventPayload):
 
         ANALYTICS_STATE["total_talk_seconds"] = round(sum(s["talk_seconds"] for s in ANALYTICS_STATE["speakers"].values()), 2)
         ANALYTICS_STATE["total_angry_episodes"] = sum(s["angry_episodes"] for s in ANALYTICS_STATE["speakers"].values())
+        ANALYTICS_STATE["total_vulgarity_count"] = sum(s.get("vulgarity_count", 0) for s in ANALYTICS_STATE["speakers"].values())
 
     await broadcast_event({"type": event.type, "event": event.dict(), "live_state": LIVE_STATE, "analytics": ANALYTICS_STATE})
     return {"status": "ok", "event_id": event.event_id}
@@ -510,6 +533,7 @@ async def reset_live_state():
     ANALYTICS_STATE["speakers"].clear()
     ANALYTICS_STATE["total_talk_seconds"] = 0.0
     ANALYTICS_STATE["total_angry_episodes"] = 0
+    ANALYTICS_STATE["total_vulgarity_count"] = 0
     ANALYTICS_STATE["longest_streak"] = {
         "speaker_name": None,
         "streak_seconds": 0.0

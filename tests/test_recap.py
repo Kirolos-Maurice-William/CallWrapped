@@ -136,6 +136,37 @@ class TestSessionRecapRenderer(unittest.TestCase):
         self.assertIn("😡 محدش عصب في المكالمة دي... كده مش طبيعي 😂", recap_text)
         self.assertNotIn("نوبات إحباط", recap_text)
 
+    def test_phase2_most_unfiltered_and_diplomat_badges_render_in_recap(self):
+        """
+        Verifies that Phase 2 badges ('The Most Unfiltered' and 'The Diplomat')
+        render correctly in Discord /recap when criteria are met.
+        """
+        session = SessionState(guild_id=444)
+        # Alice: drops 3 vulgarity tokens
+        session.stats_tracker.record_utterance(
+            "alice", 0.0, 30.0, "Alice",
+            text="احا يا عم ده bullshit خالص fuck"
+        )
+        # Bob: speaks 45s clean with 0 anger and 0 vulgarity
+        session.stats_tracker.record_utterance(
+            "bob", 30.0, 75.0, "Bob",
+            text="يا جماعة نهدى شوية ونتكلم باحترام وهدوء"
+        )
+        session.topic_counts = {"tech": 2}
+
+        recap_text = render_recap(session)
+        print("\n" + "=" * 60)
+        print("=== PHASE 2 BADGES SESSION RECAP ===")
+        print("=" * 60)
+        print(recap_text)
+        print("=" * 60 + "\n")
+
+        # Verify The Most Unfiltered badge
+        self.assertIn("🌶️ **الأكثر صراحة / أنفلترد:** Alice (3 كلمة بدون فلتر)", recap_text)
+
+        # Verify The Diplomat badge
+        self.assertIn("🕊️ **الدبلوماسي (أكتر مشاركة هادية ونظيفة):** Bob (45s كلام راقي بدون أي عصبية)", recap_text)
+
 
 if __name__ == "__main__":
     unittest.main()
