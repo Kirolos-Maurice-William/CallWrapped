@@ -122,8 +122,8 @@ class TestTwoTierTopicClassification(unittest.TestCase):
         session.micro_tags = {"RTX 5070": 3, "الأهلي": 2}
 
         recap_text = render_recap(session)
-        self.assertIn("🏷️ **أكتر مواضيع اتكلمتوا فيها:**", recap_text)
-        self.assertIn("📌 **أبرز الكلمات والمواضيع الدقيقة:**", recap_text)
+        self.assertIn("🏷️ **Top Discussion Topics:**", recap_text)
+        self.assertIn("📌 **Key Entities & Subtopics:**", recap_text)
         self.assertIn("#RTX 5070 (3)", recap_text)
         self.assertIn("#الأهلي (2)", recap_text)
 

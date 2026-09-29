@@ -333,17 +333,18 @@ def format_streak_mmss(seconds: float) -> str:
 
 def render_recap(session_state: Any) -> str:
     """
-    Pure function rendering real session recap text in Egyptian Arabic.
+    Pure function rendering real session recap text in English.
     Shows:
     - Per-speaker talk minutes + % share bar (▰▱)
     - Longest streak record holder (formatted as m:ss)
-    - Anger leaderboard (episode count + first anger quote as "receipts")
+    - Silent Observer, Most Unfiltered, The Diplomat, The Roast Master
+    - Anger & Frustration Moments (episode count + first anger quote as "receipts")
     - Top-3 topics with %
-    Returns 'No data yet in this call.' if the session is empty.
+    Returns 'No speech data recorded in this call yet.' if the session is empty.
     Never fabricates or default-fills numbers.
     """
     if not session_state:
-        return "مفيش بيانات في المكالمة دي لسه."
+        return "No speech data recorded in this call yet."
 
     # Flush any pending discourse trajectory candidates before rendering
     if hasattr(session_state, "discourse_tracker") and session_state.discourse_tracker:
@@ -389,7 +390,7 @@ def render_recap(session_state: Any) -> str:
 
     # Empty session check: render ONLY from real session data
     if not speakers or (total_talk_sec == 0.0 and total_utterances == 0):
-        return "مفيش بيانات في المكالمة دي لسه."
+        return "No speech data recorded in this call yet."
 
     # 2. Extract topics from session_state
     topic_counts: Dict[str, int] = {}
@@ -427,10 +428,10 @@ def render_recap(session_state: Any) -> str:
             if claim.topic:
                 topic_counts[claim.topic] = topic_counts.get(claim.topic, 0) + 1
 
-    lines = ["🎙️ **ملخص المكالمة**\n"]
+    lines = ["🎙️ **Call Wrapped Summary**\n"]
 
     # Section A: Per-speaker talk minutes + % share bar (▰▱)
-    lines.append("🗣️ **وقت الكلام ونسبة المشاركة:**")
+    lines.append("🗣️ **Airtime & Participation:**")
     sorted_speakers = sorted(speakers, key=lambda s: s.total_speak_seconds, reverse=True)
     for spk in sorted_speakers:
         name = spk.speaker_name or spk.speaker_id
@@ -443,7 +444,7 @@ def render_recap(session_state: Any) -> str:
         lines.append(f"• **{name}**: {talk_str} {bar} ({pct:.1f}%)")
 
     # Section B: Longest streak record holder (formatted as m:ss) + Silent Observer
-    lines.append("\n🔥 **صاحب أطول ريكورد كلام متواصل:**")
+    lines.append("\n🔥 **Longest Uninterrupted Streak:**")
     streak_holder = max(speakers, key=lambda s: s.longest_streak_seconds)
     if streak_holder.longest_streak_seconds > 0:
         s_name = streak_holder.speaker_name or streak_holder.speaker_id
@@ -462,7 +463,7 @@ def render_recap(session_state: Any) -> str:
             q_talk_sec = quietest.total_speak_seconds
             q_dur_str = f"{q_talk_sec / 60.0:.1f}m" if q_talk_sec >= 60.0 else f"{int(round(q_talk_sec))}s"
             q_pct = (q_talk_sec / total_talk_sec * 100.0)
-            lines.append(f"🤫 **المستمع الهادئ (أقل مشاركة):** {q_name} ({q_dur_str} - {q_pct:.1f}%)")
+            lines.append(f"🤫 **The Silent Observer (Lowest Airtime):** {q_name} ({q_dur_str} - {q_pct:.1f}%)")
 
     # Most Unfiltered: speaker with most banter/vulgarity tokens (>0 with honest tie guard, requires >= 2 speakers)
     if len(speakers) >= 2:
@@ -476,8 +477,8 @@ def render_recap(session_state: Any) -> str:
                 v_cnt = top_spicy.vulgarity_count
                 sample_terms = top_spicy.vulgarity_terms[:2] if getattr(top_spicy, "vulgarity_terms", None) else []
                 sample_str = f" ({', '.join(sample_terms)})" if sample_terms else ""
-                w_str = "كلمة واحدة" if v_cnt == 1 else ("كلمتين" if v_cnt == 2 else (f"{v_cnt} كلمات" if 3 <= v_cnt <= 10 else f"{v_cnt} كلمة"))
-                lines.append(f"🌶️ **الأكثر صراحة / أنفلترد:** {u_name} ({w_str} بدون فلتر){sample_str}")
+                w_str = f"{v_cnt} raw token" if v_cnt == 1 else f"{v_cnt} raw tokens"
+                lines.append(f"🌶️ **The Most Unfiltered:** {u_name} ({w_str}){sample_str}")
 
     # The Diplomat: speaker with 0 vulgarity, 0 anger, >= 15s talk time, in >= 2 speaker calls
     if len(speakers) >= 2 and total_talk_sec > 0:
@@ -493,7 +494,7 @@ def render_recap(session_state: Any) -> str:
                 d_name = best_diplomat.speaker_name or best_diplomat.speaker_id
                 d_sec = best_diplomat.total_speak_seconds
                 d_dur_str = f"{d_sec / 60.0:.1f}m" if d_sec >= 60.0 else f"{int(round(d_sec))}s"
-                lines.append(f"🕊️ **الدبلوماسي (أكتر مشاركة هادية ونظيفة):** {d_name} ({d_dur_str} كلام راقي بدون أي عصبية)")
+                lines.append(f"🕊️ **The Diplomat (Clean & Civilized):** {d_name} ({d_dur_str} peaceful)")
 
     # The Roast Master: speaker who participated most in friendly banter (requires >= 2 speakers with honest tie guard)
     if len(speakers) >= 2:
@@ -505,14 +506,14 @@ def render_recap(session_state: Any) -> str:
             if not is_roast_tie:
                 r_name = top_roast.speaker_name or top_roast.speaker_id
                 r_cnt = top_roast.banter_count
-                r_str = "مناوشة ودية واحدة" if r_cnt == 1 else ("مناوشتين وديتين" if r_cnt == 2 else (f"{r_cnt} مناوشات ودية" if 3 <= r_cnt <= 10 else f"{r_cnt} مناوشة ودية"))
-                lines.append(f"🎭 **ملك الضحك والمناوشات:** {r_name} ({r_str} بدون أي زعل)")
+                r_str = f"{r_cnt} friendly banter turn" if r_cnt == 1 else f"{r_cnt} friendly banter turns"
+                lines.append(f"🎭 **The Roast Master:** {r_name} ({r_str})")
 
     # Section C: Anger leaderboard (episode count + first anger quote as "receipts")
-    # If zero angry episodes for everyone, replace with: "😡 Nobody got angry this call... suspicious."
+    # If zero angry episodes for everyone, replace with: "😡 Nobody got angry or frustrated this call... suspicious."
     angry_speakers = [s for s in sorted_speakers if s.angry_episodes > 0]
     if angry_speakers:
-        lines.append("\n😡 **نوبات إحباط:**")
+        lines.append("\n😡 **Anger & Frustration Moments:**")
         angry_speakers.sort(key=lambda s: s.angry_episodes, reverse=True)
         for s in angry_speakers:
             name = s.speaker_name or s.speaker_id
@@ -522,13 +523,13 @@ def render_recap(session_state: Any) -> str:
     else:
         total_banter = sum(getattr(s, "banter_count", 0) for s in speakers)
         if total_banter > 0:
-            b_word = "مناوشة ودية واحدة" if total_banter == 1 else ("مناوشتين وديتين" if total_banter == 2 else (f"{total_banter} مناوشات ودية" if 3 <= total_banter <= 10 else f"{total_banter} مناوشة ودية"))
-            lines.append(f"\n😡 محدش عصب في المكالمة دي... أجواء ضحك ومناوشات ({b_word}، 0 عصبية) 😂")
+            b_word = f"{total_banter} roast" if total_banter == 1 else f"{total_banter} roasts"
+            lines.append(f"\n😡 Nobody got angry or frustrated this call... playful vibe ({b_word}, 0 anger) 😂")
         else:
-            lines.append("\n😡 محدش عصب في المكالمة دي... كده مش طبيعي 😂")
+            lines.append("\n😡 Nobody got angry or frustrated this call... suspicious. 😂")
 
     # Section D: Top-3 topics with % (Taxonomy v3: TOPICAL only, null_topic excluded)
-    lines.append("\n🏷️ **أكتر مواضيع اتكلمتوا فيها:**")
+    lines.append("\n🏷️ **Top Discussion Topics:**")
 
     # Extract continuous topic durations and intervals if present
     topic_durations: Dict[str, float] = {}
@@ -572,7 +573,7 @@ def render_recap(session_state: Any) -> str:
                 mvp_info = mvps.get(top_name) or mvps.get(top_name.lower())
                 if mvp_info:
                     mvp_name, mvp_pct = mvp_info
-                    mvp_badge = f" — 👑 {mvp_name} ({int(round(mvp_pct))}%)"
+                    mvp_badge = f" - 👑 {mvp_name} ({int(round(mvp_pct))}%)"
             if has_durations:
                 dur_sec = topic_durations.get(top_name, 0.0)
                 dur_str = f"{dur_sec / 60.0:.1f}m" if dur_sec >= 60.0 else f"{int(round(dur_sec))}s"
@@ -581,7 +582,7 @@ def render_recap(session_state: Any) -> str:
                 top_cnt = topic_counts.get(top_name, 0)
                 lines.append(f"{rank}. **{display_name}**: {t_pct:.1f}% ({top_cnt})")
         if null_count > 0:
-            lines.append(f"ℹ️ نسبة التغطية الموضوعية: {coverage_pct:.1f}% (مستبعد {null_count} جمل بدون موضوع)")
+            lines.append(f"ℹ️ Topical Coverage: {coverage_pct:.1f}% ({null_count} conversational filler turns excluded)")
 
         # Fine-grained micro-tag highlights (eradicates generic "Other" obscurity)
         micro_tags = getattr(session_state, "micro_tags", {})
@@ -590,11 +591,11 @@ def render_recap(session_state: Any) -> str:
             if valid_tags:
                 top_tags = sorted(valid_tags.items(), key=lambda x: x[1], reverse=True)[:4]
                 tag_str = " • ".join(f"#{t} ({c})" for t, c in top_tags)
-                lines.append(f"📌 **أبرز الكلمات والمواضيع الدقيقة:** {tag_str}")
+                lines.append(f"📌 **Key Entities & Subtopics:** {tag_str}")
     elif null_count > 0:
-        lines.append(f"مفيش مواضيع مسجلة (كل الكلام كان دردشة/تنسيق بدون موضوع - {null_count} جمل).")
+        lines.append(f"No specific topics detected (casual banter/coordination only: {null_count} turns).")
     else:
-        lines.append("مفيش مواضيع مسجلة لسه.")
+        lines.append("No topics recorded yet.")
 
     return "\n".join(lines)
 
@@ -622,10 +623,10 @@ async def card_command(ctx: commands.Context):
     payload = build_card_payload_from_session(
         session,
         session_title=f"CallWrapped • {guild_name}",
-        period_label="ملخص الجلسة الصوتية وتفاعل المتحدثين"
+        period_label="Voice Session Summary & Speaker Dynamics"
     )
     if not payload:
-        await ctx.send("مفيش بيانات في المكالمة دي لسه.")
+        await ctx.send("No speech data recorded in this call yet.")
         return
 
     try:
@@ -634,10 +635,10 @@ async def card_command(ctx: commands.Context):
         await ctx.send(file=file)
     except discord.HTTPException as e:
         logger.error(f"[CardCommand] Discord HTTP error uploading recap card: {e}", exc_info=True)
-        await ctx.send("حدث خطأ أثناء إنشاء كارت الملخص.")
+        await ctx.send("An error occurred while generating the recap card.")
     except Exception as e:
         logger.error(f"[CardCommand] Error generating recap card: {e}", exc_info=True)
-        await ctx.send("حدث خطأ أثناء إنشاء كارت الملخص.")
+        await ctx.send("An error occurred while generating the recap card.")
 
 
 @bot.command(name="help")
@@ -867,7 +868,7 @@ async def check_dispute(ctx: commands.Context):
     offer = session.pending_offer
     if not offer or offer.is_resolved:
         try:
-            await ctx.send("ℹ️ لا يوجد طلب تحقق معلق حالياً.")
+            await ctx.send("ℹ️ No pending dispute verification offer at the moment.")
         except Exception as e:
             logger.debug(f"Could not send check notice to text channel: {e}")
         return
@@ -878,7 +879,7 @@ async def check_dispute(ctx: commands.Context):
         offer.expiry_task.cancel()
 
     try:
-        await ctx.send("🔍 جاري التحقق من المعلومة عبر المصادر الموثوقة...")
+        await ctx.send("🔍 Verifying claim against authoritative web sources...")
     except Exception as e:
         logger.debug(f"Could not send check confirmation notice to text channel: {e}")
 
@@ -952,7 +953,7 @@ async def manual_arbitrate(ctx: commands.Context, *, query: str):
     is_cooldown, remaining, reason = session.is_in_cooldown(topic_key, now)
     if is_cooldown:
         logger.info(f"DISPUTE_SUPPRESSED: cooldown active (remaining: {remaining}s)")
-        await ctx.send(f"⏳ فترة التهدئة نشطة. يرجى الانتظار {remaining} ثانية قبل طلب تدقيق جديد. | Cooldown active: please wait {remaining}s.")
+        await ctx.send(f"⏳ Cooldown active. Please wait {remaining}s before requesting a new dispute check.")
         return
 
     # Cancel older unconfirmed pending offer if any
@@ -1002,8 +1003,8 @@ async def manual_arbitrate(ctx: commands.Context, *, query: str):
         arbitration_engine._offer_expiry_timer(guild_id=ctx.guild.id, offer_id=offer_id, timeout_seconds=expiry_sec)
     )
 
-    # Post Arabic offer message to Discord text channel
-    offer_text = f"🤖 تم اقتراح التحقق من: «{query}» — أتحقق؟ قول «شوفها» أو اكتب !check"
+    # Post offer message to Discord text channel
+    offer_text = f"🤖 Dispute check offered for: '{query}' - Verify? Say 'شوفها' or type !check"
     await ctx.send(offer_text)
 
     # Publish VoiceEvent(type="dispute_check_offered")

@@ -25,7 +25,7 @@ class TestSessionRecapRenderer(unittest.TestCase):
     def test_empty_session_returns_no_data(self):
         empty_session = SessionState(guild_id=111)
         output = render_recap(empty_session)
-        self.assertEqual(output, "مفيش بيانات في المكالمة دي لسه.")
+        self.assertEqual(output, "No speech data recorded in this call yet.")
         print("\n[Test 1: Empty Session]")
         print(f"Output: {output}")
 
@@ -93,8 +93,8 @@ class TestSessionRecapRenderer(unittest.TestCase):
 
         # Assertions
         # 1. Header & Talk minutes and % share bar (▰▱)
-        self.assertIn("🎙️ **ملخص المكالمة**", recap_text)
-        self.assertIn("🗣️ **وقت الكلام ونسبة المشاركة:**", recap_text)
+        self.assertIn("🎙️ **Call Wrapped Summary**", recap_text)
+        self.assertIn("🗣️ **Airtime & Participation:**", recap_text)
         self.assertIn("• **Alice**: 2.0m", recap_text)
         self.assertIn("• **Bob**: 1.0m", recap_text)
         self.assertIn("▰", recap_text)
@@ -103,15 +103,15 @@ class TestSessionRecapRenderer(unittest.TestCase):
         self.assertIn("33.3%", recap_text)
 
         # 2. Longest streak record holder formatted as m:ss (83.0s -> "1:23")
-        self.assertIn("🔥 **صاحب أطول ريكورد كلام متواصل:**", recap_text)
+        self.assertIn("🔥 **Longest Uninterrupted Streak:**", recap_text)
         self.assertIn("👑 **Alice** (1:23)", recap_text)
 
         # 3. Anger leaderboard
-        self.assertIn("😡 **نوبات إحباط:**", recap_text)
+        self.assertIn("😡 **Anger & Frustration Moments:**", recap_text)
         self.assertIn("• **Alice**: 1 moment | Receipts: \"زهقت خلاص من السيرفر ده\"", recap_text)
 
         # 4. Top-3 topics with %
-        self.assertIn("🏷️ **أكتر مواضيع اتكلمتوا فيها:**", recap_text)
+        self.assertIn("🏷️ **Top Discussion Topics:**", recap_text)
         self.assertIn("1. **gaming**: 50.0% (3)", recap_text)
         self.assertIn("2. **football**: 33.3% (2)", recap_text)
         self.assertIn("3. **tech**: 16.7% (1)", recap_text)
@@ -119,7 +119,7 @@ class TestSessionRecapRenderer(unittest.TestCase):
     def test_zero_angry_episodes_shows_suspicious_message(self):
         """
         Verifies that if zero angry episodes for everyone,
-        the anger section is replaced with: '😡 Nobody got angry this call... suspicious.'
+        the anger section is replaced with: '😡 Nobody got angry or frustrated this call... suspicious.'
         """
         session = SessionState(guild_id=333)
         session.stats_tracker.record_utterance("alice", 0.0, 30.0, "Alice")
@@ -133,8 +133,8 @@ class TestSessionRecapRenderer(unittest.TestCase):
         print(recap_text)
         print("=" * 60 + "\n")
 
-        self.assertIn("😡 محدش عصب في المكالمة دي... كده مش طبيعي 😂", recap_text)
-        self.assertNotIn("نوبات إحباط", recap_text)
+        self.assertIn("😡 Nobody got angry or frustrated this call... suspicious. 😂", recap_text)
+        self.assertNotIn("Anger & Frustration Moments", recap_text)
 
     def test_phase2_most_unfiltered_and_diplomat_badges_render_in_recap(self):
         """
@@ -162,10 +162,10 @@ class TestSessionRecapRenderer(unittest.TestCase):
         print("=" * 60 + "\n")
 
         # Verify The Most Unfiltered badge
-        self.assertIn("🌶️ **الأكثر صراحة / أنفلترد:** Alice (3 كلمات بدون فلتر)", recap_text)
+        self.assertIn("🌶️ **The Most Unfiltered:** Alice (3 raw tokens)", recap_text)
 
         # Verify The Diplomat badge
-        self.assertIn("🕊️ **الدبلوماسي (أكتر مشاركة هادية ونظيفة):** Bob (45s كلام راقي بدون أي عصبية)", recap_text)
+        self.assertIn("🕊️ **The Diplomat (Clean & Civilized):** Bob (45s peaceful)", recap_text)
 
     def test_render_recap_roast_master_and_friendly_banter(self):
         """Phase 3: Verify The Roast Master badge and friendly banter call vibe."""
@@ -184,8 +184,8 @@ class TestSessionRecapRenderer(unittest.TestCase):
         print(recap_text)
         print("=" * 60 + "\n")
 
-        self.assertIn("🎭 **ملك الضحك والمناوشات:** Alice (3 مناوشات ودية بدون أي زعل)", recap_text)
-        self.assertIn("أجواء ضحك ومناوشات (4 مناوشات ودية، 0 عصبية) 😂", recap_text)
+        self.assertIn("🎭 **The Roast Master:** Alice (3 friendly banter turns)", recap_text)
+        self.assertIn("playful vibe (4 roasts, 0 anger) 😂", recap_text)
 
 
 if __name__ == "__main__":

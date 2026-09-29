@@ -284,8 +284,8 @@ class TestSplitClassifier(unittest.IsolatedAsyncioTestCase):
         print("Rendered Recap Output:\n" + recap_text)
         self.assertIn("Tamer", recap_text, "Recap must mention speaker Tamer")
         self.assertIn("Mostafa", recap_text, "Recap must mention speaker Mostafa")
-        self.assertIn("ملخص المكالمة", recap_text, "Recap title must be present")
-        self.assertNotIn("مفيش بيانات في المكالمة دي لسه.", recap_text, "Recap must not report empty session")
+        self.assertIn("Call Wrapped Summary", recap_text, "Recap title must be present")
+        self.assertNotIn("No speech data recorded in this call yet.", recap_text, "Recap must not report empty session")
         print("[PROOF VERIFIED] Recap flush correctly flushed pending buffer and rendered complete stats.\n")
 
     def test_infer_topic_precedence_and_boundary_cases(self):

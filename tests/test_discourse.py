@@ -474,10 +474,10 @@ class TestDiscourseTrajectory(unittest.TestCase):
 
         # 4. Session Recap text
         recap_text = render_recap(session)
-        self.assertIn("ملك الضحك والمناوشات", recap_text)
+        self.assertIn("The Roast Master", recap_text)
         self.assertIn("Ali", recap_text)
-        self.assertIn("أجواء ضحك ومناوشات", recap_text)
-        self.assertNotIn("نوبات إحباط", recap_text)
+        self.assertIn("playful vibe", recap_text)
+        self.assertNotIn("Anger & Frustration Moments", recap_text)
 
 
 if __name__ == "__main__":

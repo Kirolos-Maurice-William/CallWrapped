@@ -6,14 +6,14 @@ from bot.arbitration.lexicon import analyze_banter, mask_term
 
 logger = logging.getLogger("TalkStats")
 
-# Taxonomy v3 display name mappings (colloquial Egyptian Arabic)
+# Taxonomy v3 display name mappings (clean English)
 TOPIC_DISPLAY_NAMES: Dict[str, str] = {
-    "food": "أكل",
-    "travel": "سفر",
-    "study_work": "دراسة وشغل",
-    "health": "صحة",
-    "cars": "عربيات",
-    "money": "فلوس",
+    "food": "food",
+    "travel": "travel",
+    "study_work": "study & work",
+    "health": "health",
+    "cars": "cars",
+    "money": "money",
 }
 
 

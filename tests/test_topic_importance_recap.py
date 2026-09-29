@@ -83,7 +83,7 @@ class TestTopicImportanceRecap(unittest.TestCase):
 
         recap_text = render_recap(session)
 
-        self.assertIn("🏷️ **أكتر مواضيع اتكلمتوا فيها:**", recap_text)
+        self.assertIn("🏷️ **Top Discussion Topics:**", recap_text)
         # Tech: 150s = 2.5m
         self.assertIn("2.5m", recap_text)
         # Gaming: 18s
