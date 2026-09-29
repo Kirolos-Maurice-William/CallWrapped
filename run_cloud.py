@@ -12,8 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 def main():
     print("=" * 60)
-    print("  CALLWRAPPED — CLOUD RUNNER")
-    print("  AssemblyAI Voice Agent Hackathon (lablab.ai)")
+    print("  CALLWRAPPED - CLOUD SERVICE RUNNER")
     print("=" * 60)
 
     env = os.environ.copy()

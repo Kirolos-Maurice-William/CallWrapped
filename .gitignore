@@ -35,11 +35,10 @@ discord_bot/debug_last_audio.wav
 audit/shadow/
 *.jsonl
 
-# Internal AI Traceback & Self-Check Logs
-audit/selfcheck/
-audit/final/
-audit/user_prompt.txt
-audit/quality/vulture_raw.txt
+# Internal Audit, Benchmarks & Scratch Logs
+audit/
+REGRESSION_LEDGER.md
+assemblyai_capability_report.json
 
 # Build Artifacts
 *.tsbuildinfo
@@ -47,6 +46,7 @@ audit/quality/vulture_raw.txt
 # Editor / Tool Metadata
 .qwen/
 opencode.json
+
 
 
 
