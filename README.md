@@ -195,8 +195,8 @@ Served locally at `http://localhost:8000` via FastAPI and Next.js 14:
 
 ### 1. Installation
 ```bash
-git clone https://github.com/Kirolos-Maurice-William/CallsWrapped.git
-cd CallsWrapped
+git clone https://github.com/Kirolos-Maurice-William/CallWrapped.git
+cd CallWrapped
 
 # Python setup
 python -m venv backend/venv
