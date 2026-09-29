@@ -512,7 +512,7 @@ export default function CallWrappedDashboard() {
     } catch (e) {
       console.error("Failed to start replay:", e);
     } finally {
-      setTimeout(() => setIsSimulating(false), 8000);
+      setTimeout(() => setIsSimulating(false), 11000);
     }
   };
 
