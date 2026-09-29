@@ -77,80 +77,95 @@ export function PipelineFlow({
           </div>
         </div>
 
-        {/* Connected Node Flow (Locked to single horizontal row starting with Node 1) */}
-        <div className="w-full xl:w-auto flex items-center gap-1.5 sm:gap-2 justify-start overflow-x-auto flex-nowrap scrollbar-none py-1 max-w-full">
+        {/* Connected Node Flow (Compact Vertically-Stacked Cards with Bottom-Centered Latency) */}
+        <div className="w-full xl:w-auto flex items-center justify-between xl:justify-end gap-1 sm:gap-1.5 flex-nowrap py-1">
           {/* Node 1: AssemblyAI STT */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#1e1f22] border border-[#383a40] text-cyan-200 shadow-sm flex-shrink-0">
-            <Radio className="w-3.5 h-3.5 text-cyan-400" />
-            <div className="text-[11px] leading-tight">
-              <span className="text-[9px] text-cyan-400/80 font-mono block">1. ASR STREAM</span>
-              <span className="font-bold text-[#F2F3F5]">AssemblyAI {speechModel}</span>
+          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#1e1f22] border border-[#383a40] text-center shadow-sm w-[110px] sm:w-[124px] flex-shrink-0">
+            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-cyan-400 font-bold mb-0.5">
+              <Radio className="w-3 h-3 text-cyan-400" />
+              <span>1. ASR</span>
             </div>
-            <span className="font-mono font-bold text-cyan-400 ml-1 text-xs">
+            <div className="text-[11px] font-bold text-[#F2F3F5] truncate w-full" title={`AssemblyAI ${speechModel}`}>
+              AssemblyAI
+            </div>
+            <div className="mt-1 px-1.5 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/40 text-cyan-300 font-mono text-[10px] font-bold">
               {stt}ms
-            </span>
+            </div>
           </div>
 
-          <ArrowRight className="w-3.5 h-3.5 text-[#949BA4]/50 hidden sm:block flex-shrink-0" />
+          <ArrowRight className="w-3 h-3 text-[#949BA4]/40 flex-shrink-0" />
 
           {/* Node 2: FastGate */}
-          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-[#1e1f22] border border-[#383a40] text-indigo-200 shadow-sm flex-shrink-0">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#5865F2]" />
-            <div className="text-[11px] leading-tight">
-              <span className="text-[9px] text-[#5865F2]/80 font-mono block">2. FASTGATE</span>
-              <span className="font-bold text-[#F2F3F5]">Epistemic Veto</span>
+          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#1e1f22] border border-[#383a40] text-center shadow-sm w-[110px] sm:w-[124px] flex-shrink-0">
+            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-[#5865F2] font-bold mb-0.5">
+              <ShieldCheck className="w-3 h-3 text-[#5865F2]" />
+              <span>2. FASTGATE</span>
             </div>
-            <span className="font-mono font-bold text-[#5865F2] ml-1 text-xs">
+            <div className="text-[11px] font-bold text-[#F2F3F5] truncate w-full" title="FastGate Epistemic Veto">
+              Epistemic Veto
+            </div>
+            <div className="mt-1 px-1.5 py-0.5 rounded bg-[#5865F2]/20 border border-[#5865F2]/40 text-[#5865F2] font-mono text-[10px] font-bold">
               &lt;10ms
-            </span>
+            </div>
           </div>
 
-          <ArrowRight className="w-3.5 h-3.5 text-[#949BA4]/50 hidden sm:block flex-shrink-0" />
+          <ArrowRight className="w-3 h-3 text-[#949BA4]/40 flex-shrink-0" />
 
           {/* Node 3: Groq LPU */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#1e1f22] border border-[#383a40] text-purple-200 shadow-sm flex-shrink-0">
-            <Cpu className="w-3.5 h-3.5 text-purple-400" />
-            <div className="text-[11px] leading-tight">
-              <span className="text-[9px] text-purple-400/80 font-mono block">3. LPU REASONING</span>
-              <span className="font-bold text-[#F2F3F5]">Groq Qwen 3.8 27B</span>
+          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#1e1f22] border border-[#383a40] text-center shadow-sm w-[110px] sm:w-[124px] flex-shrink-0">
+            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-purple-400 font-bold mb-0.5">
+              <Cpu className="w-3 h-3 text-purple-400" />
+              <span>3. REASONING</span>
             </div>
-            <span className="font-mono font-bold text-purple-400 ml-1 text-xs">
+            <div className="text-[11px] font-bold text-[#F2F3F5] truncate w-full" title="Groq Qwen 3.8 27B">
+              Groq Qwen 27B
+            </div>
+            <div className="mt-1 px-1.5 py-0.5 rounded bg-purple-950/70 border border-purple-800/40 text-purple-300 font-mono text-[10px] font-bold">
               {llm}ms
-            </span>
+            </div>
           </div>
 
-          <ArrowRight className="w-3.5 h-3.5 text-[#949BA4]/50 hidden sm:block flex-shrink-0" />
+          <ArrowRight className="w-3 h-3 text-[#949BA4]/40 flex-shrink-0" />
 
           {/* Node 4: Tavily Search */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#1e1f22] border border-[#383a40] text-amber-200 shadow-sm flex-shrink-0">
-            <Search className="w-3.5 h-3.5 text-[#F0B232]" />
-            <div className="text-[11px] leading-tight">
-              <span className="text-[9px] text-[#F0B232]/80 font-mono block">4. TIER-1 SEARCH</span>
-              <span className="font-bold text-[#F2F3F5]">Tavily Web</span>
+          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#1e1f22] border border-[#383a40] text-center shadow-sm w-[110px] sm:w-[124px] flex-shrink-0">
+            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-[#F0B232] font-bold mb-0.5">
+              <Search className="w-3 h-3 text-[#F0B232]" />
+              <span>4. SEARCH</span>
             </div>
-            <span className="font-mono font-bold text-[#F0B232] ml-1 text-xs">
+            <div className="text-[11px] font-bold text-[#F2F3F5] truncate w-full" title="Tavily Tier-1 Ground Truth Search">
+              Tavily Web
+            </div>
+            <div className="mt-1 px-1.5 py-0.5 rounded bg-amber-950/70 border border-amber-800/40 text-amber-300 font-mono text-[10px] font-bold">
               {search}ms
-            </span>
+            </div>
           </div>
 
-          <ArrowRight className="w-3.5 h-3.5 text-[#949BA4]/50 hidden sm:block flex-shrink-0" />
+          <ArrowRight className="w-3 h-3 text-[#949BA4]/40 flex-shrink-0" />
 
           {/* Node 5: Edge Neural TTS */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#1e1f22] border border-[#383a40] text-emerald-200 shadow-sm flex-shrink-0">
-            <Volume2 className="w-3.5 h-3.5 text-[#23A55A]" />
-            <div className="text-[11px] leading-tight">
-              <span className="text-[9px] text-[#23A55A]/80 font-mono block">5. VOICE OUT</span>
-              <span className="font-bold text-[#F2F3F5]">Edge Neural Shakir</span>
+          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#1e1f22] border border-[#383a40] text-center shadow-sm w-[110px] sm:w-[124px] flex-shrink-0">
+            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-[#23A55A] font-bold mb-0.5">
+              <Volume2 className="w-3 h-3 text-[#23A55A]" />
+              <span>5. VOICE OUT</span>
             </div>
-            <span className="font-mono font-bold text-[#23A55A] ml-1 text-xs">
+            <div className="text-[11px] font-bold text-[#F2F3F5] truncate w-full" title="Edge Neural TTS (Shakir Arabic / Christopher English)">
+              Edge Neural
+            </div>
+            <div className="mt-1 px-1.5 py-0.5 rounded bg-emerald-950/70 border border-emerald-800/40 text-emerald-300 font-mono text-[10px] font-bold">
               {tts}ms
-            </span>
+            </div>
           </div>
 
           {/* Total Badge */}
-          <div className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#5865F2]/20 border border-[#5865F2]/40 text-white font-mono font-bold text-xs shadow-md flex-shrink-0">
-            <Clock className="w-3.5 h-3.5 text-[#5865F2]" />
-            <span>Total: {(total / 1000).toFixed(2)}s</span>
+          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#5865F2]/20 border border-[#5865F2]/40 text-center shadow-md w-[90px] sm:w-[100px] flex-shrink-0">
+            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-[#5865F2] font-bold mb-0.5">
+              <Clock className="w-3 h-3" />
+              <span>TOTAL</span>
+            </div>
+            <div className="text-xs font-black font-mono text-white mt-1">
+              {(total / 1000).toFixed(2)}s
+            </div>
           </div>
         </div>
       </div>

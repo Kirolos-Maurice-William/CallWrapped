@@ -199,7 +199,7 @@ export default function CallWrappedDashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionType, setConnectionType] = useState<"ws" | "poll">("poll");
   const [showRecapModal, setShowRecapModal] = useState(false);
-  const [leftTab, setLeftTab] = useState<"arbitration" | "transcript">("arbitration");
+  const [playingClip, setPlayingClip] = useState<string | null>(null);
   const hasLoadedOnce = useRef(false);
 
   const [latency, setLatency] = useState<LatencyMetrics>({
@@ -242,7 +242,6 @@ export default function CallWrappedDashboard() {
   const [factCheckModeBadge, setFactCheckModeBadge] = useState<string>("Fact Check Mode: OFF");
 
   const applyGoldenDemo = () => {
-    setLeftTab("arbitration");
     setLatency(GOLDEN_DEMO_DATA.latency);
     setActiveDispute(GOLDEN_DEMO_DATA.activeDispute as DisputeInfo);
     setDisputes(GOLDEN_DEMO_DATA.disputes as DisputeCard[]);
@@ -276,6 +275,27 @@ export default function CallWrappedDashboard() {
       };
     }
     return { http: "http://localhost:8000", ws: "ws://localhost:8000" };
+  };
+
+  const handlePlayAudio = (clip: string) => {
+    try {
+      const { http } = getBackendBase();
+      const url = `${http}/api/audio-evidence/${clip}`;
+      const audio = new Audio(url);
+      setPlayingClip(clip);
+      audio.onended = () => setPlayingClip(null);
+      audio.onerror = (e) => {
+        console.error("Audio playback error for", url, e);
+        setPlayingClip(null);
+      };
+      audio.play().catch(e => {
+        console.error("Audio play promise error:", e);
+        setPlayingClip(null);
+      });
+    } catch (err) {
+      console.error("Audio error:", err);
+      setPlayingClip(null);
+    }
   };
 
   useEffect(() => {
@@ -486,7 +506,6 @@ export default function CallWrappedDashboard() {
   // Trigger Demo Replay
   const handleTriggerReplay = async () => {
     setIsSimulating(true);
-    setLeftTab("arbitration");
     const { http } = getBackendBase();
     try {
       await fetch(`${http}/api/demo/run`, { method: "POST" });
@@ -654,53 +673,7 @@ export default function CallWrappedDashboard() {
           {/* ======================================================== */}
           <div className="lg:col-span-7 flex flex-col space-y-4">
 
-            {/* TAB SELECTOR HEADER */}
-            <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[#2b2d31] border border-[#383a40]">
-              <button
-                onClick={() => setLeftTab("arbitration")}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  leftTab === "arbitration"
-                    ? "bg-[#5865F2] text-white shadow-md shadow-[#5865F2]/25"
-                    : "text-[#949BA4] hover:text-[#F2F3F5] hover:bg-[#313338]"
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>AI Voice Referee & Disputes</span>
-                {activeDispute && (
-                  <span className="w-2 h-2 rounded-full bg-[#23A55A] animate-pulse" />
-                )}
-                {disputes.length > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
-                    leftTab === "arbitration" ? "bg-white/20 text-white" : "bg-[#1e1f22] text-[#949BA4]"
-                  }`}>
-                    {disputes.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setLeftTab("transcript")}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  leftTab === "transcript"
-                    ? "bg-[#5865F2] text-white shadow-md shadow-[#5865F2]/25"
-                    : "text-[#949BA4] hover:text-[#F2F3F5] hover:bg-[#313338]"
-                }`}
-              >
-                <Radio className="w-4 h-4 text-cyan-400" />
-                <span>Discord Voice Transcript</span>
-                {turns.length > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
-                    leftTab === "transcript" ? "bg-white/20 text-white" : "bg-[#1e1f22] text-[#949BA4]"
-                  }`}>
-                    {turns.length} turns
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {leftTab === "arbitration" ? (
-              <div className="space-y-4">
-                {/* HERO ACTIVE EVIDENCE ARBITRATION CARD */}
+            {/* HERO ACTIVE EVIDENCE ARBITRATION CARD */}
                 <div className={`relative rounded-2xl bg-[#2b2d31] shadow-xl shadow-black/40 p-5 md:p-6 overflow-hidden transition-all ${
               activeDispute ? "border-2 border-[#23A55A]/40 shadow-[#23A55A]/5" : "border border-[#383a40]"
             }`}>
@@ -926,44 +899,8 @@ export default function CallWrappedDashboard() {
             {/* DISPUTES PANEL */}
             <DisputesPanel disputes={disputes} />
 
-            {/* LATEST VOICE UTTERANCE TICKER */}
-            {turns.length > 0 && (
-              <div className="p-3.5 rounded-xl bg-[#2b2d31] border border-[#383a40] flex items-center justify-between gap-3 text-xs shadow-md">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-[#23A55A] animate-pulse shrink-0" />
-                  <span className="text-[#949BA4] text-[11px] shrink-0 font-mono">Live Speech:</span>
-                  <span className="font-semibold text-[#F2F3F5] shrink-0" dir="auto">{turns[turns.length - 1].speaker_name}:</span>
-                  <span className="text-[#DBDEE1] truncate italic" dir="auto">"{turns[turns.length - 1].text}"</span>
-                </div>
-                <button
-                  onClick={() => setLeftTab("transcript")}
-                  className="shrink-0 text-[11px] font-bold text-[#5865F2] hover:text-[#5865F2]/80 transition-colors cursor-pointer"
-                >
-                  View in Transcript →
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* ACTIVE ARBITRATION BANNER (IF DISPUTE IN PROGRESS) */}
-            {activeDispute && (
-              <div className="p-3.5 rounded-xl bg-[#23A55A]/15 border border-[#23A55A]/30 flex items-center justify-between text-xs shadow-md animate-in fade-in">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-[#23A55A]" />
-                  <span className="font-bold text-[#23A55A]">Active Arbitration in Progress!</span>
-                </div>
-                <button
-                  onClick={() => setLeftTab("arbitration")}
-                  className="px-2.5 py-1 rounded-lg bg-[#23A55A] hover:bg-[#1f9450] text-white font-bold text-[11px] transition-colors cursor-pointer shadow"
-                >
-                  Switch to Referee Verdict →
-                </button>
-              </div>
-            )}
-
             {/* REAL-TIME DISCORD TRANSCRIPT STREAM (STYLED LIKE DISCORD CHAT) */}
-            <div className="flex flex-col h-[580px] rounded-2xl bg-[#2b2d31] border border-[#383a40] overflow-hidden shadow-lg">
+            <div className="flex flex-col h-[520px] rounded-2xl bg-[#2b2d31] border border-[#383a40] overflow-hidden shadow-lg">
               <div className="p-3.5 border-b border-[#383a40] bg-[#1e1f22] flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Radio className="w-4 h-4 text-[#F23F43] animate-pulse" />
@@ -971,9 +908,12 @@ export default function CallWrappedDashboard() {
                     DISCORD VOICE TRANSCRIPT STREAM
                   </h2>
                 </div>
-                <span className="text-[11px] font-mono text-[#949BA4]">
-                  {turns.length} utterances
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#23A55A] animate-pulse" />
+                  <span className="text-[11px] font-mono text-[#949BA4]">
+                    {turns.length} utterances
+                  </span>
+                </div>
               </div>
 
               {/* Transcript Chat Area */}
@@ -1032,8 +972,6 @@ export default function CallWrappedDashboard() {
                 <span>Raw Verbatim Evidence</span>
               </div>
             </div>
-          </div>
-        )}
 
           </div>
 
@@ -1216,15 +1154,16 @@ export default function CallWrappedDashboard() {
                               {ep.audio_clip && (
                                 <div className="pt-1 mt-1 border-t border-[#383a40] flex items-center justify-between text-[10px]">
                                   <button
-                                    onClick={() => {
-                                      const audio = new Audio(`/api/audio-evidence/${ep.audio_clip}`);
-                                      audio.play().catch(e => console.error("Playback error:", e));
-                                    }}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#F23F43]/20 hover:bg-[#F23F43]/30 text-[#F23F43] font-mono border border-[#F23F43]/40 transition-colors cursor-pointer"
+                                    onClick={() => handlePlayAudio(ep.audio_clip!)}
+                                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-mono border transition-all cursor-pointer ${
+                                      playingClip === ep.audio_clip
+                                        ? "bg-[#23A55A]/20 border-[#23A55A]/50 text-[#23A55A] animate-pulse"
+                                        : "bg-[#F23F43]/20 hover:bg-[#F23F43]/30 text-[#F23F43] border-[#F23F43]/40"
+                                    }`}
                                     title={`Play audio evidence: ${ep.audio_clip}`}
                                   >
-                                    <span>▶️</span>
-                                    <span>Play Audio Evidence</span>
+                                    <span>{playingClip === ep.audio_clip ? "🔊" : "▶️"}</span>
+                                    <span>{playingClip === ep.audio_clip ? "Playing..." : "Play Audio Evidence"}</span>
                                   </button>
                                   <span className="font-mono text-[9px] text-[#949BA4] truncate max-w-[110px]" title={ep.audio_clip}>
                                     {ep.audio_clip}

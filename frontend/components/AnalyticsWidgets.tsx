@@ -1,12 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   PieChart,
   Clock,
   Flame,
   Award,
-  AlertTriangle,
   Smile,
   BarChart3
 } from "lucide-react";
@@ -110,6 +109,36 @@ interface Props {
 
 export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
   const { topic_totals, speakers, total_talk_seconds, total_angry_episodes, longest_streak } = analytics;
+  const [playingClip, setPlayingClip] = useState<string | null>(null);
+
+  const getAudioUrl = (clip: string) => {
+    if (typeof window !== "undefined") {
+      const hostname = window.location.hostname || "localhost";
+      const port = window.location.port === "3000" ? "8000" : (window.location.port || "8000");
+      return `${window.location.protocol}//${hostname}:${port}/api/audio-evidence/${clip}`;
+    }
+    return `/api/audio-evidence/${clip}`;
+  };
+
+  const handlePlayAudio = (clip: string) => {
+    try {
+      const url = getAudioUrl(clip);
+      const audio = new Audio(url);
+      setPlayingClip(clip);
+      audio.onended = () => setPlayingClip(null);
+      audio.onerror = (e) => {
+        console.error("Audio playback error for", url, e);
+        setPlayingClip(null);
+      };
+      audio.play().catch(e => {
+        console.error("Audio play promise error:", e);
+        setPlayingClip(null);
+      });
+    } catch (err) {
+      console.error("Audio error:", err);
+      setPlayingClip(null);
+    }
+  };
 
   // Topic totals calculations: exclude null_topic from pie, compute coverage
   const topicalEntries = Object.entries(topic_totals || {}).filter(
@@ -353,15 +382,16 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                             {ep.audio_clip && (
                               <div className="pt-1 mt-1 border-t border-[#383a40] flex items-center justify-between text-[10px]">
                                 <button
-                                  onClick={() => {
-                                    const audio = new Audio(`/api/audio-evidence/${ep.audio_clip}`);
-                                    audio.play().catch(e => console.error("Playback error:", e));
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#F23F43]/20 hover:bg-[#F23F43]/30 text-[#F23F43] font-mono border border-[#F23F43]/40 transition-colors cursor-pointer"
+                                  onClick={() => handlePlayAudio(ep.audio_clip!)}
+                                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-mono border transition-all cursor-pointer ${
+                                    playingClip === ep.audio_clip
+                                      ? "bg-[#23A55A]/20 border-[#23A55A]/50 text-[#23A55A] animate-pulse"
+                                      : "bg-[#F23F43]/20 hover:bg-[#F23F43]/30 text-[#F23F43] border-[#F23F43]/40"
+                                  }`}
                                   title={`Play audio evidence: ${ep.audio_clip}`}
                                 >
-                                  <span>▶️</span>
-                                  <span>Play Audio Evidence</span>
+                                  <span>{playingClip === ep.audio_clip ? "🔊" : "▶️"}</span>
+                                  <span>{playingClip === ep.audio_clip ? "Playing..." : "Play Audio Evidence"}</span>
                                 </button>
                                 <span className="font-mono text-[9px] text-[#949BA4] truncate max-w-[110px]" title={ep.audio_clip}>
                                   {ep.audio_clip}

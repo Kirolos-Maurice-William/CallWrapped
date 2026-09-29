@@ -538,9 +538,9 @@ async def get_audio_evidence(filename: str):
     Guards strictly against directory traversal attacks.
     """
     from fastapi.responses import FileResponse, Response
-    from bot.config import PROJECT_ROOT
 
-    recordings_root = (PROJECT_ROOT / "recordings").resolve()
+    project_root = Path(__file__).resolve().parent.parent.parent
+    recordings_root = (project_root / "recordings").resolve()
     safe_filename = Path(filename).name
     if not safe_filename.endswith(".wav"):
         return Response(status_code=400, content="Invalid audio format")
