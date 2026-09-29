@@ -17,7 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from bot.ai.assemblyai import build_keyterms, ASSEMBLYAI_KEYTERMS, AssemblyAIClient
+from bot.ai.assemblyai import build_keyterms, build_custom_spelling, ASSEMBLYAI_KEYTERMS, AssemblyAIClient
 from bot.arbitration.engine import SessionState
 
 
@@ -147,6 +147,42 @@ class TestDynamicKeyterms(unittest.TestCase):
                 self.assertEqual(keyterms_sent[0], "CustomGameBoss")
 
         asyncio.run(run())
+
+    def test_build_custom_spelling_single_word_rule(self):
+        """Verifies that only single-word 'to' targets are included in custom_spelling."""
+        extra = [
+            {"from": ["فالورنت"], "to": "Valorant"},      # Valid single word
+            {"from": ["وستيسكات ماستر"], "to": "Scout Master"} # Invalid multi-word
+        ]
+        spelling = build_custom_spelling(extra)
+        
+        # Valorant should be in custom spelling
+        to_targets = [item["to"] for item in spelling]
+        self.assertIn("Valorant", to_targets)
+        # Scout Master must NOT be in custom spelling
+        self.assertNotIn("Scout Master", to_targets)
+        # All 'to' values in custom_spelling must strictly have 1 word (0 spaces)
+        for item in spelling:
+            self.assertEqual(len(item["to"].split()), 1, f"Multi-word 'to' violation: {item['to']}")
+
+    def test_get_active_custom_spelling_from_session(self):
+        """Verifies SessionState filters multi-word entities out of custom_spelling."""
+        session = SessionState(guild_id=12345)
+        # Single-word entity
+        session.add_discovered_entity("Valorant", ["فالورنت", "فالورانت"])
+        # Multi-word entity
+        session.add_discovered_entity("Scout Master", ["وستيسكات ماستر"])
+
+        active_spelling = session.get_active_custom_spelling()
+        # Should only have 1 entry (Valorant)
+        self.assertEqual(len(active_spelling), 1)
+        self.assertEqual(active_spelling[0]["to"], "Valorant")
+        self.assertEqual(set(active_spelling[0]["from"]), {"فالورنت", "فالورانت"})
+
+        # Keyterms, however, must include BOTH!
+        keyterms = session.get_active_keyterms()
+        self.assertIn("Valorant", keyterms)
+        self.assertIn("Scout Master", keyterms)
 
 
 if __name__ == "__main__":

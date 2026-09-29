@@ -231,6 +231,21 @@ class SessionState:
         """Returns session-discovered entities for upstream ASR keyterm biasing."""
         return list(reversed(self.discovered_entities))[:max_terms]
 
+    def get_active_custom_spelling(self) -> List[Dict[str, Any]]:
+        """
+        Extracts session-discovered aliases whose canonical target is a single word.
+        Format: [{'from': [alias], 'to': canonical_single_word}]
+        Safe for AssemblyAI Universal-3.5 Pro custom_spelling API.
+        """
+        spelling_map: Dict[str, List[str]] = {}
+        for alias, canonical in self.entity_aliases.items():
+            clean_canonical = canonical.strip()
+            # AssemblyAI constraint: 'to' must be a SINGLE WORD (no spaces)
+            if len(clean_canonical.split()) == 1:
+                spelling_map.setdefault(clean_canonical, []).append(alias.strip())
+
+        return [{"from": aliases, "to": canonical} for canonical, aliases in spelling_map.items()]
+
     def resolve_entity(self, text: str, threshold: float = 0.68) -> Optional[Tuple[str, str, float]]:
         """
         Resolves any phonetic variants or known aliases in the text against session entities.

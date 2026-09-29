@@ -1,7 +1,7 @@
 import time
 import asyncio
 import logging
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict, Any
 import httpx
 from bot.config import config
 
@@ -141,6 +141,57 @@ def build_keyterms(extra_keyterms: Optional[List[str]] = None) -> List[str]:
     return combined[:100]
 
 
+def build_custom_spelling(
+    extra_spelling: Optional[List[Dict[str, Any]]] = None
+) -> List[Dict[str, Any]]:
+    """
+    Constructs the custom_spelling array for AssemblyAI Universal-3.5 Pro.
+    Merges session-discovered single-word replacements with static ASSEMBLYAI_CUSTOM_SPELLING.
+    Strictly enforces AssemblyAI API constraint: 'to' must be a SINGLE WORD (no whitespace).
+    Any multi-word 'to' target is safely rejected (it belongs in keyterms_prompt).
+    """
+    combined: List[Dict[str, Any]] = []
+    seen_from: set = set()
+
+    if extra_spelling:
+        for item in extra_spelling:
+            if not isinstance(item, dict):
+                continue
+            to_val = item.get("to")
+            from_vals = item.get("from")
+            if not to_val or not isinstance(to_val, str):
+                continue
+            to_clean = to_val.strip()
+            # CRITICAL AssemblyAI API Constraint: 'to' must be a single word (no spaces)
+            if len(to_clean.split()) != 1:
+                continue
+            if not from_vals or not isinstance(from_vals, (list, tuple)):
+                continue
+
+            valid_from = []
+            for f in from_vals:
+                if f and isinstance(f, str):
+                    f_clean = f.strip()
+                    if f_clean and f_clean.lower() not in seen_from:
+                        seen_from.add(f_clean.lower())
+                        valid_from.append(f_clean)
+
+            if valid_from:
+                combined.append({"from": valid_from, "to": to_clean})
+
+    # Fill remaining from static table
+    for item in ASSEMBLYAI_CUSTOM_SPELLING:
+        to_val = item.get("to", "").strip()
+        from_vals = item.get("from", [])
+        valid_from = [f for f in from_vals if f and f.strip().lower() not in seen_from]
+        if valid_from:
+            for f in valid_from:
+                seen_from.add(f.strip().lower())
+            combined.append({"from": valid_from, "to": to_val})
+
+    return combined
+
+
 class AssemblyAIClient:
     """
     AssemblyAI Universal-3.5 Pro Client.
@@ -157,7 +208,8 @@ class AssemblyAIClient:
         self,
         wav_bytes: bytes,
         speaker_name: str = "unknown",
-        extra_keyterms: Optional[List[str]] = None
+        extra_keyterms: Optional[List[str]] = None,
+        extra_custom_spelling: Optional[List[Dict[str, Any]]] = None
     ) -> Tuple[Optional[str], int]:
         """Transcribes audio and returns (raw_text, latency_ms)."""
         if not self.api_key or not wav_bytes or len(wav_bytes) < 1000:
@@ -193,7 +245,7 @@ class AssemblyAIClient:
                     "format_text": True,
                     "prompt": ASSEMBLYAI_CONTEXT_PROMPT,
                     "keyterms_prompt": build_keyterms(extra_keyterms),
-                    "custom_spelling": ASSEMBLYAI_CUSTOM_SPELLING
+                    "custom_spelling": build_custom_spelling(extra_custom_spelling)
                 }
 
                 job_resp = await client.post(self.transcript_url, headers=headers, json=job_payload)
