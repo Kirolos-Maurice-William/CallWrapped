@@ -145,13 +145,13 @@ def is_confirmation_utterance(text: str) -> bool:
     cleaned = re.sub(r"[^\w\s]", " ", cleaned)
 
     tokens = set(cleaned.split())
-    arabic_keywords = {"شوفها", "شوف", "اكد", "اتاكد", "تحقق"}
+    arabic_keywords = {"شوفها", "اشوفها", "شوف", "اشوف", "اكد", "تاكد", "اتاكد", "تحقق"}
     if any(kw in tokens for kw in arabic_keywords):
         return True
 
-    if "check it" in cleaned:
+    if "check it" in cleaned or "do it" in cleaned:
         return True
-    if "check" in tokens:
+    if "check" in tokens or "verify" in tokens:
         return True
 
     return False
@@ -1335,8 +1335,8 @@ class ArbitrationEngine:
         offer.search_plan = search_plan
         session.pending_offer = offer
 
-        # Post Arabic offer message to Discord text channel
-        offer_text = "🤖 شفت اتنين بيقولوا نفس المعلومة بشكل مختلف — أتحقق؟ قول «شوفها» أو اكتب !check"
+        is_arabic = any('\u0600' <= char <= '\u06FF' for char in (prior_claim.claim_text + claim_stmt))
+        offer_text = "🤖 شفت اتنين بيقولوا نفس المعلومة بشكل مختلف: أشوفها؟ قول «شوفها» أو اكتب !check" if is_arabic else "🤖 Detected different claims: Do I check? Say 'check it' or type !check"
         if text_channel:
             try:
                 await text_channel.send(offer_text)
@@ -1345,8 +1345,7 @@ class ArbitrationEngine:
 
         # Speak concise offer in voice
         if voice_client and voice_client.is_connected() and not voice_client.is_playing():
-            is_arabic = any('\u0600' <= char <= '\u06FF' for char in (prior_claim.claim_text + claim_stmt))
-            spoken_offer = "شفتكم اختلفتوا، أشوفها؟" if is_arabic else "Heard a disagreement, want me to check?"
+            spoken_offer = "أشوفها؟" if is_arabic else "Do I check?"
             asyncio.create_task(speaker.speak(voice_client, spoken_offer))
 
         # Publish VoiceEvent(type="dispute_check_offered")
