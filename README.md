@@ -57,31 +57,56 @@ Traditional voice assistants (Siri, Alexa) don't work in group calls because nob
 CallWrapped operates through a polite **Two-Stage Check**:
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Listening
-    Listening --> DisputeDetected: Conflicting Claims Detected
-    
-    state DisputeDetected {
-        [*] --> SilentOffer
-        SilentOffer: Post silent offer to Discord text & dashboard
-        SilentOffer: Background: prefetch Tavily search & warm TTS
-        SilentOffer: Bot stays completely silent in voice!
-    }
-    
-    DisputeDetected --> SpokenVerdict: User confirms ("check it" / !check)
-    DisputeDetected --> Listening: 30s timeout (expired quietly)
-    
-    state SpokenVerdict {
-        [*] --> StreamFact: Spoken verdict with official source citation
-        StreamFact --> StreamHedge: Context hedge ("in case I missed context...")
-    }
-    
-    SpokenVerdict --> Listening: Resume listening
+flowchart TD
+    subgraph MultiPartyCall ["1. Multi-Party Voice Call"]
+        L["🎧 Listening to Voice Channel<br/><i>(AssemblyAI Universal-3.5 Pro)</i>"]
+    end
+
+    subgraph DisputeAndPrefetch ["2. Dispute Detection & Parallel Pre-fetch"]
+        D["⚡ Conflicting Claims Detected<br/><i>(Groq Qwen LPU Extraction)</i>"]
+        P["🔍 Background Search Pre-fetch & Warm TTS<br/><i>(Tavily API + Edge-TTS)</i>"]
+        O["🤝 Spoken Voice Offer:<br/><b>«أشوفها؟»</b> <i>(Arabic)</i> or <b>'Do I check?'</b> <i>(English)</i>"]
+    end
+
+    subgraph Resolution ["3. Spoken Resolution"]
+        V["🔊 Verified Factual Resolution<br/><i>(Spoken fact with official source + polite hedge)</i>"]
+    end
+
+    L -->|"Two speakers disagree on a fact"| D
+    D --> P
+    D --> O
+    O -->|"User confirms: «شوفها» / 'check it' / !check"| V
+    O -->|"30s timeout without confirmation"| L
+    V -->|"Playback finished or Barge-in interrupt"| L
 ```
 
-1. **Stage 1 (Silent Offer):** The bot verifies the disputed claim silently against live web sources. It posts an offer in the text channel without speaking in voice.
-2. **Stage 2 (Confirmation):** If a user says *"شوفها"* / *"check it"* in voice or types `!check` in chat, the bot speaks the verified answer with citations.
-3. **Barge-in Support:** If someone begins talking while the bot is answering, the bot immediately stops speaking so it never talks over users.
+### 🗣️ Voice Dispute Guide: How to Use «شوفها» and "check it"
+
+CallWrapped is designed to never talk over people or make group calls awkward. When two participants state conflicting facts in voice, it initiates a polite two-stage verification:
+
+1. **The Disagreement Trigger:**
+   Two speakers in voice state conflicting facts (for example, arguing whether the RTX 5070 has 12GB or 16GB, or when a historical event occurred).
+
+2. **The Bot Asks Out Loud:**
+   The bot speaks a quick question in voice:
+   - **Arabic:** **«أشوفها؟»**
+   - **English:** **"Do I check?"**
+   - *(It also displays an offer card on the Live Dashboard and a message in the Discord text channel).*
+
+3. **Background Pre-Fetch:**
+   While the bot asks the question, it is **already searching live web sources in the background** via Tavily and warming the voice connection.
+
+4. **Your Voice Confirmation:**
+   To hear the factual resolution, anyone in the call can confirm naturally in voice:
+   - **Arabic:** Say **«شوفها»** (also supports **«أشوفها»**, **«شوف»**, **«تأكد»**).
+   - **English:** Say **"check it"** (also supports **"check"**, **"do it"**, **"verify"**).
+   - **Text:** Type `!check` in the Discord channel.
+
+5. **Instant Spoken Resolution:**
+   Because search evidence was already pre-fetched in step 3, saying **«شوفها»** speaks the verified fact with official citations in under 1.5 seconds. If no one confirms within 30 seconds, the offer quietly expires with zero noise.
+
+6. **Barge-in Protection:**
+   If someone starts talking while the bot is answering, the bot cuts off immediately so it never interrupts users.
 
 ---
 
@@ -100,7 +125,7 @@ CallWrapped is built with an event-driven Python backend and a real-time Next.js
 3. **Split Epistemic Reasoning (Groq LPU):**
    - **Fast Claim Path:** Sub-second claim extraction prompt identifying disputed entities and numerical values.
    - **Batched Analytics Path:** 75-second rolling window aggregating conversation turns to calculate 15-category topic talk shares and speaker streaks.
-   - **Key Rotation Pool:** Automatically rotates across up to 6 Groq API keys with graceful 429 recovery to prevent rate limits during active sessions.
+   - **Key Rotation Pool:** Automatically rotates across 8 Groq API keys with token-budget balancing, instant 429 rotation, and 5xx failover to ensure zero downtime during active sessions.
 
 4. **Fact Verification & Voice Output:**
    - **Tavily Search:** Fetches real-world domain citations and filters out private personal claims.
@@ -156,11 +181,9 @@ Served locally at `http://localhost:8000` via FastAPI and Next.js 14:
 4. Say the conflicting claims in voice (or click **"Replay RTX 5070 Live Demo Session"** on the dashboard):
    - **Speaker 1:** *"The RTX 5070 launched with 16GB VRAM from Nvidia."*
    - **Speaker 2:** *"No way, it only launched with 12GB GDDR7, there is no 16GB version."*
-5. **Stage 1 (Silent Text Offer):** The bot posts an offer in the text channel and dashboard:  
-   *"🤖 I noticed a disagreement on this fact. Want me to check? Say 'check it' or type `!check`."*  
-   *(Notice: The bot remains completely silent in voice).*
-6. **Stage 2 (Confirmation):** Say *"check it"* in voice (or type `!check` in chat).
-7. **Spoken Verdict:** The bot speaks the verified answer with Nvidia source citations, while the dashboard highlights the dispute card with verified badges.
+5. **Stage 1 (Spoken & Visual Offer):** The bot asks in voice: *"Do I check?"* (or *«أشوفها؟»* for Arabic conversations) while displaying the offer card on the dashboard and in Discord text.
+6. **Stage 2 (Voice Confirmation):** Say *"check it"* (or *«شوفها»*) in voice (or type `!check` in chat).
+7. **Spoken Verdict:** The bot delivers the verified answer with official source citations, while the dashboard highlights the dispute card with verified badges.
 8. Type `!recap` to see your session's CallWrapped recap card and awards.
 
 ---
