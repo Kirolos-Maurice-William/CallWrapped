@@ -46,47 +46,47 @@ interface StatusStyle {
 
 const STATUS_STYLES: Record<string, StatusStyle> = {
   offered: {
-    badge: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    badge: "bg-[#F0B232]/15 text-[#F0B232] border-[#F0B232]/40",
     label: "Offered",
-    border: "border-amber-500/30",
-    accent: "text-amber-300",
+    border: "border-[#F0B232]/30",
+    accent: "text-[#F0B232]",
     Icon: Clock,
   },
   checking: {
-    badge: "bg-sky-500/15 text-sky-300 border-sky-500/40",
+    badge: "bg-[#5865F2]/15 text-[#5865F2] border-[#5865F2]/40",
     label: "Checking a disputed claim…",
-    border: "border-sky-500/40",
-    accent: "text-sky-300",
+    border: "border-[#5865F2]/40",
+    accent: "text-[#5865F2]",
     Icon: Search,
   },
   resolved: {
-    badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    badge: "bg-[#23A55A]/15 text-[#23A55A] border-[#23A55A]/40",
     label: "Resolved",
-    border: "border-emerald-500/40",
-    accent: "text-emerald-300",
+    border: "border-[#23A55A]/40",
+    accent: "text-[#23A55A]",
     Icon: CheckCircle2,
   },
   refused_private: {
-    badge: "bg-slate-600/20 text-slate-300 border-slate-600/50",
+    badge: "bg-[#383a40]/60 text-[#949BA4] border-[#383a40]",
     label: "Refused",
-    border: "border-slate-700/70",
-    accent: "text-slate-400",
+    border: "border-[#383a40]",
+    accent: "text-[#949BA4]",
     Icon: ShieldOff,
   },
   expired: {
-    badge: "bg-slate-800/60 text-slate-500 border-slate-700/60",
+    badge: "bg-[#1e1f22] text-[#949BA4] border-[#383a40]",
     label: "Expired",
-    border: "border-slate-800/80",
-    accent: "text-slate-500",
+    border: "border-[#383a40]",
+    accent: "text-[#949BA4]",
     Icon: Clock,
   },
 };
 
 const FALLBACK_STYLE: StatusStyle = {
-  badge: "bg-slate-800/60 text-slate-400 border-slate-700/60",
+  badge: "bg-[#1e1f22] text-[#949BA4] border-[#383a40]",
   label: "Unknown",
-  border: "border-slate-800/80",
-  accent: "text-slate-500",
+  border: "border-[#383a40]",
+  accent: "text-[#949BA4]",
   Icon: Scale,
 };
 
@@ -105,10 +105,10 @@ function ClaimBlock({
   accent: string;
 }) {
   return (
-    <div dir="auto" className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/70">
+    <div dir="auto" className="p-3 rounded-xl bg-[#313338] border border-[#383a40]">
       <div className="flex items-center gap-1.5 mb-1.5">
-        <Users className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-        <span className="text-xs font-semibold text-slate-300 truncate">
+        <Users className="w-3.5 h-3.5 text-[#949BA4] flex-shrink-0" />
+        <span className="text-xs font-semibold text-[#DBDEE1] truncate">
           {speaker || "Unknown speaker"}
         </span>
       </div>
@@ -127,7 +127,7 @@ function DisputeCardView({ card }: { card: DisputeCard }) {
 
   return (
     <article
-      className={`rounded-2xl bg-slate-900/70 border p-4 space-y-3 ${style.border} ${
+      className={`rounded-2xl bg-[#1e1f22] border p-4 space-y-3 ${style.border} ${
         isDim ? "opacity-60" : ""
       }`}
     >
@@ -135,14 +135,14 @@ function DisputeCardView({ card }: { card: DisputeCard }) {
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <Scale className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <Scale className="w-3.5 h-3.5 text-[#949BA4] flex-shrink-0" />
+            <span className="text-[11px] font-bold text-[#949BA4] uppercase tracking-wider">
               Disputed
             </span>
           </div>
           <p
             dir="auto"
-            className="text-sm font-semibold text-slate-100 truncate mt-0.5"
+            className="text-sm font-semibold text-[#F2F3F5] truncate mt-0.5"
             title={card.disputed_attribute || undefined}
           >
             {card.disputed_attribute || "Unspecified attribute"}
@@ -158,20 +158,20 @@ function DisputeCardView({ card }: { card: DisputeCard }) {
 
       {/* Claims side by side */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <ClaimBlock speaker={card.speaker_a} claim={card.claim_a} accent="text-slate-200" />
-        <ClaimBlock speaker={card.speaker_b} claim={card.claim_b} accent="text-slate-200" />
+        <ClaimBlock speaker={card.speaker_a} claim={card.claim_a} accent="text-[#F2F3F5]" />
+        <ClaimBlock speaker={card.speaker_b} claim={card.claim_b} accent="text-[#F2F3F5]" />
       </div>
 
       {/* Resolved: source link + evidence excerpt */}
       {status === "resolved" && (
-        <div className="space-y-2 pt-1 border-t border-slate-800/70">
+        <div className="space-y-2 pt-1 border-t border-[#383a40]">
           {card.source_url && (
             <a
               href={card.source_url}
               target="_blank"
               rel="noreferrer"
               dir="auto"
-              className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 break-all"
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#5865F2] hover:text-[#5865F2]/80 break-all"
             >
               <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
               {card.source_name || card.source_url}
@@ -180,10 +180,10 @@ function DisputeCardView({ card }: { card: DisputeCard }) {
           {card.evidence_excerpt && (
             <blockquote
               dir="auto"
-              className="flex gap-2 p-2.5 rounded-lg bg-slate-950/50 border border-slate-800/70"
+              className="flex gap-2 p-2.5 rounded-lg bg-[#313338] border border-[#383a40]"
             >
-              <Quote className="w-3.5 h-3.5 text-slate-500 flex-shrink-0 mt-0.5" />
-              <span className="text-xs text-slate-300 leading-relaxed break-words">
+              <Quote className="w-3.5 h-3.5 text-[#949BA4] flex-shrink-0 mt-0.5" />
+              <span className="text-xs text-[#DBDEE1] leading-relaxed break-words">
                 {card.evidence_excerpt}
               </span>
             </blockquote>
@@ -195,7 +195,7 @@ function DisputeCardView({ card }: { card: DisputeCard }) {
       {status === "refused_private" && (
         <p
           dir="auto"
-          className="text-xs text-slate-400 pt-1 border-t border-slate-800/70 flex items-center gap-1.5"
+          className="text-xs text-[#949BA4] pt-1 border-t border-[#383a40] flex items-center gap-1.5"
         >
           <ShieldOff className="w-3.5 h-3.5 flex-shrink-0" />
           {card.refusal_reason || "Private claim — no lookup performed"}
@@ -204,14 +204,14 @@ function DisputeCardView({ card }: { card: DisputeCard }) {
 
       {/* Expired / offered: refusal or pending reason */}
       {status !== "refused_private" && card.refusal_reason && status !== "resolved" && (
-        <p dir="auto" className="text-xs text-slate-500 pt-1 border-t border-slate-800/70">
+        <p dir="auto" className="text-xs text-[#949BA4] pt-1 border-t border-[#383a40]">
           {card.refusal_reason}
         </p>
       )}
 
       {/* T_perceived, shown only once measured (confirmed verdict) */}
       {typeof card.t_perceived_ms === "number" && (
-        <p className="flex items-center gap-1.5 text-xs text-emerald-300 font-semibold pt-1 border-t border-slate-800/70">
+        <p className="flex items-center gap-1.5 text-xs text-[#23A55A] font-semibold pt-1 border-t border-[#383a40]">
           <Timer className="w-3.5 h-3.5" />
           T_perceived: {card.t_perceived_ms} ms
         </p>
@@ -224,17 +224,17 @@ export function DisputesPanel({ disputes }: { disputes: DisputeCard[] }) {
   const cards = disputes || [];
 
   return (
-    <section className="rounded-2xl bg-slate-900/60 border border-slate-800 p-5 space-y-3">
-      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-        <Scale className="w-4 h-4" />
+    <section className="rounded-2xl bg-[#2b2d31] border border-[#383a40] p-5 space-y-3">
+      <h3 className="text-xs font-bold text-[#949BA4] uppercase tracking-wider flex items-center gap-2">
+        <Scale className="w-4 h-4 text-[#5865F2]" />
         Disputes
         {cards.length > 0 && (
-          <span className="text-slate-500 normal-case font-medium">({cards.length})</span>
+          <span className="text-[#949BA4] normal-case font-medium">({cards.length})</span>
         )}
       </h3>
 
       {cards.length === 0 ? (
-        <p className="text-sm text-slate-500 py-6 text-center">No disputes yet this call.</p>
+        <p className="text-sm text-[#949BA4] py-6 text-center">No disputes yet this call.</p>
       ) : (
         <div className="space-y-3">
           {cards.map((card) => (

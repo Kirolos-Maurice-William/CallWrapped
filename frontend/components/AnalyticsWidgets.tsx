@@ -70,7 +70,7 @@ export function formatDurationHuman(seconds: number): string {
   return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
 }
 
-const TOPIC_DISPLAY_NAMES: Record<string, string> = {
+export const TOPIC_DISPLAY_NAMES: Record<string, string> = {
   food: "أكل",
   travel: "سفر",
   study_work: "دراسة وشغل",
@@ -87,20 +87,20 @@ const TOPIC_DISPLAY_NAMES: Record<string, string> = {
   other: "أخرى",
 };
 
-const TOPIC_COLORS = [
+export const TOPIC_COLORS = [
   "bg-cyan-500",
   "bg-purple-500",
   "bg-amber-500",
-  "bg-emerald-500",
-  "bg-rose-500",
-  "bg-indigo-500",
+  "bg-[#23A55A]",
+  "bg-[#F23F43]",
+  "bg-[#5865F2]",
   "bg-blue-500",
   "bg-teal-500",
   "bg-orange-500",
   "bg-lime-500",
   "bg-pink-500",
   "bg-violet-500",
-  "bg-yellow-500"
+  "bg-[#F0B232]"
 ];
 
 interface Props {
@@ -132,11 +132,11 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
   const angrySpeakers = speakerEntries.filter((s) => s.angry_episodes > 0);
 
   return (
-    <div id="analytics-widgets" className="rounded-2xl bg-slate-900/80 border border-slate-800 p-5 space-y-4 shadow-xl">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+    <div id="analytics-widgets" className="rounded-2xl bg-[#2b2d31] border border-[#383a40] p-5 space-y-4 shadow-xl">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#383a40] pb-3">
         <div className="flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-sm font-bold text-white tracking-wide uppercase">
+          <BarChart3 className="w-4 h-4 text-[#5865F2]" />
+          <h3 className="text-sm font-bold text-[#F2F3F5] tracking-wide uppercase">
             Call Analytics & Real-Time Intelligence
           </h3>
         </div>
@@ -144,14 +144,14 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
           {onOpenRecap && (
             <button
               onClick={onOpenRecap}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-90 text-white text-[11px] font-bold shadow-md shadow-indigo-600/25 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-[11px] font-bold shadow-md shadow-[#5865F2]/25 transition-all cursor-pointer"
               title="Open Spotify-style CallWrapped session recap card"
             >
               <Award className="w-3.5 h-3.5" />
               <span>CallWrapped Recap Card</span>
             </button>
           )}
-          <span className="text-[11px] font-mono text-slate-400 hidden sm:inline">
+          <span className="text-[11px] font-mono text-[#949BA4] hidden sm:inline">
             Live Aggregations from /api/analytics
           </span>
         </div>
@@ -159,11 +159,11 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* WIDGET 1: TOPIC BREAKDOWN */}
-        <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col justify-between">
+        <div className="p-4 rounded-xl bg-[#1e1f22] border border-[#383a40] flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <PieChart className="w-4 h-4 text-indigo-400" />
-              <h4 className="text-xs font-bold text-slate-200 tracking-wider uppercase">
+              <PieChart className="w-4 h-4 text-[#5865F2]" />
+              <h4 className="text-xs font-bold text-[#DBDEE1] tracking-wider uppercase">
                 Topic Breakdown
               </h4>
             </div>
@@ -176,14 +176,14 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                   return (
                     <div key={topic} className="space-y-1">
                       <div className="flex items-center justify-between text-xs font-medium">
-                        <span className="text-slate-300 capitalize">
+                        <span className="text-[#DBDEE1] capitalize">
                           {TOPIC_DISPLAY_NAMES[topic.toLowerCase()] ? `${topic} (${TOPIC_DISPLAY_NAMES[topic.toLowerCase()]})` : topic}
                         </span>
-                        <span className="font-mono text-slate-400">
+                        <span className="font-mono text-[#949BA4]">
                           {count} ({pct.toFixed(1)}%)
                         </span>
                       </div>
-                      <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className="w-full bg-[#313338] h-2 rounded-full overflow-hidden">
                         <div
                           className={`h-full ${color} rounded-full transition-all duration-500`}
                           style={{ width: `${pct}%` }}
@@ -194,26 +194,26 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                 })}
               </div>
             ) : (
-              <div className="py-6 text-center text-xs text-slate-500 italic">
+              <div className="py-6 text-center text-xs text-[#949BA4] italic">
                 waiting for call data…
               </div>
             )}
           </div>
           {totalAllTopics > 0 && (
-            <div className="mt-3 pt-2 border-t border-slate-800/60 text-[10px] font-mono text-slate-400 flex justify-between">
+            <div className="mt-3 pt-2 border-t border-[#383a40] text-[10px] font-mono text-[#949BA4] flex justify-between">
               <span>Topical Coverage: {topicalCoveragePct.toFixed(1)}%</span>
-              <span className="text-slate-500">Excl. {nullCount} null</span>
+              <span className="text-[#949BA4]">Excl. {nullCount} null</span>
             </div>
           )}
         </div>
 
         {/* WIDGET 2: TALK TIME & SHARE */}
-        <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col justify-between">
+        <div className="p-4 rounded-xl bg-[#1e1f22] border border-[#383a40] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-cyan-400" />
-                <h4 className="text-xs font-bold text-slate-200 tracking-wider uppercase">
+                <h4 className="text-xs font-bold text-[#DBDEE1] tracking-wider uppercase">
                   Talk Time Share
                 </h4>
               </div>
@@ -231,14 +231,14 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                   return (
                     <div key={s.speaker_name || idx} className="space-y-1">
                       <div className="flex items-center justify-between text-xs font-medium">
-                        <span className="text-slate-200 font-semibold" dir="auto">
+                        <span className="text-[#F2F3F5] font-semibold" dir="auto">
                           {s.speaker_name}
                         </span>
-                        <span className="font-mono text-cyan-300">
+                        <span className="font-mono text-cyan-400">
                           {formatDurationHuman(s.talk_seconds)} ({pct.toFixed(1)}%)
                         </span>
                       </div>
-                      <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className="w-full bg-[#313338] h-2 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-cyan-500 rounded-full transition-all duration-500"
                           style={{ width: `${pct}%` }}
@@ -249,36 +249,36 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                 })}
               </div>
             ) : (
-              <div className="py-6 text-center text-xs text-slate-500 italic">
+              <div className="py-6 text-center text-xs text-[#949BA4] italic">
                 waiting for call data…
               </div>
             )}
           </div>
           {hasSpeakers && (
-            <div className="mt-3 pt-2 border-t border-slate-800/60 text-[10px] font-mono text-slate-500 text-right">
+            <div className="mt-3 pt-2 border-t border-[#383a40] text-[10px] font-mono text-[#949BA4] text-right">
               {speakerEntries.length} speaker{speakerEntries.length === 1 ? "" : "s"} tracked
             </div>
           )}
         </div>
 
         {/* WIDGET 3: ANGER LEADERBOARD & RECEIPTS */}
-        <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col justify-between">
+        <div className="p-4 rounded-xl bg-[#1e1f22] border border-[#383a40] flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <Flame className="w-4 h-4 text-rose-400" />
-              <h4 className="text-xs font-bold text-slate-200 tracking-wider uppercase">
+              <Flame className="w-4 h-4 text-[#F23F43]" />
+              <h4 className="text-xs font-bold text-[#DBDEE1] tracking-wider uppercase">
                 Anger Leaderboard
               </h4>
             </div>
 
             {!hasSpeakers ? (
-              <div className="py-6 text-center text-xs text-slate-500 italic">
+              <div className="py-6 text-center text-xs text-[#949BA4] italic">
                 waiting for call data…
               </div>
             ) : total_angry_episodes === 0 || angrySpeakers.length === 0 ? (
-              <div className="py-5 px-3 rounded-lg bg-emerald-950/20 border border-emerald-500/20 text-center space-y-1">
-                <Smile className="w-5 h-5 text-emerald-400 mx-auto" />
-                <p className="text-xs text-emerald-300 font-medium">
+              <div className="py-5 px-3 rounded-lg bg-[#23A55A]/10 border border-[#23A55A]/30 text-center space-y-1">
+                <Smile className="w-5 h-5 text-[#23A55A] mx-auto" />
+                <p className="text-xs text-[#23A55A] font-medium">
                   Nobody got angry this call... suspicious.
                 </p>
               </div>
@@ -299,12 +299,12 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                   if (history.length === 0) return null;
 
                   return (
-                    <div key={s.speaker_name || idx} className="p-2.5 rounded-lg bg-rose-950/20 border border-rose-500/30 space-y-1.5">
+                    <div key={s.speaker_name || idx} className="p-2.5 rounded-lg bg-[#F23F43]/10 border border-[#F23F43]/30 space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-white" dir="auto">
+                        <span className="font-bold text-[#F2F3F5]" dir="auto">
                           {s.speaker_name}
                         </span>
-                        <span className="px-1.5 py-0.5 rounded bg-rose-900/60 text-rose-300 font-mono font-bold text-[10px]">
+                        <span className="px-1.5 py-0.5 rounded bg-[#F23F43]/20 text-[#F23F43] font-mono font-bold text-[10px]">
                           {s.angry_episodes} {s.angry_episodes === 1 ? "episode" : "episodes"}
                         </span>
                       </div>
@@ -317,14 +317,14 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                         return (
                           <div
                             key={eIdx}
-                            className="text-[11px] text-amber-200/90 bg-slate-950/70 border border-slate-800 rounded px-2 py-1 leading-snug space-y-0.5"
+                            className="text-[11px] text-[#DBDEE1] bg-[#313338] border border-[#383a40] rounded px-2 py-1 leading-snug space-y-0.5"
                           >
-                            <div className="flex items-center justify-between text-[9px] font-mono text-slate-400">
-                              <span className="text-amber-400 font-semibold">
+                            <div className="flex items-center justify-between text-[9px] font-mono text-[#949BA4]">
+                              <span className="text-[#F0B232] font-semibold">
                                 {ep.episode_number ? `Ep #${ep.episode_number}` : "Receipt"}
                               </span>
                               {isHostile ? (
-                                <span className="text-rose-400 font-bold flex items-center gap-0.5">
+                                <span className="text-[#F23F43] font-bold flex items-center gap-0.5">
                                   <span>🔥</span>
                                   <span>hostile escalation</span>
                                 </span>
@@ -334,36 +334,36 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                                   <span>monologue rant</span>
                                 </span>
                               ) : isLoud ? (
-                                <span className="text-rose-400 font-bold flex items-center gap-0.5">
+                                <span className="text-[#F23F43] font-bold flex items-center gap-0.5">
                                   <span>🔊</span>
                                   <span>+{clampedZ}σ spike</span>
                                 </span>
                               ) : isArg ? (
-                                <span className="text-amber-400 flex items-center gap-0.5">
+                                <span className="text-[#F0B232] flex items-center gap-0.5">
                                   <span>🎙️</span>
                                   <span>heated exchange</span>
                                 </span>
                               ) : (
-                                <span className="text-slate-500">vocal friction</span>
+                                <span className="text-[#949BA4]">vocal friction</span>
                               )}
                             </div>
                             <div className="italic" dir="auto">
                               "{ep.quote}"
                             </div>
                             {ep.audio_clip && (
-                              <div className="pt-1 mt-1 border-t border-slate-800/60 flex items-center justify-between text-[10px]">
+                              <div className="pt-1 mt-1 border-t border-[#383a40] flex items-center justify-between text-[10px]">
                                 <button
                                   onClick={() => {
                                     const audio = new Audio(`/api/audio-evidence/${ep.audio_clip}`);
                                     audio.play().catch(e => console.error("Playback error:", e));
                                   }}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-900/40 hover:bg-rose-800/60 text-rose-300 font-mono border border-rose-700/40 transition-colors cursor-pointer"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#F23F43]/20 hover:bg-[#F23F43]/30 text-[#F23F43] font-mono border border-[#F23F43]/40 transition-colors cursor-pointer"
                                   title={`Play audio evidence: ${ep.audio_clip}`}
                                 >
                                   <span>▶️</span>
                                   <span>Play Audio Evidence</span>
                                 </button>
-                                <span className="font-mono text-[9px] text-slate-500 truncate max-w-[110px]" title={ep.audio_clip}>
+                                <span className="font-mono text-[9px] text-[#949BA4] truncate max-w-[110px]" title={ep.audio_clip}>
                                   {ep.audio_clip}
                                 </span>
                               </div>
@@ -378,40 +378,40 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
             )}
           </div>
           {total_angry_episodes > 0 && (
-            <div className="mt-3 pt-2 border-t border-slate-800/60 text-[10px] font-mono text-rose-400 text-right">
+            <div className="mt-3 pt-2 border-t border-[#383a40] text-[10px] font-mono text-[#F23F43] text-right">
               {total_angry_episodes} total episode{total_angry_episodes === 1 ? "" : "s"}
             </div>
           )}
         </div>
 
         {/* WIDGET 4: CALL BADGES & HIGHLIGHTS */}
-        <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col justify-between">
+        <div className="p-4 rounded-xl bg-[#1e1f22] border border-[#383a40] flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <Award className="w-4 h-4 text-amber-400" />
-              <h4 className="text-xs font-bold text-slate-200 tracking-wider uppercase">
+              <Award className="w-4 h-4 text-[#F0B232]" />
+              <h4 className="text-xs font-bold text-[#DBDEE1] tracking-wider uppercase">
                 Call Badges & Records
               </h4>
             </div>
 
             {longest_streak && longest_streak.speaker_name && longest_streak.streak_seconds > 0 ? (
               <div className="space-y-2.5">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-amber-950/30 to-slate-900 border border-amber-500/30 text-center space-y-1.5">
-                  <div className="inline-flex p-1.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                <div className="p-3 rounded-xl bg-[#313338] border border-[#F0B232]/30 text-center space-y-1.5">
+                  <div className="inline-flex p-1.5 rounded-xl bg-[#F0B232]/20 text-[#F0B232] border border-[#F0B232]/40">
                     <Award className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
+                    <div className="text-[10px] uppercase font-bold text-[#F0B232] tracking-wider">
                       The Monologue King
                     </div>
                     <div className="text-sm font-bold text-white flex items-center justify-center gap-1.5" dir="auto">
                       <span>👑</span>
                       <span>{longest_streak.speaker_name}</span>
                     </div>
-                    <div className="text-xl font-extrabold font-mono text-amber-300 mt-0.5">
+                    <div className="text-xl font-extrabold font-mono text-[#F0B232] mt-0.5">
                       {formatStreakMMSS(longest_streak.streak_seconds)}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-400">
+                    <div className="text-[10px] font-mono text-[#949BA4]">
                       ({formatDurationHuman(longest_streak.streak_seconds)} uninterrupted)
                     </div>
                   </div>
@@ -424,11 +424,11 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                   if (secondQuietest.talk_seconds - quietest.talk_seconds >= 1.0) {
                     const qPct = total_talk_seconds > 0 ? (quietest.talk_seconds / total_talk_seconds) * 100 : 0;
                     return (
-                      <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-950/30 to-slate-900 border border-indigo-500/30 flex items-center justify-between text-xs">
+                      <div className="p-2.5 rounded-xl bg-[#313338] border border-[#5865F2]/30 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <span className="text-base">🤫</span>
                           <div>
-                            <div className="text-[9px] uppercase font-bold text-indigo-300 tracking-wider">
+                            <div className="text-[9px] uppercase font-bold text-[#5865F2] tracking-wider">
                               The Silent Observer
                             </div>
                             <div className="font-bold text-white truncate max-w-[110px]" dir="auto">
@@ -436,9 +436,9 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                             </div>
                           </div>
                         </div>
-                        <div className="text-right font-mono text-indigo-300">
+                        <div className="text-right font-mono text-[#5865F2]">
                           <div className="font-bold text-xs">{formatDurationHuman(quietest.talk_seconds)}</div>
-                          <div className="text-[9px] text-slate-400">({qPct.toFixed(1)}% airtime)</div>
+                          <div className="text-[9px] text-[#949BA4]">({qPct.toFixed(1)}% airtime)</div>
                         </div>
                       </div>
                     );
@@ -456,11 +456,11 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                     return null;
                   }
                   return (
-                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-950/30 to-slate-900 border border-rose-500/30 flex items-center justify-between text-xs">
+                    <div className="p-2.5 rounded-xl bg-[#313338] border border-[#F23F43]/30 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <span className="text-base">🌶️</span>
                         <div>
-                          <div className="text-[9px] uppercase font-bold text-rose-300 tracking-wider">
+                          <div className="text-[9px] uppercase font-bold text-[#F23F43] tracking-wider">
                             The Most Unfiltered
                           </div>
                           <div className="font-bold text-white truncate max-w-[110px]" dir="auto">
@@ -468,9 +468,9 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right font-mono text-rose-300">
+                      <div className="text-right font-mono text-[#F23F43]">
                         <div className="font-bold text-xs">{top.vulgarity_count} raw tokens</div>
-                        <div className="text-[9px] text-slate-400">
+                        <div className="text-[9px] text-[#949BA4]">
                           {top.vulgarity_terms && top.vulgarity_terms.length > 0 ? top.vulgarity_terms.slice(0, 2).join(", ") : "uncensored"}
                         </div>
                       </div>
@@ -490,11 +490,11 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                     return null;
                   }
                   return (
-                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-950/30 to-slate-900 border border-emerald-500/30 flex items-center justify-between text-xs">
+                    <div className="p-2.5 rounded-xl bg-[#313338] border border-[#23A55A]/30 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <span className="text-base">🕊️</span>
                         <div>
-                          <div className="text-[9px] uppercase font-bold text-emerald-300 tracking-wider">
+                          <div className="text-[9px] uppercase font-bold text-[#23A55A] tracking-wider">
                             The Diplomat
                           </div>
                           <div className="font-bold text-white truncate max-w-[110px]" dir="auto">
@@ -502,9 +502,9 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right font-mono text-emerald-300">
+                      <div className="text-right font-mono text-[#23A55A]">
                         <div className="font-bold text-xs">{formatDurationHuman(topDiplomat.talk_seconds)}</div>
-                        <div className="text-[9px] text-slate-400">100% peaceful</div>
+                        <div className="text-[9px] text-[#949BA4]">100% peaceful</div>
                       </div>
                     </div>
                   );
@@ -520,11 +520,11 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                     return null;
                   }
                   return (
-                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-950/30 to-slate-900 border border-purple-500/30 flex items-center justify-between text-xs">
+                    <div className="p-2.5 rounded-xl bg-[#313338] border border-purple-500/30 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <span className="text-base">🎭</span>
                         <div>
-                          <div className="text-[9px] uppercase font-bold text-purple-300 tracking-wider">
+                          <div className="text-[9px] uppercase font-bold text-purple-400 tracking-wider">
                             The Roast Master
                           </div>
                           <div className="font-bold text-white truncate max-w-[110px]" dir="auto">
@@ -532,9 +532,9 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right font-mono text-purple-300">
+                      <div className="text-right font-mono text-purple-400">
                         <div className="font-bold text-xs">{topBanter.banter_count} {topBanter.banter_count === 1 ? "banter turn" : "banter turns"}</div>
-                        <div className="text-[9px] text-slate-400">
+                        <div className="text-[9px] text-[#949BA4]">
                           {topBanter.banter_terms && topBanter.banter_terms.length > 0 ? topBanter.banter_terms.slice(0, 2).join(", ") : "friendly teasing"}
                         </div>
                       </div>
@@ -543,13 +543,13 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                 })()}
               </div>
             ) : (
-              <div className="py-6 text-center text-xs text-slate-500 italic">
+              <div className="py-6 text-center text-xs text-[#949BA4] italic">
                 waiting for call data…
               </div>
             )}
           </div>
           {longest_streak && longest_streak.streak_seconds > 0 && (
-            <div className="mt-3 pt-2 border-t border-slate-800/60 text-[10px] font-mono text-amber-400/80 text-right">
+            <div className="mt-3 pt-2 border-t border-[#383a40] text-[10px] font-mono text-[#F0B232] text-right">
               Session Highlights
             </div>
           )}
