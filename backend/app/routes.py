@@ -566,14 +566,8 @@ async def get_audio_evidence(filename: str):
     return FileResponse(path=str(target_path), media_type="audio/wav", filename=safe_filename, content_disposition_type="inline")
 
 
-@router.post("/reset")
-async def reset_live_state(request: Request):
-    """Resets dashboard state for a fresh run."""
-    control_key = os.getenv("CONTROL_PLANE_KEY")
-    if control_key:
-        auth_header = request.headers.get("x-control-key")
-        if auth_header != control_key:
-            return Response(status_code=401, content="Unauthorized control-plane reset")
+async def do_reset_state():
+    """Internal helper to reset in-memory state and notify connected WebSockets."""
     LIVE_STATE["last_updated"] = 0.0
     LIVE_STATE["latency"] = {
         "stt_ms": 0,
@@ -608,6 +602,17 @@ async def reset_live_state(request: Request):
     return {"status": "ok"}
 
 
+@router.post("/reset")
+async def reset_live_state(request: Request):
+    """Resets dashboard state for a fresh run."""
+    control_key = os.getenv("CONTROL_PLANE_KEY")
+    if control_key:
+        auth_header = request.headers.get("x-control-key")
+        if auth_header != control_key:
+            return Response(status_code=401, content="Unauthorized control-plane reset")
+    return await do_reset_state()
+
+
 @router.post("/demo/run")
 async def run_demo_simulation():
     """Triggers the golden RTX 5070 demo replay asynchronously."""
@@ -621,14 +626,17 @@ async def run_demo_simulation():
         data = json.load(f)
 
     async def _runner():
-        await reset_live_state()
-        for step in data.get("events", []):
-            delay = step.get("delay_seconds", 1.0)
-            await asyncio.sleep(delay)
-            evt_dict = step.get("event", {})
-            evt_dict["timestamp"] = time.time()
-            evt = VoiceEventPayload(**evt_dict)
-            await ingest_voice_event(evt)
+        try:
+            await do_reset_state()
+            for step in data.get("events", []):
+                delay = step.get("delay_seconds", 1.0)
+                await asyncio.sleep(delay)
+                evt_dict = step.get("event", {})
+                evt_dict["timestamp"] = time.time()
+                evt = VoiceEventPayload(**evt_dict)
+                await ingest_voice_event(evt)
+        except Exception as e:
+            logger.exception("Error in demo replay runner: %s", e)
 
     asyncio.create_task(_runner())
     return {"status": "started", "message": "Demo replay initiated"}
