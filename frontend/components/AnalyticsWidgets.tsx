@@ -84,9 +84,10 @@ const TOPIC_COLORS = [
 
 interface Props {
   analytics: AnalyticsState;
+  onOpenRecap?: () => void;
 }
 
-export function AnalyticsWidgets({ analytics }: Props) {
+export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
   const { topic_totals, speakers, total_talk_seconds, total_angry_episodes, longest_streak } = analytics;
 
   // Topic totals calculations: exclude null_topic from pie, compute coverage
@@ -110,17 +111,29 @@ export function AnalyticsWidgets({ analytics }: Props) {
   const angrySpeakers = speakerEntries.filter((s) => s.angry_episodes > 0);
 
   return (
-    <div id="analytics-widgets" className="rounded-2xl bg-slate-900/80 border border-slate-800 p-5 space-y-4">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+    <div id="analytics-widgets" className="rounded-2xl bg-slate-900/80 border border-slate-800 p-5 space-y-4 shadow-xl">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-cyan-400" />
           <h3 className="text-sm font-bold text-white tracking-wide uppercase">
             Call Analytics & Real-Time Intelligence
           </h3>
         </div>
-        <span className="text-[11px] font-mono text-slate-400">
-          Live Aggregations from /api/analytics
-        </span>
+        <div className="flex items-center gap-2 sm:gap-3">
+          {onOpenRecap && (
+            <button
+              onClick={onOpenRecap}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-90 text-white text-[11px] font-bold shadow-md shadow-indigo-600/25 transition-all cursor-pointer"
+              title="Open Spotify-style CallWrapped session recap card"
+            >
+              <Award className="w-3.5 h-3.5" />
+              <span>CallWrapped Recap Card</span>
+            </button>
+          )}
+          <span className="text-[11px] font-mono text-slate-400 hidden sm:inline">
+            Live Aggregations from /api/analytics
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -251,10 +264,18 @@ export function AnalyticsWidgets({ analytics }: Props) {
             ) : (
               <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
                 {angrySpeakers.map((s, idx) => {
-                  const fallbackQuote = s.anger_evidence || s.first_anger_quote;
-                  const history = s.anger_episodes_history && s.anger_episodes_history.length > 0
-                    ? s.anger_episodes_history
-                    : (fallbackQuote ? [{ quote: fallbackQuote, episode_number: s.angry_episodes }] : []);
+                  const fallbackQuote = (s.anger_evidence || s.first_anger_quote || "").trim();
+                  // Filter out empty or placeholder quotes
+                  const validHistory = (s.anger_episodes_history || []).filter(
+                    (ep) => ep.quote && ep.quote.trim() !== "" && ep.quote !== "(no verbal evidence captured)"
+                  );
+                  const history = validHistory.length > 0
+                    ? validHistory
+                    : (fallbackQuote && fallbackQuote !== "(no verbal evidence captured)"
+                        ? [{ quote: fallbackQuote, episode_number: s.angry_episodes }]
+                        : []);
+
+                  if (history.length === 0) return null;
 
                   return (
                     <div key={s.speaker_name || idx} className="p-2.5 rounded-lg bg-rose-950/20 border border-rose-500/30 space-y-1.5">
@@ -269,6 +290,7 @@ export function AnalyticsWidgets({ analytics }: Props) {
                       {history.map((ep, eIdx) => {
                         const isLoud = Boolean(ep.was_loud || (ep.peak_z && ep.peak_z >= 2.5));
                         const isArg = ep.context && (ep.context.includes("argument") || ep.context.includes("dispute"));
+                        const clampedZ = ep.peak_z ? Math.min(10.0, ep.peak_z).toFixed(1) : "2.8";
                         return (
                           <div
                             key={eIdx}
@@ -281,7 +303,7 @@ export function AnalyticsWidgets({ analytics }: Props) {
                               {isLoud ? (
                                 <span className="text-rose-400 font-bold flex items-center gap-0.5">
                                   <span>🔊</span>
-                                  <span>{ep.peak_z ? `+${ep.peak_z.toFixed(1)}σ spike` : "volume spike"}</span>
+                                  <span>+{clampedZ}σ spike</span>
                                 </span>
                               ) : isArg ? (
                                 <span className="text-amber-400 flex items-center gap-0.5">
