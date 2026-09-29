@@ -16,6 +16,15 @@ if str(PROJECT_ROOT) not in sys.path:
 
 load_dotenv(".env")
 
+def get_secret(key: str, default: str = "") -> str:
+    """Safely retrieves secrets from Streamlit secrets or OS environment variables."""
+    try:
+        if hasattr(st, "secrets") and key in st.secrets:
+            return str(st.secrets[key])
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
 # Page Configuration
 st.set_page_config(
     page_title="CallWrapped | AI Voice Referee",
@@ -140,8 +149,8 @@ with tab_sandbox:
     if st.button("🔍 Run Fact Verification", type="primary"):
         with st.spinner("Arbitrating claim via Groq LPU + Tavily Web Search..."):
             # Try live verification if keys present
-            tavily_key = st.secrets.get("TAVILY_API_KEY", "") or os.getenv("TAVILY_API_KEY", "")
-            groq_key = st.secrets.get("GROQ_API_KEY", "") or os.getenv("GROQ_API_KEY", "")
+            tavily_key = get_secret("TAVILY_API_KEY", "")
+            groq_key = get_secret("GROQ_API_KEY", "")
             
             verdict_text = ""
             sources = []
