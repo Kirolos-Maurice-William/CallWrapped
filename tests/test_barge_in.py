@@ -328,7 +328,10 @@ class TestBargeIn(unittest.IsolatedAsyncioTestCase):
         t2.join()
 
         # Allow coroutines to schedule on loop
-        await asyncio.sleep(0.1)
+        for _ in range(10):
+            if len(dispatched_utterances) >= 1:
+                break
+            await asyncio.sleep(0.05)
 
         self.assertEqual(len(dispatched_utterances), 1, "Exactly one utterance must be dispatched despite concurrent finalize calls")
         self.assertEqual(len(buf.pcm_chunks), 0, "Buffer must be empty after finalize")
