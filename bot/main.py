@@ -425,18 +425,20 @@ def render_recap(session_state: Any) -> str:
             q_pct = (q_talk_sec / total_talk_sec * 100.0)
             lines.append(f"🤫 **المستمع الهادئ (أقل مشاركة):** {q_name} ({q_dur_str} - {q_pct:.1f}%)")
 
-    # Most Unfiltered: speaker with most banter/vulgarity tokens (>0 with honest tie guard)
-    spicy_speakers = [s for s in speakers if getattr(s, "vulgarity_count", 0) > 0]
-    if spicy_speakers:
-        spicy_speakers.sort(key=lambda s: s.vulgarity_count, reverse=True)
-        top_spicy = spicy_speakers[0]
-        is_spicy_tie = len(spicy_speakers) >= 2 and spicy_speakers[1].vulgarity_count == top_spicy.vulgarity_count
-        if not is_spicy_tie:
-            u_name = top_spicy.speaker_name or top_spicy.speaker_id
-            v_cnt = top_spicy.vulgarity_count
-            sample_terms = top_spicy.vulgarity_terms[:2] if getattr(top_spicy, "vulgarity_terms", None) else []
-            sample_str = f" ({', '.join(sample_terms)})" if sample_terms else ""
-            lines.append(f"🌶️ **الأكثر صراحة / أنفلترد:** {u_name} ({v_cnt} كلمة بدون فلتر){sample_str}")
+    # Most Unfiltered: speaker with most banter/vulgarity tokens (>0 with honest tie guard, requires >= 2 speakers)
+    if len(speakers) >= 2:
+        spicy_speakers = [s for s in speakers if getattr(s, "vulgarity_count", 0) > 0]
+        if spicy_speakers:
+            spicy_speakers.sort(key=lambda s: s.vulgarity_count, reverse=True)
+            top_spicy = spicy_speakers[0]
+            is_spicy_tie = len(spicy_speakers) >= 2 and spicy_speakers[1].vulgarity_count == top_spicy.vulgarity_count
+            if not is_spicy_tie:
+                u_name = top_spicy.speaker_name or top_spicy.speaker_id
+                v_cnt = top_spicy.vulgarity_count
+                sample_terms = top_spicy.vulgarity_terms[:2] if getattr(top_spicy, "vulgarity_terms", None) else []
+                sample_str = f" ({', '.join(sample_terms)})" if sample_terms else ""
+                w_str = "كلمة واحدة" if v_cnt == 1 else ("كلمتين" if v_cnt == 2 else (f"{v_cnt} كلمات" if 3 <= v_cnt <= 10 else f"{v_cnt} كلمة"))
+                lines.append(f"🌶️ **الأكثر صراحة / أنفلترد:** {u_name} ({w_str} بدون فلتر){sample_str}")
 
     # The Diplomat: speaker with 0 vulgarity, 0 anger, >= 15s talk time, in >= 2 speaker calls
     if len(speakers) >= 2 and total_talk_sec > 0:

@@ -339,7 +339,9 @@ export default function CallWrappedDashboard() {
             longest_streak_seconds: Number(spk.longest_streak_seconds || 0),
             angry_episodes: Number(spk.angry_episodes || 0),
             anger_evidence: spk.anger_evidence || spk.first_anger_quote || cache[name] || undefined,
-            anger_episodes_history: spk.anger_episodes_history || []
+            anger_episodes_history: spk.anger_episodes_history || [],
+            vulgarity_count: Number(spk.vulgarity_count || 0),
+            vulgarity_terms: Array.isArray(spk.vulgarity_terms) ? spk.vulgarity_terms : []
           };
         }
       }
@@ -349,6 +351,7 @@ export default function CallWrappedDashboard() {
         speakers: mergedSpeakers,
         total_talk_seconds: Number(rawAnalytics.total_talk_seconds || 0),
         total_angry_episodes: Number(rawAnalytics.total_angry_episodes || 0),
+        total_vulgarity_count: Number(rawAnalytics.total_vulgarity_count || 0),
         longest_streak: {
           speaker_name: rawAnalytics.longest_streak?.speaker_name || null,
           streak_seconds: Number(rawAnalytics.longest_streak?.streak_seconds || 0)

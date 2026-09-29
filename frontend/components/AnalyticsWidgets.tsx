@@ -412,8 +412,8 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
                   return null;
                 })()}
 
-                {/* The Most Unfiltered / Spicy Tongue */}
-                {hasSpeakers && (() => {
+                {/* The Most Unfiltered / Spicy Tongue (minimum 2 speakers) */}
+                {hasSpeakers && speakerEntries.length >= 2 && (() => {
                   const withVulgarity = speakerEntries.filter(s => (s.vulgarity_count || 0) > 0);
                   if (withVulgarity.length === 0) return null;
                   const sortedVulgar = [...withVulgarity].sort((a, b) => (b.vulgarity_count || 0) - (a.vulgarity_count || 0));

@@ -560,6 +560,11 @@ class TestPhase1DurationAndSilentObserver(unittest.TestCase):
         self.assertEqual(tracker.get_total_vulgarity_count(), 2)
 
     def test_most_unfiltered_badge_logic(self):
+        # Case 0: Solo call (1 speaker only) -> None (conversational awards require >= 2 speakers)
+        tracker_solo = SessionStatsTracker("test_solo_unfiltered")
+        tracker_solo.record_utterance("alice", 0.0, 20.0, "Alice", text="احا يا عم")
+        self.assertIsNone(tracker_solo.get_most_unfiltered())
+
         tracker = SessionStatsTracker("test_most_unfiltered")
 
         # Case 1: No vulgarity -> None

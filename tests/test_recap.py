@@ -162,7 +162,7 @@ class TestSessionRecapRenderer(unittest.TestCase):
         print("=" * 60 + "\n")
 
         # Verify The Most Unfiltered badge
-        self.assertIn("🌶️ **الأكثر صراحة / أنفلترد:** Alice (3 كلمة بدون فلتر)", recap_text)
+        self.assertIn("🌶️ **الأكثر صراحة / أنفلترد:** Alice (3 كلمات بدون فلتر)", recap_text)
 
         # Verify The Diplomat badge
         self.assertIn("🕊️ **الدبلوماسي (أكتر مشاركة هادية ونظيفة):** Bob (45s كلام راقي بدون أي عصبية)", recap_text)

@@ -50,7 +50,7 @@ export function CallWrappedModal({
   const spicySpeakers = speakerList.filter(s => (s.vulgarity_count || 0) > 0).sort((a, b) => (b.vulgarity_count || 0) - (a.vulgarity_count || 0));
   const topSpicy = spicySpeakers[0];
   const isSpicyEligible = Boolean(
-    topSpicy && (spicySpeakers.length < 2 || (topSpicy.vulgarity_count || 0) > (spicySpeakers[1].vulgarity_count || 0))
+    speakerList.length >= 2 && topSpicy && (spicySpeakers.length < 2 || (topSpicy.vulgarity_count || 0) > (spicySpeakers[1].vulgarity_count || 0))
   );
 
   const diplomatCandidates = speakerList.filter(
@@ -86,7 +86,7 @@ export function CallWrappedModal({
       diplomatLine +
       `🎯 **Ground Truth:** ${verifiedCount} verified, ${disputedCount} refuted\n` +
       `📊 **Top Topic:** ${topTopicName}\n` +
-      `🕊️ **Call Vibe:** ${total_angry_episodes === 0 ? "Civilized discussion (0 anger spikes)" : `${total_angry_episodes} heated episodes`}\n` +
+      `🎭 **Call Vibe:** ${total_angry_episodes === 0 ? "Civilized discussion (0 anger spikes)" : `${total_angry_episodes} heated episodes`}\n` +
       `⚡ *Arbitrated live by CallWrapped AI Referee (AssemblyAI + Groq)*`;
 
     navigator.clipboard.writeText(summaryText);

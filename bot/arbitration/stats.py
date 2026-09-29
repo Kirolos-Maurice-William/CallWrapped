@@ -439,7 +439,7 @@ class SessionStatsTracker:
                 stats.vulgarity_count += banter_res.vulgarity_count
                 for term in banter_res.matched_terms:
                     masked = mask_term(term)
-                    if masked not in stats.vulgarity_terms:
+                    if len(stats.vulgarity_terms) < 20 and masked not in stats.vulgarity_terms:
                         stats.vulgarity_terms.append(masked)
 
         logger.debug(
@@ -561,6 +561,9 @@ class SessionStatsTracker:
         - Disqualifies if the top two speakers tie for vulgarity count.
         Returns (speaker_id, vulgarity_count, vulgarity_terms) or None.
         """
+        if len(self.speakers) < 2:
+            return None
+
         speakers_with_vulgarity = [s for s in self.speakers.values() if s.vulgarity_count > 0]
         if not speakers_with_vulgarity:
             return None
