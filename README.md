@@ -464,15 +464,6 @@ The CallWrapped codebase has undergone continuous verification through three com
 - **Audit #2 (`audit/quality/AUDIT_REPORT_2.md`):** Remediated in commit `2f8ce46` (BOM-safe UTF-8-sig loader, corruption warnings, Groq pool expansion, dead code elimination).
 - **Audit #3 (Adversarial Multi-Model Cross-Review):** Evaluated by independent adversarial review models. Resulted in fixes for TTS timeout fallbacks, `FifoSet` capacity capping, atomic CSV writes, thread-safe AudioReceiver locks, and atomic offer confirmations (commits `488f632`, `8f674f3`, `5722d11`, `e2e9bff`).
 
----
-
-## 👥 Team & Contact
-
-Developed for the **AssemblyAI Voice Agent Hackathon 2026**:
-
-| Member | Institution | Core Focus | Contact |
-| :--- | :--- | :--- | :--- |
-| **Kirolos Maurice William** | Faculty of AI, Egyptian Chinese University (ECU) | • Lead System Architect & AI Engineer<br>• Groq LPU split classification & 6-key rotation pool<br>• Tavily search verification & private-entity gating<br>• Two-stage referee state machine & consent invariant<br>• Next.js 14 live judge dashboard & WebSocket hub | [![GitHub](https://img.shields.io/badge/GitHub-Kirolos--Maurice--William-181717?style=flat&logo=github)](https://github.com/Kirolos-Maurice-William) [![LinkedIn](https://img.shields.io/badge/LinkedIn-Kirolos_Maurice-0A66C2?style=flat&logo=linkedin)](https://www.linkedin.com/in/kirolos-maurice-william/) |
 
 ---
 
