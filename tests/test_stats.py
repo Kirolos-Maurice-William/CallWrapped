@@ -373,6 +373,59 @@ class TestSpeakerTalkStatistics(unittest.TestCase):
         self.assertAlmostEqual(alice.longest_topic_streak_seconds, 10.0, places=3)
         self.assertEqual(alice.longest_topic, "football")
 
+    def test_anger_episodes_history_recorded_with_metadata(self):
+        """Verifies anger episode history preserves all episode receipts, timestamps, and loudness."""
+        tracker = SessionStatsTracker(session_id="anger_history_test")
+        
+        # Episode 1 at t=10.0s
+        tracker.record_anger(
+            speaker_id="alice",
+            timestamp=10.0,
+            anger="mild",
+            anger_quote="الكول أوف ديوتي زبالة",
+            speaker_name="Alice",
+            was_loud=True,
+            peak_z=3.8,
+            context="boost_applied"
+        )
+        
+        # Rant continuation within 90s (debounce) at t=30.0s -> does not create new episode
+        tracker.record_anger(
+            speaker_id="alice",
+            timestamp=30.0,
+            anger="mild",
+            anger_quote="مش عارف ألعب",
+            speaker_name="Alice"
+        )
+
+        # Episode 2 after > 90s at t=125.0s (125 - 30 = 95 > 90)
+        tracker.record_anger(
+            speaker_id="alice",
+            timestamp=125.0,
+            anger="high",
+            anger_quote="أنا زهقت خلاص كفاية",
+            speaker_name="Alice",
+            was_loud=True,
+            peak_z=4.5,
+            context="boost_applied"
+        )
+
+        alice = tracker.get_speaker("alice")
+        self.assertEqual(alice.angry_episodes, 2)
+        self.assertEqual(alice.first_anger_quote, "الكول أوف ديوتي زبالة")
+        self.assertEqual(len(alice.anger_episodes_history), 2)
+        self.assertEqual(alice.anger_episodes_history[0]["episode_number"], 1)
+        self.assertEqual(alice.anger_episodes_history[0]["quote"], "الكول أوف ديوتي زبالة")
+        self.assertTrue(alice.anger_episodes_history[0]["was_loud"])
+        self.assertEqual(alice.anger_episodes_history[1]["episode_number"], 2)
+        self.assertEqual(alice.anger_episodes_history[1]["quote"], "أنا زهقت خلاص كفاية")
+        self.assertEqual(alice.anger_episodes_history[1]["anger"], "high")
+
+        # to_dict contains anger_episodes_history
+        d = alice.to_dict()
+        self.assertIn("anger_episodes_history", d)
+        self.assertEqual(len(d["anger_episodes_history"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

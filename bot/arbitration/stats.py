@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional, Any, List, Set, Tuple
 
 logger = logging.getLogger("TalkStats")
@@ -146,6 +146,7 @@ class SpeakerStats:
     angry_episodes: int = 0
     last_anger_time: float = 0.0
     first_anger_quote: Optional[str] = None
+    anger_episodes_history: List[Dict[str, Any]] = field(default_factory=list)
     # Topic streak tracking (Taxonomy v2)
     current_topic: Optional[str] = None
     current_topic_streak: float = 0.0
@@ -167,7 +168,10 @@ class SpeakerStats:
         self,
         timestamp: float,
         anger: Any,
-        quote: Optional[str] = None
+        quote: Optional[str] = None,
+        was_loud: bool = False,
+        peak_z: float = 0.0,
+        context: str = ""
     ) -> bool:
         """
         Pure Python anger episode counter on top of classifier output.
@@ -199,11 +203,23 @@ class SpeakerStats:
 
         self.last_anger_time = timestamp
 
+        clean_quote = str(extracted_quote).strip() if (extracted_quote and str(extracted_quote).strip()) else "(no verbal evidence captured)"
+
         if self.first_anger_quote is None:
-            if extracted_quote and str(extracted_quote).strip():
-                self.first_anger_quote = str(extracted_quote).strip()
-            else:
-                self.first_anger_quote = "(no verbal evidence captured)"
+            self.first_anger_quote = clean_quote
+
+        if is_new_episode:
+            self.anger_episodes_history.append({
+                "episode_number": self.angry_episodes,
+                "quote": clean_quote,
+                "timestamp": round(timestamp, 2),
+                "anger": str(anger).lower(),
+                "was_loud": bool(was_loud),
+                "peak_z": round(float(peak_z), 2),
+                "context": str(context)
+            })
+            if len(self.anger_episodes_history) > 20:
+                self.anger_episodes_history.pop(0)
 
         return is_new_episode
 
@@ -219,6 +235,7 @@ class SpeakerStats:
             "angry_episodes": self.angry_episodes,
             "last_anger_time": round(self.last_anger_time, 3),
             "first_anger_quote": self.first_anger_quote,
+            "anger_episodes_history": list(self.anger_episodes_history),
             "current_topic": self.current_topic,
             "current_topic_streak": round(self.current_topic_streak, 3),
             "longest_topic_streak_seconds": round(self.longest_topic_streak_seconds, 3),
@@ -416,7 +433,10 @@ class SessionStatsTracker:
         timestamp: float,
         anger: Any,
         anger_quote: Optional[str] = None,
-        speaker_name: Optional[str] = None
+        speaker_name: Optional[str] = None,
+        was_loud: bool = False,
+        peak_z: float = 0.0,
+        context: str = ""
     ) -> SpeakerStats:
         """
         Records an anger classification for a speaker.
@@ -424,7 +444,14 @@ class SessionStatsTracker:
         """
         spk_key = str(speaker_id)
         stats = self.get_or_create_speaker(spk_key, speaker_name)
-        stats.record_anger(timestamp=timestamp, anger=anger, quote=anger_quote)
+        stats.record_anger(
+            timestamp=timestamp,
+            anger=anger,
+            quote=anger_quote,
+            was_loud=was_loud,
+            peak_z=peak_z,
+            context=context
+        )
         return stats
 
     def reset(self):

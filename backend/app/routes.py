@@ -72,6 +72,8 @@ class VoiceEventPayload(BaseModel):
     topic: Optional[str] = None
     anger: Optional[str] = None
     anger_evidence: Optional[str] = None
+    first_anger_quote: Optional[str] = None
+    anger_episodes_history: Optional[List[Dict[str, Any]]] = None
     talk_delta_seconds: Optional[float] = None
     streak_seconds: Optional[float] = None
     angry_episodes: Optional[int] = None
@@ -405,9 +407,15 @@ async def ingest_voice_event(event: VoiceEventPayload):
                 "speaker_name": spk,
                 "talk_seconds": 0.0,
                 "longest_streak_seconds": 0.0,
-                "angry_episodes": 0
+                "angry_episodes": 0,
+                "first_anger_quote": None,
+                "anger_evidence": None,
+                "anger_episodes_history": []
             }
         spk_stats = ANALYTICS_STATE["speakers"][spk]
+
+        if "anger_episodes_history" not in spk_stats:
+            spk_stats["anger_episodes_history"] = []
 
         if topic:
             ANALYTICS_STATE["topic_totals"][topic] = ANALYTICS_STATE["topic_totals"].get(topic, 0) + 1
@@ -427,6 +435,34 @@ async def ingest_voice_event(event: VoiceEventPayload):
             spk_stats["angry_episodes"] = max(spk_stats["angry_episodes"], int(episodes))
         elif anger in ("mild", "high"):
             spk_stats["angry_episodes"] += 1
+
+        # Preserve quotes and receipts
+        first_q = event.first_anger_quote or event.payload.get("first_anger_quote")
+        if first_q and not spk_stats.get("first_anger_quote"):
+            spk_stats["first_anger_quote"] = str(first_q).strip()
+
+        if anger_evidence:
+            spk_stats["anger_evidence"] = str(anger_evidence).strip()
+            if not spk_stats.get("first_anger_quote"):
+                spk_stats["first_anger_quote"] = str(anger_evidence).strip()
+
+        # Update episode history list
+        hist = event.anger_episodes_history or event.payload.get("anger_episodes_history")
+        if hist and isinstance(hist, list):
+            spk_stats["anger_episodes_history"] = list(hist)
+        elif anger in ("mild", "high") and anger_evidence:
+            existing_quotes = {item.get("quote") for item in spk_stats["anger_episodes_history"]}
+            clean_ev = str(anger_evidence).strip()
+            if clean_ev not in existing_quotes:
+                af = event.payload.get("audio_features") or {}
+                spk_stats["anger_episodes_history"].append({
+                    "episode_number": spk_stats["angry_episodes"],
+                    "quote": clean_ev,
+                    "timestamp": round(event.timestamp, 2),
+                    "anger": str(anger).lower(),
+                    "was_loud": bool(af.get("was_loud", False)),
+                    "peak_z": float(af.get("peak_robust_z", 0.0))
+                })
 
         ANALYTICS_STATE["total_talk_seconds"] = round(sum(s["talk_seconds"] for s in ANALYTICS_STATE["speakers"].values()), 2)
         ANALYTICS_STATE["total_angry_episodes"] = sum(s["angry_episodes"] for s in ANALYTICS_STATE["speakers"].values())

@@ -194,10 +194,10 @@ class TestFusion(unittest.TestCase):
         self.assertEqual(res_dict.final_anger, "mild")
         self.assertEqual(res_dict.gate_reason, "boost_applied")
 
-    def test_default_config_flag_is_disabled(self):
-        """Verify default ACOUSTIC_FUSION_ENABLED is 0 (disabled in production)."""
+    def test_default_config_flag_is_enabled(self):
+        """Verify default ACOUSTIC_FUSION_ENABLED is 1 (enabled in production with two-way veto)."""
         from bot.config import config
-        self.assertEqual(config.ACOUSTIC_FUSION_ENABLED, 0)
+        self.assertEqual(config.ACOUSTIC_FUSION_ENABLED, 1)
 
     def test_engine_fusion_disabled_by_default(self):
         """When ACOUSTIC_FUSION_ENABLED=0, raw classifier anger is passed through unchanged."""
@@ -304,6 +304,52 @@ class TestFusion(unittest.TestCase):
             self.assertEqual(stats.angry_episodes, 1)
         finally:
             config.ACOUSTIC_FUSION_ENABLED = old_val
+
+    def test_calm_voice_mild_text_no_dispute_vetoed_to_none(self):
+        """Calm speaker (peak_z <= 1.8, not loud, no dispute/argument) vetos mild text to none."""
+        features = UtteranceAudioFeatures(
+            frame_count=20,
+            voiced_frames=18,
+            p95_log_rms_db=45.0,
+            peak_robust_z=0.6,
+            sustained_spike_count=0,
+            clip_ratio=0.00,
+            calibrated=True,
+            was_loud=False
+        )
+        result = fuse_anger(
+            raw_anger="mild",
+            audio_features=features,
+            has_active_dispute=False,
+            in_active_argument=False,
+            text="i hate this bot"
+        )
+        self.assertEqual(result.final_anger, "none")
+        self.assertEqual(result.gate_reason, "calm_context_veto")
+        self.assertAlmostEqual(result.p_fused, 0.20, places=2)
+
+    def test_calm_voice_mild_text_with_argument_preserved_mild(self):
+        """Calm speaker with mild text in an active argument retains mild anger."""
+        features = UtteranceAudioFeatures(
+            frame_count=20,
+            voiced_frames=18,
+            p95_log_rms_db=45.0,
+            peak_robust_z=0.6,
+            sustained_spike_count=0,
+            clip_ratio=0.00,
+            calibrated=True,
+            was_loud=False
+        )
+        result = fuse_anger(
+            raw_anger="mild",
+            audio_features=features,
+            has_active_dispute=False,
+            in_active_argument=True,
+            text="i hate this"
+        )
+        self.assertEqual(result.final_anger, "mild")
+        self.assertEqual(result.gate_reason, "not_loud")
+        self.assertAlmostEqual(result.p_fused, 0.50, places=2)
 
 
 if __name__ == "__main__":

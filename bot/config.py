@@ -48,8 +48,8 @@ class BotConfig:
     ANALYTICS_WINDOW_SEC: float = float(os.getenv("ANALYTICS_WINDOW_SEC", default_window))
     TOPIC_SILENCE_BOUNDARY_SEC: float = float(os.getenv("TOPIC_SILENCE_BOUNDARY_SEC", "35.0"))
 
-    # Acoustic Loudness & Emotion Fusion (0 = disabled in prod, 1 = experimental re-enable)
-    ACOUSTIC_FUSION_ENABLED: int = int(os.getenv("ACOUSTIC_FUSION_ENABLED", "0"))
+    # Acoustic Loudness & Emotion Fusion (1 = enabled with two-way veto and dispute context)
+    ACOUSTIC_FUSION_ENABLED: int = int(os.getenv("ACOUSTIC_FUSION_ENABLED", "1"))
 
     # Test-Mode Capture Flag (clip factory)
     TEST_CAPTURE_MODE: int = int(os.getenv("TEST_CAPTURE_MODE", "0"))

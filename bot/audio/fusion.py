@@ -41,6 +41,7 @@ def fuse_anger(
     audio_features: Optional[Union[Dict[str, Any], Any]] = None,
     *,
     has_active_dispute: bool = False,
+    in_active_argument: bool = False,
     text: str = ""
 ) -> FusedAngerResult:
     """
@@ -48,18 +49,21 @@ def fuse_anger(
 
     1. Base text probability:
        none -> 0.0, mild -> 0.5, high -> 0.9
-    2. Acoustic boost:
-       if was_loud AND calibrated AND clip_ratio < 0.05:
+    2. Acoustic boost & Two-Way Context Veto:
+       - if was_loud AND calibrated AND clip_ratio < 0.05:
            boost = 0.6 * clamp((peak_z - 2.5) / 2.5, 0.0, 1.0)
+       - if NOT was_loud AND calibrated AND peak_z <= 1.8 AND NOT (has_active_dispute or in_active_argument):
+           calm_context_veto: dampens mild text (p_fused = p_text * 0.4 = 0.20 < 0.45 -> 'none')
     3. Fused probability:
-       p_fused = 1.0 - (1.0 - p_text) * (1.0 - boost)
+       p_fused = 1.0 - (1.0 - p_text) * (1.0 - boost) (or dampened by calm veto)
     4. Final label:
        p_fused >= 0.8 -> high, >= 0.45 -> mild, else none.
 
     GATES (deterministic, authoritative):
-    - not calibrated -> boost = 0.0 (no acoustic contribution)
-    - clip_ratio >= 0.05 -> boost = 0.0 (no acoustic contribution)
-    - was_loud with NO frustration text AND NO active dispute -> boost = 0.0 (excitement guard)
+    - not calibrated -> boost = 0.0, p_fused = p_text (no acoustic contribution)
+    - clip_ratio >= 0.05 -> boost = 0.0, p_fused = p_text (no acoustic contribution)
+    - was_loud with NO frustration text AND NO conflict -> boost = 0.0 (excitement guard)
+    - NOT was_loud with mild text, calm voice, AND NO conflict -> calm_context_veto (downgraded to none)
     """
     norm_anger = str(raw_anger or "none").lower().strip()
     if norm_anger == "high":
@@ -87,28 +91,39 @@ def fuse_anger(
         clip_ratio = float(getattr(audio_features, "clip_ratio", 0.0))
         peak_z = float(getattr(audio_features, "peak_robust_z", 0.0))
 
+    has_conflict = bool(has_active_dispute or in_active_argument)
+
     # Evaluate deterministic gates in priority order
     if not calibrated:
         boost = 0.0
         gate_reason = "uncalibrated"
+        p_fused = p_text
     elif clip_ratio >= 0.05:
         boost = 0.0
         gate_reason = "clipping_exceeded"
+        p_fused = p_text
     elif not was_loud:
         boost = 0.0
-        gate_reason = "not_loud"
+        # Two-Way Veto: If speaker is calibrated, voice is calm (peak_z <= 1.8),
+        # and there is NO active dispute or argument, veto mild text to none.
+        if norm_anger == "mild" and peak_z <= 1.8 and not has_conflict:
+            gate_reason = "calm_context_veto"
+            p_fused = round(p_text * 0.4, 4)
+        else:
+            gate_reason = "not_loud"
+            p_fused = round(1.0 - (1.0 - p_text) * (1.0 - boost), 4)
     else:
         # was_loud is True: evaluate excitement guard
         has_frustration = has_frustration_cues(text=text, raw_anger=norm_anger)
-        if not has_frustration and not has_active_dispute:
+        if not has_frustration and not has_conflict:
             boost = 0.0
             gate_reason = "excitement_guard"
+            p_fused = p_text
         else:
             clamp_val = max(0.0, min(1.0, (peak_z - 2.5) / 2.5))
             boost = round(0.6 * clamp_val, 4)
             gate_reason = "boost_applied"
-
-    p_fused = round(1.0 - (1.0 - p_text) * (1.0 - boost), 4)
+            p_fused = round(1.0 - (1.0 - p_text) * (1.0 - boost), 4)
 
     if p_fused >= 0.8:
         final_anger = "high"

@@ -195,7 +195,8 @@ export default function CallWrappedDashboard() {
             talk_seconds: Number(spk.talk_seconds || 0),
             longest_streak_seconds: Number(spk.longest_streak_seconds || 0),
             angry_episodes: Number(spk.angry_episodes || 0),
-            anger_evidence: spk.anger_evidence || spk.first_anger_quote || cache[name] || undefined
+            anger_evidence: spk.anger_evidence || spk.first_anger_quote || cache[name] || undefined,
+            anger_episodes_history: spk.anger_episodes_history || []
           };
         }
       }

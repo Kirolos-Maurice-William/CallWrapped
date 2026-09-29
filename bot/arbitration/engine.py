@@ -3,6 +3,7 @@ import time
 import uuid
 import logging
 from collections import OrderedDict
+from dataclasses import is_dataclass, asdict
 from typing import Dict, Any, List, Optional, Tuple
 
 import discord
@@ -210,6 +211,46 @@ class SessionState:
         self.active_interval: Optional[TopicInterval] = None
         self.completed_intervals: List[TopicInterval] = []
         self.topic_durations: Dict[str, float] = {}
+
+    def is_in_active_argument(self, window_sec: float = 25.0) -> bool:
+        """
+        Detects whether the session is currently in an active interpersonal argument.
+        Evaluates:
+        1. Pending dispute offer or active conflict in claim memory.
+        2. Rapid turn-taking alternation between >= 2 speakers within window_sec
+           accompanied by conversational disagreement or friction tokens.
+        """
+        if self.pending_offer and not self.pending_offer.is_resolved:
+            return True
+
+        now = time.time()
+        recent_turns = [t for t in self.turns if (now - float(t.get("timestamp", 0.0))) <= window_sec]
+        if len(recent_turns) < 3:
+            return False
+
+        unique_speakers = {t.get("speaker_name") for t in recent_turns if t.get("speaker_name")}
+        if len(unique_speakers) < 2:
+            return False
+
+        has_rapid_alternation = False
+        for i in range(1, len(recent_turns)):
+            t_prev = recent_turns[i - 1]
+            t_curr = recent_turns[i]
+            if t_prev.get("speaker_name") != t_curr.get("speaker_name"):
+                gap = float(t_curr.get("timestamp", 0.0)) - float(t_prev.get("timestamp", 0.0))
+                if 0.0 <= gap <= 4.5:
+                    has_rapid_alternation = True
+                    break
+
+        if not has_rapid_alternation:
+            return False
+
+        friction_tokens = (
+            "لا", "مش", "غلط", "كذب", "انت", "انتي", "انتوا", "بطل", "إيه ده", "ايه ده",
+            "no", "not", "wrong", "lie", "why", "stop", "you", "shut", "hate"
+        )
+        combined_text = " ".join(t.get("text", "").lower() for t in recent_turns)
+        return any(tok in combined_text for tok in friction_tokens)
 
     def add_discovered_entity(self, canonical_name: str, aliases: Optional[List[str]] = None):
         """Registers a discovered entity and its surface aliases into session memory."""
@@ -677,6 +718,7 @@ class ArbitrationEngine:
     ):
         results_by_line = {r.get("line_number", i + 1): r for i, r in enumerate(results)}
         has_active_dispute = bool(session.pending_offer and not session.pending_offer.is_resolved)
+        in_active_argument = session.is_in_active_argument(window_sec=25.0)
 
         for idx, item in enumerate(buffer_to_process, 1):
             res = results_by_line.get(idx, {})
@@ -711,11 +753,16 @@ class ArbitrationEngine:
 
             # Deterministic late fusion (guarded by ACOUSTIC_FUSION_ENABLED)
             audio_feat = item.get("audio_features")
+            af_dict = asdict(audio_feat) if is_dataclass(audio_feat) else (audio_feat if isinstance(audio_feat, dict) else {})
+            was_loud_val = bool(af_dict.get("was_loud", False))
+            peak_z_val = float(af_dict.get("peak_robust_z", 0.0))
+
             if getattr(config, "ACOUSTIC_FUSION_ENABLED", 0):
                 fusion = fuse_anger(
                     raw_anger=raw_anger,
                     audio_features=audio_feat,
                     has_active_dispute=has_active_dispute,
+                    in_active_argument=in_active_argument,
                     text=item["text"]
                 )
                 anger = fusion.final_anger
@@ -741,7 +788,10 @@ class ArbitrationEngine:
                     timestamp=item["timestamp"],
                     anger=anger,
                     anger_quote=anger_evidence,
-                    speaker_name=item["speaker_name"]
+                    speaker_name=item["speaker_name"],
+                    was_loud=was_loud_val,
+                    peak_z=peak_z_val,
+                    context=gate_reason
                 )
             else:
                 stats = session._stats_tracker.get_or_create_speaker(spk_key, item["speaker_name"])
@@ -767,6 +817,7 @@ class ArbitrationEngine:
                 talk_delta_seconds=item["talk_delta_seconds"],
                 streak_seconds=item["streak_seconds"],
                 angry_episodes=stats.angry_episodes,
+                audio_features=af_dict,
                 payload={
                     "topic": topic,
                     "tag": raw_tag,
@@ -778,6 +829,8 @@ class ArbitrationEngine:
                     "total_speak_seconds": round(stats.total_speak_seconds, 3),
                     "utterance_count": stats.utterance_count,
                     "first_anger_quote": stats.first_anger_quote,
+                    "anger_episodes_history": getattr(stats, "anger_episodes_history", []),
+                    "audio_features": af_dict,
                     "tokens": tokens,
                     "batch_reason": reason,
                     "classification": {

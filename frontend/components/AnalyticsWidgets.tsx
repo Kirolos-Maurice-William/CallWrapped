@@ -11,6 +11,16 @@ import {
   BarChart3
 } from "lucide-react";
 
+export interface AngerEpisodeItem {
+  episode_number?: number;
+  quote: string;
+  timestamp?: number;
+  anger?: string;
+  was_loud?: boolean;
+  peak_z?: number;
+  context?: string;
+}
+
 export interface SpeakerAnalytics {
   speaker_name: string;
   talk_seconds: number;
@@ -18,6 +28,7 @@ export interface SpeakerAnalytics {
   angry_episodes: number;
   first_anger_quote?: string;
   anger_evidence?: string;
+  anger_episodes_history?: AngerEpisodeItem[];
 }
 
 export interface AnalyticsState {
@@ -238,11 +249,15 @@ export function AnalyticsWidgets({ analytics }: Props) {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
                 {angrySpeakers.map((s, idx) => {
-                  const quote = s.anger_evidence || s.first_anger_quote;
+                  const fallbackQuote = s.anger_evidence || s.first_anger_quote;
+                  const history = s.anger_episodes_history && s.anger_episodes_history.length > 0
+                    ? s.anger_episodes_history
+                    : (fallbackQuote ? [{ quote: fallbackQuote, episode_number: s.angry_episodes }] : []);
+
                   return (
-                    <div key={s.speaker_name || idx} className="p-2.5 rounded-lg bg-rose-950/20 border border-rose-500/30 space-y-1">
+                    <div key={s.speaker_name || idx} className="p-2.5 rounded-lg bg-rose-950/20 border border-rose-500/30 space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-bold text-white" dir="auto">
                           {s.speaker_name}
@@ -251,14 +266,38 @@ export function AnalyticsWidgets({ analytics }: Props) {
                           {s.angry_episodes} {s.angry_episodes === 1 ? "episode" : "episodes"}
                         </span>
                       </div>
-                      {quote && (
-                        <div
-                          className="text-[11px] text-amber-200/90 italic bg-slate-950/60 border border-slate-800 rounded px-2 py-1 leading-snug"
-                          dir="auto"
-                        >
-                          Receipt: "{quote}"
-                        </div>
-                      )}
+                      {history.map((ep, eIdx) => {
+                        const isLoud = Boolean(ep.was_loud || (ep.peak_z && ep.peak_z >= 2.5));
+                        const isArg = ep.context && (ep.context.includes("argument") || ep.context.includes("dispute"));
+                        return (
+                          <div
+                            key={eIdx}
+                            className="text-[11px] text-amber-200/90 bg-slate-950/70 border border-slate-800 rounded px-2 py-1 leading-snug space-y-0.5"
+                          >
+                            <div className="flex items-center justify-between text-[9px] font-mono text-slate-400">
+                              <span className="text-amber-400 font-semibold">
+                                {ep.episode_number ? `Ep #${ep.episode_number}` : "Receipt"}
+                              </span>
+                              {isLoud ? (
+                                <span className="text-rose-400 font-bold flex items-center gap-0.5">
+                                  <span>🔊</span>
+                                  <span>{ep.peak_z ? `+${ep.peak_z.toFixed(1)}σ spike` : "volume spike"}</span>
+                                </span>
+                              ) : isArg ? (
+                                <span className="text-amber-400 flex items-center gap-0.5">
+                                  <span>🎙️</span>
+                                  <span>heated exchange</span>
+                                </span>
+                              ) : (
+                                <span className="text-slate-500">vocal friction</span>
+                              )}
+                            </div>
+                            <div className="italic" dir="auto">
+                              "{ep.quote}"
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
