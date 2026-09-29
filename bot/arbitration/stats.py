@@ -195,6 +195,13 @@ class SpeakerStats:
         if not is_angry:
             return False
 
+        # Strict dual-evidence requirement:
+        # An anger episode MUST have verified verbal evidence.
+        # If there is no quote or it's empty / placeholder, do NOT record an episode.
+        clean_quote = str(extracted_quote).strip() if (extracted_quote and str(extracted_quote).strip()) else ""
+        if not clean_quote or clean_quote == "(no verbal evidence captured)":
+            return False
+
         # Consecutive angry classifications within 90s = 1 episode
         is_new_episode = False
         if self.angry_episodes == 0 or (timestamp - self.last_anger_time) > 90.0:
@@ -202,8 +209,6 @@ class SpeakerStats:
             is_new_episode = True
 
         self.last_anger_time = timestamp
-
-        clean_quote = str(extracted_quote).strip() if (extracted_quote and str(extracted_quote).strip()) else "(no verbal evidence captured)"
 
         if self.first_anger_quote is None:
             self.first_anger_quote = clean_quote

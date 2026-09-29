@@ -1,12 +1,16 @@
 from dataclasses import dataclass
 from typing import Optional, Any, Dict, Union
 
-# Egyptian and Arabic frustration cues for text-based arousal correlation
+# Egyptian, Arabic, and English frustration cues for text-based arousal correlation
 FRUSTRATION_KEYWORDS = (
     "زهقت", "بيعصب", "زبالة", "يا عم", "ياعم", "حرام", "مش معقول", "كفاية",
     "غلط", "كذب", "مش صح", "هبد", "يا ابني", "بطل", "يا نهار", "مفيش الكلام",
     "مجانين", "مجنين", "مش فاهيمن", "مش فاهمين", "مستحيل", "على الطلاق",
-    "بلا خيبة", "تعبان", "اقعد بقى", "إيه ده", "ايه ده", "هاتهم وانا هشتريهم"
+    "بلا خيبة", "تعبان", "اقعد بقى", "إيه ده", "ايه ده", "هاتهم وانا هشتريهم",
+    # English frustration and rage cues
+    "hate", "fucking", "fuck", "shit", "damn", "bullshit", "trash",
+    "annoying", "idiot", "stupid", "stfu", "shut up", "wtf", "horrible",
+    "worst", "garbage"
 )
 
 
@@ -26,9 +30,10 @@ class FusedAngerResult:
 
 def has_frustration_cues(text: str = "", raw_anger: str = "none") -> bool:
     """
-    Checks if text contains frustration keywords or non-none classifier anger.
+    Checks if text contains frustration keywords or explicit high anger.
+    Raw 'mild' alone does NOT qualify as a frustration cue (prevents circular excitement bias).
     """
-    if str(raw_anger).lower() in ("mild", "high"):
+    if str(raw_anger).lower() == "high":
         return True
     if not text:
         return False
@@ -118,7 +123,7 @@ def fuse_anger(
         if not has_frustration and not has_conflict:
             boost = 0.0
             gate_reason = "excitement_guard"
-            p_fused = p_text
+            p_fused = round(p_text * 0.4, 4) if norm_anger == "mild" else p_text
         else:
             clamp_val = max(0.0, min(1.0, (peak_z - 2.5) / 2.5))
             boost = round(0.6 * clamp_val, 4)

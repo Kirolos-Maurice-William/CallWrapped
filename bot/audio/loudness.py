@@ -118,14 +118,21 @@ class SpeakerLoudnessBaseline:
     - Robust statistics: Median + MAD (scaled by 1.4826).
     """
 
-    def __init__(self, maxlen: int = 1200, min_calibration_frames: int = 30):
+    def __init__(
+        self,
+        maxlen: int = 1200,
+        min_calibration_frames: int = 30,
+        min_voiced_db: float = 38.06
+    ):
         self.history: collections.deque = collections.deque(maxlen=maxlen)
         self.min_calibration_frames = min_calibration_frames
+        self.min_voiced_db = min_voiced_db
         self._cached_median: Optional[float] = None
         self._cached_mad: Optional[float] = None
         self._dirty: bool = True
         self.recompute_interval: int = 50
         self._frames_since_recompute: int = 0
+        self._consecutive_rejected_loud: int = 0
 
     @property
     def state(self) -> CalibrationState:
@@ -174,8 +181,9 @@ class SpeakerLoudnessBaseline:
 
     def score(self, log_rms_db: float) -> Optional[float]:
         """
-        Computes robust z-score: (log_rms_db - median) / (1.4826 * MAD).
-        Returns None if baseline is uncalibrated (< 30 eligible frames).
+        Computes robust z-score: (log_rms_db - median) / max(1.4826 * MAD, 2.5).
+        Returns None if baseline is uncalibrated (< min_calibration_frames eligible frames).
+        Enforces a 2.5 dB spread floor and clamps z to [-20.0, 10.0] to prevent pathological division.
         """
         if not self.baseline_ready:
             return None
@@ -187,14 +195,14 @@ class SpeakerLoudnessBaseline:
             return None
 
         diff = float(log_rms_db) - med
-        denom = 1.4826 * mad
-        if denom < 1e-4:
-            # Handle perfectly flat baseline without division by zero
-            if abs(diff) < 1e-4:
-                return 0.0
-            return diff / 1e-4
+        if abs(diff) < 1e-4:
+            return 0.0
 
-        return diff / denom
+        # In speech acoustics, standard deviation spread cannot collapse to near-zero.
+        # A floor of 2.5 dB matches the human vocal variation threshold.
+        denom = max(1.4826 * mad, 2.5)
+        z = diff / denom
+        return round(max(-20.0, min(10.0, z)), 3)
 
     def observe_eligible_frame(
         self,
@@ -203,10 +211,16 @@ class SpeakerLoudnessBaseline:
         is_loud: Optional[bool] = None
     ) -> bool:
         """
-        Appends log_rms_db to baseline history ONLY if frame is not clipped and not flagged loud.
-        Update gate ensures a shout never normalizes itself into the baseline.
-        Returns True if appended, False if rejected.
+        Appends log_rms_db to baseline history ONLY if frame is:
+        1. Voiced (log_rms_db >= min_voiced_db) — excludes digital silence / ambient noise.
+        2. Not clipped (clip_ratio < threshold).
+        3. Not loud (z < 2.5 once calibrated) — prevents shouts from corrupting baseline.
+        Includes self-healing reset if 100 consecutive frames are rejected as loud.
         """
+        # Voiced energy gate: digital silence / unvoiced noise (< 38.06 dB ≈ 80 RMS) must not calibrate baseline
+        if float(log_rms_db) < self.min_voiced_db:
+            return False
+
         is_clipped = clipped if isinstance(clipped, bool) else (float(clipped) >= PCM16Adapter.FRAME_CLIP_RATIO_THRESHOLD)
         if is_clipped:
             return False
@@ -218,7 +232,14 @@ class SpeakerLoudnessBaseline:
         if self.baseline_ready:
             z = self.score(log_rms_db)
             if z is not None and z >= 2.5:
+                self._consecutive_rejected_loud += 1
+                if self._consecutive_rejected_loud >= 100:
+                    # Self-healing: if 100 consecutive frames are rejected as loud,
+                    # the baseline was calibrated on an unrepresentative noise floor.
+                    self.reset()
                 return False
+            else:
+                self._consecutive_rejected_loud = 0
 
         self.history.append(float(log_rms_db))
         self._dirty = True
@@ -232,6 +253,7 @@ class SpeakerLoudnessBaseline:
         self._cached_mad = None
         self._dirty = True
         self._frames_since_recompute = 0
+        self._consecutive_rejected_loud = 0
 
 
 @dataclass(frozen=True)

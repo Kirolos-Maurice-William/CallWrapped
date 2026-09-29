@@ -351,7 +351,8 @@ class ClaimDetector:
                     w_loud = False
                     z_pk = 0.0
                 if w_loud:
-                    acoustic_str = f" [acoustic: was_loud=true, z_peak={z_pk:.1f}]"
+                    z_clamped = min(10.0, max(0.0, z_pk))
+                    acoustic_str = f" [acoustic: was_loud=true, z_peak={z_clamped:.1f}]"
             lines.append(f"{idx}. {spk}: {txt}{acoustic_str}")
 
         formatted_input = "\n".join(lines)

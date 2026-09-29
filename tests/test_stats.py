@@ -231,21 +231,27 @@ class TestSpeakerTalkStatistics(unittest.TestCase):
         self.assertEqual(s.angry_episodes, 1)
         self.assertAlmostEqual(s.last_anger_time, 50.0, places=3)
 
-    def test_anger_episode_with_null_evidence_sets_placeholder(self):
+    def test_anger_episode_with_null_evidence_rejected_without_increment(self):
         """
-        ACCEPTANCE (FIX 4 / DATA-06):
-        Anger episode with null evidence -> first_anger_quote = "(no verbal evidence captured)".
+        ACCEPTANCE (Strict Dual-Evidence Guard):
+        Anger episode with null or empty evidence is rejected (angry_episodes remains 0).
+        Verifiable anger requires actual verbal evidence.
         """
         tracker = SessionStatsTracker(session_id="anger_null_evidence")
         c1 = {"anger": "mild", "anger_evidence": None, "topic": "gaming", "is_factual_claim": False}
         s = tracker.record_anger("player1", timestamp=10.0, anger=c1)
-        self.assertEqual(s.angry_episodes, 1)
-        self.assertEqual(s.first_anger_quote, "(no verbal evidence captured)")
+        self.assertEqual(s.angry_episodes, 0)
+        self.assertIsNone(s.first_anger_quote)
 
-        # Verify direct call with null evidence also sets placeholder
+        # Verify direct call with null evidence also does not increment
         s2 = tracker.record_anger("player2", timestamp=15.0, anger="mild", anger_quote=None)
-        self.assertEqual(s2.angry_episodes, 1)
-        self.assertEqual(s2.first_anger_quote, "(no verbal evidence captured)")
+        self.assertEqual(s2.angry_episodes, 0)
+        self.assertIsNone(s2.first_anger_quote)
+
+        # Verify call with actual quote DOES increment
+        s3 = tracker.record_anger("player3", timestamp=20.0, anger="mild", anger_quote="زهقت من اللعبة دي")
+        self.assertEqual(s3.angry_episodes, 1)
+        self.assertEqual(s3.first_anger_quote, "زهقت من اللعبة دي")
 
 
     def test_phase2_topic_share_excludes_null_topic_and_computes_coverage(self):

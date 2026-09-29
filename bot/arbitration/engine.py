@@ -780,14 +780,18 @@ class ArbitrationEngine:
                     if raw_tag.lower() not in ("none", "null", "other", "null_topic"):
                         session.micro_tags[raw_tag] = session.micro_tags.get(raw_tag, 0) + 1
 
-            # 2. Update anger with 90s debounce (record_anger ONLY when anger is mild or high)
+            # 2. Update anger with 90s debounce (record_anger ONLY when anger is mild or high AND has verbal quote)
             spk_key = str(item["user_id"])
-            if anger and str(anger).lower() in ("mild", "high"):
+            quote_candidate = (anger_evidence or "").strip()
+            if not quote_candidate and anger and str(anger).lower() in ("mild", "high") and boost_val > 0:
+                quote_candidate = (item.get("text") or "").strip()
+
+            if anger and str(anger).lower() in ("mild", "high") and quote_candidate:
                 stats = session._stats_tracker.record_anger(
                     speaker_id=spk_key,
                     timestamp=item["timestamp"],
                     anger=anger,
-                    anger_quote=anger_evidence,
+                    anger_quote=quote_candidate,
                     speaker_name=item["speaker_name"],
                     was_loud=was_loud_val,
                     peak_z=peak_z_val,
