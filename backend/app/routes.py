@@ -219,6 +219,7 @@ async def ingest_voice_event(event: VoiceEventPayload):
         payload = event.payload
         spk_a = payload.get("speaker_a")
         spk_b = payload.get("speaker_b")
+        logger.info(f"⚖️ [Intervention] Factual dispute resolved: {spk_a} vs {spk_b} | Winner: {payload.get('winner')}")
         spk_a_status = payload.get("speaker_a_status", "UNKNOWN")
         spk_b_status = payload.get("speaker_b_status", "UNKNOWN")
         evidence_strength = payload.get("evidence_strength", "HIGH")
