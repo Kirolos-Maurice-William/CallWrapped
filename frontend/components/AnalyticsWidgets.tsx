@@ -296,7 +296,7 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
             <div className="flex items-center gap-2 mb-3">
               <Flame className="w-4 h-4 text-[#F23F43]" />
               <h4 className="text-xs font-bold text-[#DBDEE1] tracking-wider uppercase">
-                Anger Leaderboard
+                Anger & Frustration Moments
               </h4>
             </div>
 
@@ -308,7 +308,7 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
               <div className="py-5 px-3 rounded-lg bg-[#23A55A]/10 border border-[#23A55A]/30 text-center space-y-1">
                 <Smile className="w-5 h-5 text-[#23A55A] mx-auto" />
                 <p className="text-xs text-[#23A55A] font-medium">
-                  Nobody got angry this call... suspicious.
+                  Nobody got angry or frustrated this call... suspicious.
                 </p>
               </div>
             ) : (

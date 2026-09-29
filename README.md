@@ -144,7 +144,7 @@ Served locally at `http://localhost:8000` via FastAPI and Next.js 14:
   - **Left Column:** Live Referee card showing active disputes stacked above the Real-Time Discord Voice Transcript Stream.
   - **Right Column:** Conversational analytics, 15-category topic distribution, and session stats.
 - **Compact Pipeline Telemetry (~740px):** Displays the 6 processing stages (`AssemblyAI STT`, `Claim Extraction`, `Dispute FSM`, `Tavily Search`, `Two-Stage Gate`, `Edge-TTS Audio`) with live latency badges.
-- **Audio Evidence Playback:** Interactive audio buttons on dispute cards and recap widgets allowing judges to stream the recorded WAV audio evidence directly in the browser via `/api/audio-evidence/{filename}`.
+- **Audio Evidence Playback:** Interactive audio buttons on dispute cards and the **Anger & Frustration Moments** widget allowing users and judges to stream the recorded WAV audio evidence directly in the browser via `/api/audio-evidence/{filename}`.
 - **CallWrapped Showcase Modal:** Complete summary with speaker talk share percentages, topics discussed, and cultural banter badges:
   - 🕊️ **The Diplomat:** Spoke the most without any anger, vulgarity, or roasts.
   - 🤫 **The Silent Observer:** Active listener with minimal talk share and zero interruptions.

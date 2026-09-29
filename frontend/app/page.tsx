@@ -1081,12 +1081,12 @@ export default function CallWrappedDashboard() {
                 <div className="flex items-center gap-2">
                   <Flame className="w-4 h-4 text-[#F23F43]" />
                   <h3 className="text-sm font-bold text-[#F2F3F5] tracking-wide uppercase">
-                    Anger Receipts & Audio Evidence
+                    Anger & Frustration Moments
                   </h3>
                 </div>
                 {analytics.total_angry_episodes > 0 && (
                   <span className="text-[10px] font-mono font-bold text-[#F23F43]">
-                    {analytics.total_angry_episodes} {analytics.total_angry_episodes === 1 ? "episode" : "episodes"}
+                    {analytics.total_angry_episodes} {analytics.total_angry_episodes === 1 ? "moment" : "moments"}
                   </span>
                 )}
               </div>
@@ -1099,7 +1099,7 @@ export default function CallWrappedDashboard() {
                 <div className="py-5 px-3 rounded-lg bg-[#23A55A]/10 border border-[#23A55A]/30 text-center space-y-1">
                   <Smile className="w-5 h-5 text-[#23A55A] mx-auto" />
                   <p className="text-xs text-[#23A55A] font-medium">
-                    Nobody got angry this call... suspicious.
+                    Nobody got angry or frustrated this call... suspicious.
                   </p>
                 </div>
               ) : (
