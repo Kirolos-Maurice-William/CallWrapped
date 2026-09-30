@@ -191,7 +191,7 @@ Served locally at `http://localhost:8000` via FastAPI and Next.js 14:
 ## 🔒 Privacy & Ephemeral Memory
 
 - **Session-Only Memory:** CallWrapped does not store long-term conversational profiles. When `!leave` or `!clear` is invoked, all conversation memory, speaker statistics, and pending claims are wiped.
-- **Private Entity Refusal:** The bot automatically ignores personal claims about private individuals (*"Ahmed said he bought a car"*) to protect user privacy and avoid hallucinated web searches.
+- **Private Entity Refusal:** The bot automatically ignores personal claims about private individuals (*"my friend bought a new car"*) to protect user privacy and avoid hallucinated web searches.
 - **Transparency Notice:** When `!start` is called, the bot posts a clear operating policy in chat so everyone in the channel knows how it operates.
 
 ---

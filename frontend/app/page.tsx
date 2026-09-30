@@ -524,14 +524,45 @@ export default function CallWrappedDashboard() {
 
   // Trigger Demo Replay
   const handleTriggerReplay = async () => {
+    if (isSimulating) return;
     setIsSimulating(true);
     const { http } = getBackendBase();
+    let backendStarted = false;
     try {
-      await fetch(`${http}/api/demo/run`, { method: "POST" });
+      const res = await fetch(`${http}/api/demo/run`, { method: "POST" });
+      if (res.ok) {
+        backendStarted = true;
+      }
     } catch (e) {
-      console.error("Failed to start replay:", e);
-    } finally {
-      setTimeout(() => setIsSimulating(false), 11000);
+      // Backend offline, fallback to animated client simulation
+    }
+
+    if (!backendStarted) {
+      // Animated client-side replay
+      setTurns([]);
+      setActiveDispute(null);
+      setDisputes([]);
+      setLatency({ stt_ms: 270, llm_ms: 0, search_ms: 0, tts_ms: 0, total_ms: 270 });
+
+      const allTurns = GOLDEN_DEMO_DATA.turns as Turn[];
+      for (let i = 0; i < allTurns.length; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        setTurns((prev) => [...prev, allTurns[i]]);
+
+        // At AI referee turn (index 6): trigger dispute card
+        if (i === 6) {
+          setActiveDispute(GOLDEN_DEMO_DATA.activeDispute as DisputeInfo);
+          setDisputes(GOLDEN_DEMO_DATA.disputes as DisputeCard[]);
+          setDisputesHistory(GOLDEN_DEMO_DATA.disputesHistory as DisputeInfo[]);
+          setLatency(GOLDEN_DEMO_DATA.latency);
+        }
+      }
+
+      setLeaderboard(GOLDEN_DEMO_DATA.leaderboard);
+      setAnalytics(GOLDEN_DEMO_DATA.analytics as AnalyticsState);
+      setIsSimulating(false);
+    } else {
+      setTimeout(() => setIsSimulating(false), 12000);
     }
   };
 
@@ -540,38 +571,39 @@ export default function CallWrappedDashboard() {
     const { http } = getBackendBase();
     try {
       await fetch(`${http}/api/reset`, { method: "POST" });
-      setActiveDispute(null);
-      setTurns([]);
-      setDisputesHistory([]);
-      setLeaderboard({
-        "Verified Claims": 0,
-        "Disputed Claims": 0,
-        Speakers: {},
-      });
-      setLatency({
-        stt_ms: 0,
-        llm_ms: 0,
-        search_ms: 0,
-        tts_ms: 0,
-        total_ms: 0,
-      });
-      setAnalytics({
-        topic_totals: {},
-        speakers: {},
-        total_talk_seconds: 0,
-        total_angry_episodes: 0,
-        total_vulgarity_count: 0,
-        total_banter_count: 0,
-        longest_streak: {
-          speaker_name: null,
-          streak_seconds: 0,
-        },
-      });
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("receipts_cache");
-      }
     } catch (e) {
-      console.error("Failed to reset:", e);
+      // Backend offline
+    }
+    setActiveDispute(null);
+    setDisputes([]);
+    setTurns([]);
+    setDisputesHistory([]);
+    setLeaderboard({
+      "Verified Claims": 0,
+      "Disputed Claims": 0,
+      Speakers: {},
+    });
+    setLatency({
+      stt_ms: 0,
+      llm_ms: 0,
+      search_ms: 0,
+      tts_ms: 0,
+      total_ms: 0,
+    });
+    setAnalytics({
+      topic_totals: {},
+      speakers: {},
+      total_talk_seconds: 0,
+      total_angry_episodes: 0,
+      total_vulgarity_count: 0,
+      total_banter_count: 0,
+      longest_streak: {
+        speaker_name: null,
+        streak_seconds: 0,
+      },
+    });
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("receipts_cache");
     }
   };
 

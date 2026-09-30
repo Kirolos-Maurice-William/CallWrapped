@@ -4,23 +4,64 @@
   "description": "Benchmark demonstration of CallWrapped detecting, verifying, and resolving a factual hardware dispute.",
   "events": [
     {
-      "delay_seconds": 1.0,
+      "delay_seconds": 0.8,
       "event": {
         "event_id": "demo_turn_1",
         "session_id": "demo_session_rtx5070",
         "type": "transcript",
-        "speaker_name": "Ahmed",
-        "text": "Bro, I'm pretty sure the RTX 5070 has 16 gigs of VRAM.",
-        "latency": { "stt_ms": 272 }
+        "speaker_name": "Mostafa",
+        "text": "يا شباب حد شاف ماتش السوبر؟ الأهلي غلب الزمالك 2-0 إمبارح",
+        "latency": { "stt_ms": 270 },
+        "topic": "football",
+        "talk_delta_seconds": 4.5
       }
     },
     {
-      "delay_seconds": 1.5,
+      "delay_seconds": 1.0,
+      "event": {
+        "event_id": "demo_turn_2",
+        "session_id": "demo_session_rtx5070",
+        "type": "transcript",
+        "speaker_name": "2xDanger",
+        "text": "اه الماتش كان حريقة، إمام عاشور عمل ماتش عالي أوي",
+        "latency": { "stt_ms": 260 },
+        "topic": "football",
+        "talk_delta_seconds": 4.2
+      }
+    },
+    {
+      "delay_seconds": 1.0,
+      "event": {
+        "event_id": "demo_turn_3",
+        "session_id": "demo_session_rtx5070",
+        "type": "transcript",
+        "speaker_name": "Remi",
+        "text": "Good match honestly, defense was very solid.",
+        "latency": { "stt_ms": 250 },
+        "topic": "football",
+        "talk_delta_seconds": 3.8
+      }
+    },
+    {
+      "delay_seconds": 1.2,
+      "event": {
+        "event_id": "demo_turn_4",
+        "session_id": "demo_session_rtx5070",
+        "type": "transcript",
+        "speaker_name": "2xDanger",
+        "text": "Bro, I'm pretty sure the RTX 5070 has 16 gigs of VRAM.",
+        "latency": { "stt_ms": 272 },
+        "topic": "tech",
+        "talk_delta_seconds": 4.0
+      }
+    },
+    {
+      "delay_seconds": 0.8,
       "event": {
         "event_id": "demo_claim_1",
         "session_id": "demo_session_rtx5070",
         "type": "claim",
-        "speaker_name": "Ahmed",
+        "speaker_name": "2xDanger",
         "text": "Bro, I'm pretty sure the RTX 5070 has 16 gigs of VRAM.",
         "latency": { "stt_ms": 272, "llm_ms": 194 },
         "payload": {
@@ -31,23 +72,25 @@
       }
     },
     {
-      "delay_seconds": 2.0,
+      "delay_seconds": 1.2,
       "event": {
-        "event_id": "demo_turn_2",
+        "event_id": "demo_turn_5",
         "session_id": "demo_session_rtx5070",
         "type": "transcript",
-        "speaker_name": "Mohamed",
+        "speaker_name": "Mostafa",
         "text": "No, the 5070 is 12 gigs. The Ti is 16.",
-        "latency": { "stt_ms": 258 }
+        "latency": { "stt_ms": 258 },
+        "topic": "tech",
+        "talk_delta_seconds": 3.5
       }
     },
     {
-      "delay_seconds": 1.2,
+      "delay_seconds": 0.8,
       "event": {
         "event_id": "demo_claim_2",
         "session_id": "demo_session_rtx5070",
         "type": "claim",
-        "speaker_name": "Mohamed",
+        "speaker_name": "Mostafa",
         "text": "No, the 5070 is 12 gigs. The Ti is 16.",
         "latency": { "stt_ms": 258, "llm_ms": 182 },
         "payload": {
@@ -58,18 +101,20 @@
       }
     },
     {
-      "delay_seconds": 2.0,
+      "delay_seconds": 1.2,
       "event": {
-        "event_id": "demo_turn_3",
+        "event_id": "demo_turn_6",
         "session_id": "demo_session_rtx5070",
         "type": "transcript",
-        "speaker_name": "Ahmed",
-        "text": "Nah, both are 16. Check the leak from yesterday.",
-        "latency": { "stt_ms": 265 }
+        "speaker_name": "2xDanger",
+        "text": "Nah, both are 16. شوف التسريبات بتاعت أمس كلها بتقول كده!",
+        "latency": { "stt_ms": 265 },
+        "topic": "tech",
+        "talk_delta_seconds": 3.9
       }
     },
     {
-      "delay_seconds": 1.5,
+      "delay_seconds": 1.0,
       "event": {
         "event_id": "demo_intervention_1",
         "session_id": "demo_session_rtx5070",
@@ -88,26 +133,113 @@
           "confidence": 99,
           "evidence_strength": "HIGH",
           "correct_fact": "NVIDIA GeForce RTX 5070 has 12GB GDDR7 memory (192-bit bus), while RTX 5070 Ti has 16GB GDDR7 (256-bit bus).",
-          "speaker_a": "Ahmed",
+          "speaker_a": "2xDanger",
           "claim_a": "RTX 5070 has 16 gigs of VRAM, both are 16.",
           "speaker_a_status": "CONTRADICTED",
-          "speaker_b": "Mohamed",
+          "speaker_b": "Mostafa",
           "claim_b": "The 5070 is 12 gigs. The Ti is 16.",
           "speaker_b_status": "SUPPORTED",
-          "winner": "Mohamed",
-          "loser": "Ahmed",
+          "winner": "Mostafa",
+          "loser": "2xDanger",
           "source_url": "https://www.nvidia.com/en-us/geforce/graphics-cards/50-series/rtx-5070-family/",
           "source_title": "NVIDIA GeForce RTX 5070 Family Official Specifications",
           "source_tier": 1,
-          "spoken_intervention": "Correction: the RTX 5070 has 12GB of GDDR7 memory. The RTX 5070 Ti has 16GB. Source is on the dashboard.",
+          "spoken_intervention": "توضيح: كارت RTX 5070 نازل بـ 12 جيجا GDDR7، والـ 5070 Ti هو اللي بـ 16 جيجا. المصدر الرسمي على الداشبورد.",
           "why_i_spoke": [
             "Factual claim detected regarding GPU memory capacity",
-            "Direct contradiction between Ahmed (16GB) and Mohamed (12GB)",
+            "Direct contradiction between 2xDanger (16GB) and Mostafa (12GB)",
             "Tier-1 official manufacturer source verified (nvidia.com)",
-            "Confidence 99% — Evidence strength: HIGH",
+            "Confidence 99% - Evidence strength: HIGH",
             "Autonomous voice intervention triggered"
           ]
         }
+      }
+    },
+    {
+      "delay_seconds": 1.2,
+      "event": {
+        "event_id": "demo_turn_7",
+        "session_id": "demo_session_rtx5070",
+        "type": "transcript",
+        "speaker_name": "Mostafa",
+        "text": "Told you bro! NVIDIA never gives 16GB on the non-Ti 70 class.",
+        "latency": { "stt_ms": 245 },
+        "topic": "tech",
+        "talk_delta_seconds": 3.8
+      }
+    },
+    {
+      "delay_seconds": 1.2,
+      "event": {
+        "event_id": "demo_turn_8",
+        "session_id": "demo_session_rtx5070",
+        "type": "transcript",
+        "speaker_name": "2xDanger",
+        "text": "Fuck this game, I lost the rank match again!",
+        "latency": { "stt_ms": 260 },
+        "topic": "gaming",
+        "anger": "mild",
+        "anger_evidence": "Fuck this game, I lost the rank match again!",
+        "first_anger_quote": "Fuck this game, I lost the rank match again!",
+        "talk_delta_seconds": 4.1,
+        "vulgarity_count": 2,
+        "vulgarity_terms": ["f*", "f**"],
+        "payload": {
+          "audio_features": {
+            "was_loud": true,
+            "peak_robust_z": 245.0
+          }
+        }
+      }
+    },
+    {
+      "delay_seconds": 1.0,
+      "event": {
+        "event_id": "demo_turn_9",
+        "session_id": "demo_session_rtx5070",
+        "type": "transcript",
+        "speaker_name": "Remi",
+        "text": "Calm down bro, we can duo queue League tonight and fix your rank.",
+        "latency": { "stt_ms": 255 },
+        "topic": "gaming",
+        "talk_delta_seconds": 4.5
+      }
+    },
+    {
+      "delay_seconds": 1.0,
+      "event": {
+        "event_id": "demo_turn_10",
+        "session_id": "demo_session_rtx5070",
+        "type": "transcript",
+        "speaker_name": "Mostafa",
+        "text": "يلا بينا نفتح ديسكورد بالليل ونلعب سوا",
+        "latency": { "stt_ms": 240 },
+        "topic": "gaming",
+        "talk_delta_seconds": 3.2
+      }
+    },
+    {
+      "delay_seconds": 0.5,
+      "event": {
+        "event_id": "demo_analytics_final",
+        "session_id": "demo_session_rtx5070",
+        "type": "analytics_update",
+        "speaker_name": "2xDanger",
+        "talk_delta_seconds": 96.0,
+        "streak_seconds": 15.0,
+        "angry_episodes": 1,
+        "first_anger_quote": "Fuck this game, I lost the rank match again!",
+        "anger_episodes_history": [
+          {
+            "timestamp": 1727650000.0,
+            "intensity": "mild",
+            "quote": "Fuck this game, I lost the rank match again!",
+            "loudness": 245
+          }
+        ],
+        "vulgarity_count": 2,
+        "vulgarity_terms": ["f*", "f**"],
+        "banter_count": 3
       }
     }
   ]

@@ -645,7 +645,7 @@ async def card_command(ctx: commands.Context):
 async def show_help(ctx: commands.Context):
     """Displays comprehensive help and hackathon judging instructions."""
     embed = discord.Embed(
-        title="⚖️ CallWrapped — AssemblyAI Voice Agent Hackathon",
+        title="⚖️ CallWrapped - AssemblyAI Voice Agent Hackathon",
         description=(
             "An autonomous multi-speaker referee that monitors Discord voice channels silently, "
             "catches objective factual contradictions in real time, verifies them via authoritative web sources, "
@@ -698,7 +698,7 @@ def build_status_embed(guild_ctx: Any, session: Any, ping_ms: int = 0) -> discor
     mode_str = getattr(guild_ctx, "mode", "referee").upper()
 
     embed = discord.Embed(
-        title="⚙️ CallWrapped — Operational Status",
+        title="⚙️ CallWrapped - Operational Status",
         color=0x57F287 if in_voice else config.EMBED_COLOR_INFO
     )
     embed.add_field(name="🎙️ Voice Status", value=f"Connected to: **{channel_name}**" if in_voice else "❌ Disconnected (`!join` to start)", inline=True)
@@ -812,7 +812,7 @@ def build_fact_check_mode_embed(is_on: bool = True) -> discord.Embed:
     embed = discord.Embed(
         title=f"🎙️ Fact Check Mode: {status_str}",
         description=(
-            f"✅ **Fact Check Mode: {status_str}** (offers only — bot never speaks uninvited)\n\n"
+            f"✅ **Fact Check Mode: {status_str}** (offers only - bot never speaks uninvited)\n\n"
             "🔒 **إشعار الخصوصية والشفافية:**\n"
             f"{notice}\n\n"
             "💡 عند رصد أي اختلاف في المعلومات بين المتحدثين، سيقترح البوت التحقق كتابياً. "
@@ -834,7 +834,7 @@ async def start_session(ctx: commands.Context):
     """
     Session start command:
     a) Posts Arabic consent/notice to text channel.
-    b) Announces: "Fact Check Mode: ON (offers only — bot never speaks uninvited)".
+    b) Announces: "Fact Check Mode: ON (offers only - bot never speaks uninvited)".
     c) Emits event so dashboard shows "Fact Check Mode: ON" badge.
     """
     session = arbitration_engine.get_session(ctx.guild.id)
@@ -848,7 +848,7 @@ async def start_session(ctx: commands.Context):
         session_id=str(ctx.guild.id),
         type="fact_check_mode_update",
         speaker_name=ctx.author.display_name,
-        text="Fact Check Mode: ON (offers only — bot never speaks uninvited)",
+        text="Fact Check Mode: ON (offers only - bot never speaks uninvited)",
         payload={
             "mode": "ON",
             "badge": "Fact Check Mode: ON",
@@ -1053,28 +1053,28 @@ async def simulate_demo(ctx: commands.Context):
     await ctx.send("⚡ **Simulating Golden Arbitration Dispute (RTX 5070 16GB vs 12GB Demo)...**")
 
     # Step 1: Claim A
-    await ctx.send("🗣️ **Ahmed**: Guys, the RTX 5070 definitely launches with 16GB VRAM, I am 100% sure.")
+    await ctx.send("🗣️ **2xDanger**: Guys, the RTX 5070 definitely launches with 16GB VRAM, I am 100% sure.")
     publisher.publish_sync_task(VoiceEvent(
         type="transcript",
-        speaker_name="Ahmed",
+        speaker_name="2xDanger",
         text="Guys, the RTX 5070 definitely launches with 16GB VRAM, I am 100% sure.",
         latency=LatencyBreakdown(stt_ms=0)
     ))
 
     # Step 2: Claim B
-    await ctx.send("🗣️ **Omar**: No Ahmed, you're mistaken. The RTX 5070 comes with 12GB GDDR7, not 16GB.")
+    await ctx.send("🗣️ **Mostafa**: No 2xDanger, you're mistaken. The RTX 5070 comes with 12GB GDDR7, not 16GB.")
     publisher.publish_sync_task(VoiceEvent(
         type="transcript",
-        speaker_name="Omar",
-        text="No Ahmed, you're mistaken. The RTX 5070 comes with 12GB GDDR7, not 16GB.",
+        speaker_name="Mostafa",
+        text="No 2xDanger, you're mistaken. The RTX 5070 comes with 12GB GDDR7, not 16GB.",
         latency=LatencyBreakdown(stt_ms=0)
     ))
 
     # Step 3: Real Factual Arbitration
     verdict, search_ms, synth_ms, sources = await arbitration_verifier.verify_dispute(
-        speaker_a="Ahmed",
+        speaker_a="2xDanger",
         claim_a="RTX 5070 definitely launches with 16GB VRAM",
-        speaker_b="Omar",
+        speaker_b="Mostafa",
         claim_b="RTX 5070 comes with 12GB GDDR7, not 16GB",
         search_query="RTX 5070 VRAM memory specifications"
     )
@@ -1101,16 +1101,16 @@ async def simulate_demo(ctx: commands.Context):
     stt_ms = 0  # Simulated text in chat has no speech STT
     tts_ms = 0  # !simulate NEVER speaks; dashboard events only
 
-    winner = "Omar" if spk_b_status == "SUPPORTED" else ("Ahmed" if spk_a_status == "SUPPORTED" else None)
-    loser = "Ahmed" if spk_a_status == "CONTRADICTED" else ("Omar" if spk_b_status == "CONTRADICTED" else None)
+    winner = "Mostafa" if spk_b_status == "SUPPORTED" else ("2xDanger" if spk_a_status == "SUPPORTED" else None)
+    loser = "2xDanger" if spk_a_status == "CONTRADICTED" else ("Mostafa" if spk_b_status == "CONTRADICTED" else None)
 
     verdict_display = f"{fact_clause} {hedge_clause}".strip() if hedge_clause else fact_clause
     embed = discord.Embed(
         title="⚖️ Verified Dispute Arbitration Verdict",
         description=(
             f"📢 **{fact_clause}**\n\n"
-            f"✅ **Accurate Speaker**: `{winner or 'Omar'}`\n"
-            f"❌ **Refuted Speaker**: `{loser or 'Ahmed'}`\n"
+            f"✅ **Accurate Speaker**: `{winner or 'Mostafa'}`\n"
+            f"❌ **Refuted Speaker**: `{loser or '2xDanger'}`\n"
             f"🎯 **Confidence**: `{confidence}%`\n"
             f"🔗 **Official Source**: [{source_title}]({source_url})\n\n"
             f"⚡ **Latency Breakdown:** STT {stt_ms}ms | LLM {synth_ms}ms | Search {search_ms}ms | TTS {tts_ms}ms (dashboard only)"
@@ -1122,7 +1122,7 @@ async def simulate_demo(ctx: commands.Context):
 
     publisher.publish_sync_task(VoiceEvent(
         type="intervention",
-        speaker_name=winner or "Omar",
+        speaker_name=winner or "Mostafa",
         text=verdict_display,
         latency=LatencyBreakdown(
             stt_ms=stt_ms,
@@ -1137,9 +1137,9 @@ async def simulate_demo(ctx: commands.Context):
             "hedge_clause": hedge_clause,
             "winner": winner,
             "loser": loser,
-            "speaker_a": "Ahmed",
+            "speaker_a": "2xDanger",
             "claim_a": "RTX 5070 launches with 16GB VRAM",
-            "speaker_b": "Omar",
+            "speaker_b": "Mostafa",
             "claim_b": "RTX 5070 comes with 12GB GDDR7, not 16GB",
             "speaker_a_status": spk_a_status,
             "speaker_b_status": spk_b_status,
@@ -1155,7 +1155,7 @@ async def judge_mode_command(ctx: commands.Context):
     from bot.arbitration.judge_mode import run_judge_mode_harness
 
     embed = discord.Embed(
-        title="⚔️ Judge Attack Mode — 7-Card Stress Test",
+        title="⚔️ Judge Attack Mode - 7-Card Stress Test",
         description=(
             "Running live verification across all 7 adversarial scenarios:\n\n"
             "1. **Opinion**: Subjective claim alone -> Gate rejects\n"
