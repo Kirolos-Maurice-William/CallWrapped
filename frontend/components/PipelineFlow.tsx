@@ -42,138 +42,93 @@ export function PipelineFlow({
 
   const stages = [
     {
-      id: "asr",
       code: "01",
       name: "ASR",
-      detail: speechModel,
       ms: stt > 0 ? `${stt}ms` : "—",
-      active: activeStage === "asr" || stt > 0,
-      highlight: activeStage === "asr",
+      active: activeStage === "asr",
     },
     {
-      id: "gate",
       code: "02",
-      name: "FASTGATE",
-      detail: "Epistemic",
+      name: "FastGate",
       ms: stt > 0 ? "<8ms" : "—",
-      active: activeStage === "claim" || stt > 0,
-      highlight: activeStage === "claim",
+      active: activeStage === "claim",
     },
     {
-      id: "llm",
       code: "03",
-      name: "GROQ LPU",
-      detail: "Claim FSM",
+      name: "Groq LPU",
       ms: llm > 0 ? `${llm}ms` : "—",
-      active: activeStage === "claim" || activeStage === "offer" || llm > 0,
-      highlight: activeStage === "claim" || activeStage === "offer",
+      active: activeStage === "claim" || activeStage === "offer",
     },
     {
-      id: "search",
       code: "04",
-      name: "TAVILY",
-      detail: "Pre-fetch",
+      name: "Tavily Search",
       ms: search > 0 ? `${search}ms` : "—",
-      active: activeStage === "offer" || activeStage === "search" || search > 0,
-      highlight: activeStage === "offer" || activeStage === "search",
+      active: activeStage === "offer" || activeStage === "search",
     },
     {
-      id: "tts",
       code: "05",
-      name: "EDGE TTS",
-      detail: "Voice Out",
+      name: "Edge-TTS",
       ms: tts > 0 ? `${tts}ms` : "—",
-      active: activeStage === "verdict" || tts > 0,
-      highlight: activeStage === "verdict",
+      active: activeStage === "verdict",
     },
   ];
 
   return (
-    <div className="border-b border-[#1c2029] bg-[#0b0d12] px-4 md:px-6 py-2 font-mono text-[11px] select-none overflow-x-auto">
-      <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-6 min-w-max">
-        {/* Left label */}
-        <div className="flex items-center gap-2.5 text-[#7e8694]">
-          <span
-            className={`w-1.5 h-1.5 ${
-              activeStage !== "idle"
-                ? "bg-[#3b82f6] animate-ping"
-                : stt > 0
-                ? "bg-[#10b981]"
-                : "bg-[#3a404d]"
-            }`}
-          />
-          <span className="uppercase tracking-[0.14em] text-[10px] font-semibold text-[#9aa2b1]">
-            PIPELINE TELEMETRY
+    <div className="border-b border-[#1c2436] bg-[#0d121c] px-4 md:px-6 py-1.5 font-mono text-xs select-none">
+      <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-4">
+        {/* Stages */}
+        <div className="flex items-center gap-3 overflow-x-auto text-[11px] text-[#7d8b9e]">
+          <span className="text-[10px] uppercase font-semibold text-[#546275] tracking-wider shrink-0">
+            Pipeline:
           </span>
-        </div>
-
-        {/* Stage strip */}
-        <div className="flex items-center divide-x divide-[#1c2029]">
-          {stages.map((s) => (
-            <div
-              key={s.id}
-              className={`px-3 first:pl-0 last:pr-0 flex items-center gap-2 transition-colors ${
-                s.highlight
-                  ? "text-[#e6e8ee]"
-                  : s.active
-                  ? "text-[#b4bcc8]"
-                  : "text-[#525866]"
-              }`}
-            >
-              <span className="text-[10px] text-[#525866]">{s.code}</span>
-              <span
-                className={`font-semibold tracking-wider ${
-                  s.highlight ? "text-[#3b82f6]" : ""
-                }`}
-              >
-                {s.name}
-              </span>
-              <span className="hidden xl:inline text-[10px] text-[#68707e]">
-                [{s.detail}]
-              </span>
-              <span
-                className={`px-1.5 py-0.5 text-[10px] font-semibold ${
-                  s.highlight
-                    ? "bg-[#3b82f6]/20 text-[#60a5fa] border border-[#3b82f6]/40"
-                    : s.ms !== "—"
-                    ? "bg-[#13161c] text-[#e6e8ee] border border-[#1c2029]"
-                    : "text-[#525866]"
-                }`}
-              >
-                {s.ms}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Right SLA / Total */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-[#68707e]">
-              PERCEIVED
-            </span>
-            <span className="font-bold text-[#e6e8ee]">
-              {total > 0 ? `${(total / 1000).toFixed(2)}s` : "—"}
-            </span>
+          <div className="flex items-center gap-2">
+            {stages.map((s, idx) => (
+              <React.Fragment key={s.code}>
+                {idx > 0 && <span className="text-[#2b364e]">→</span>}
+                <div
+                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors ${
+                    s.active
+                      ? "bg-[#3b82f6]/20 text-[#60a5fa] font-bold"
+                      : "text-[#8e98ab]"
+                  }`}
+                >
+                  <span>{s.name}</span>
+                  {s.ms !== "—" && (
+                    <span className="text-[10px] text-[#5e6b7d]">({s.ms})</span>
+                  )}
+                </div>
+              </React.Fragment>
+            ))}
           </div>
+        </div>
+
+        {/* SLA Status */}
+        <div className="flex items-center gap-3 text-xs shrink-0 font-mono">
+          <span className="text-[#8e98ab]">
+            Perceived:{" "}
+            <strong className="text-white">
+              {total > 0 ? `${(total / 1000).toFixed(2)}s` : "—"}
+            </strong>
+          </span>
           <span
-            className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase border ${
+            className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border ${
               !isArbitration
-                ? "border-[#1c2029] bg-[#111319] text-[#7e8694]"
+                ? "border-[#1c2436] bg-[#101522] text-[#626d80]"
                 : isPassingSla
-                ? "border-[#10b981]/40 bg-[#10b981]/10 text-[#10b981]"
-                : "border-[#ef4444]/40 bg-[#ef4444]/10 text-[#ef4444]"
+                ? "border-[#10b981]/30 bg-[#10b981]/10 text-[#10b981]"
+                : "border-[#f43f5e]/30 bg-[#f43f5e]/10 text-[#f43f5e]"
             }`}
           >
             {isArbitration
               ? isPassingSla
-                ? `SLA <${(targetSlaMs / 1000).toFixed(1)}S PASS`
+                ? "SLA PASS"
                 : "SLA EXCEEDED"
-              : "STANDBY"}
+              : "IDLE"}
           </span>
         </div>
       </div>
     </div>
   );
 }
+
 export default PipelineFlow;

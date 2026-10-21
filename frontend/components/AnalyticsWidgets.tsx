@@ -65,31 +65,31 @@ export function formatDurationHuman(seconds: number): string {
 }
 
 export const TOPIC_DISPLAY_NAMES: Record<string, string> = {
-  food: "أكل",
-  travel: "سفر",
-  study_work: "دراسة وشغل",
-  health: "صحة",
-  cars: "عربيات",
-  money: "فلوس",
-  football: "كورة",
-  politics: "سياسة",
-  music: "مزيكا",
-  movies: "أفلام",
-  gaming: "ألعاب",
-  tech: "تكنولوجيا",
-  personal: "شخصي",
-  other: "أخرى",
+  food: "Food & Dining",
+  travel: "Travel",
+  study_work: "Work & Study",
+  health: "Health",
+  cars: "Cars & Automotive",
+  money: "Finance",
+  football: "Football",
+  politics: "Public Affairs",
+  music: "Music",
+  movies: "Cinema & Movies",
+  gaming: "Gaming",
+  tech: "Technology",
+  personal: "Personal",
+  other: "Other",
 };
 
 export const TOPIC_COLORS = [
   "bg-[#3b82f6]",
   "bg-[#10b981]",
-  "bg-[#f59e0b]",
-  "bg-[#8b5cf6]",
-  "bg-[#ec4899]",
+  "bg-[#6366f1]",
   "bg-[#06b6d4]",
-  "bg-[#ef4444]",
-  "bg-[#84cc16]",
+  "bg-[#8b5cf6]",
+  "bg-[#f59e0b]",
+  "bg-[#f43f5e]",
+  "bg-[#14b8a6]",
 ];
 
 interface Props {
@@ -148,51 +148,59 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
   const angrySpeakers = speakerEntries.filter((s) => s.angry_episodes > 0);
 
   return (
-    <div className="border border-[#1c2029] bg-[#090a0d] divide-y divide-[#1c2029]">
-      <div className="px-5 py-3 bg-[#0e1015] flex items-center justify-between">
-        <span className="font-mono text-xs font-bold uppercase tracking-[0.14em] text-[#e6e8ee]">
-          SESSION TELEMETRY & ANALYTICS
-        </span>
+    <div className="border border-[#1c2436] bg-[#0b0e14] divide-y divide-[#1c2436] rounded">
+      <div className="px-6 py-4 bg-[#101522] flex items-center justify-between">
+        <div>
+          <h3 className="font-editorial text-base font-bold text-white tracking-tight">
+            Session Analytics & Participation
+          </h3>
+          <p className="text-xs text-[#8e98ab] mt-0.5">
+            Real-time talk distribution, topics, and conversational metrics
+          </p>
+        </div>
         {onOpenRecap && (
           <button
             onClick={onOpenRecap}
-            className="flex items-center gap-1.5 px-3 py-1 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-mono text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 bg-[#3b82f6] hover:bg-[#2563eb] text-white text-xs font-semibold rounded transition-colors cursor-pointer"
           >
-            <Award className="w-3.5 h-3.5" />
-            <span>Open Recap Card</span>
+            <Award className="w-4 h-4" />
+            <span>Open CallWrapped Card</span>
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[#1c2029]">
-        {/* Talk Share */}
-        <div className="p-5 space-y-3">
-          <div className="flex items-center justify-between font-mono text-[11px] text-[#7e8694] uppercase">
-            <span>AIRTIME SHARE</span>
-            <span className="text-[#e6e8ee] font-bold">
+      <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[#1c2436]">
+        {/* Airtime */}
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between text-xs text-[#8e98ab]">
+            <span className="font-semibold uppercase tracking-wider">
+              Airtime Share
+            </span>
+            <span className="font-mono text-white font-bold">
               {formatDurationHuman(total_talk_seconds)}
             </span>
           </div>
+
           {speakerEntries.length > 0 ? (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {speakerEntries.map((s) => {
                 const pct =
                   total_talk_seconds > 0
                     ? (s.talk_seconds / total_talk_seconds) * 100
                     : 0;
                 return (
-                  <div key={s.speaker_name} className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="font-semibold text-[#e6e8ee]" dir="auto">
+                  <div key={s.speaker_name} className="space-y-1.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-white" dir="auto">
                         {s.speaker_name}
                       </span>
-                      <span className="font-mono text-[#7e8694]">
+                      <span className="font-mono text-xs text-[#8e98ab]">
                         {formatDurationHuman(s.talk_seconds)} ({pct.toFixed(0)}%)
                       </span>
                     </div>
-                    <div className="w-full h-1.5 bg-[#151821]">
+                    <div className="w-full h-2 bg-[#161c2c] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[#3b82f6]"
+                        className="h-full bg-[#3b82f6] rounded-full transition-all duration-300"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -201,39 +209,42 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
               })}
             </div>
           ) : (
-            <p className="font-mono text-xs text-[#525866] py-4">
-              No voice activity recorded yet.
-            </p>
+            <p className="text-sm text-[#5e6b7d] py-4">No speech recorded yet.</p>
           )}
         </div>
 
         {/* Topics */}
-        <div className="p-5 space-y-3">
-          <div className="flex items-center justify-between font-mono text-[11px] text-[#7e8694] uppercase">
-            <span>TOPICS DETECTED</span>
-            <span>{topicalEntries.length} CATEGORIES</span>
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between text-xs text-[#8e98ab]">
+            <span className="font-semibold uppercase tracking-wider">
+              Topics Discussed
+            </span>
+            <span className="font-mono text-white">
+              {topicalEntries.length} categories
+            </span>
           </div>
+
           {totalTopicalCount > 0 ? (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {topicalEntries.map(([topic, count], idx) => {
                 const pct = (count / totalTopicalCount) * 100;
                 const color = TOPIC_COLORS[idx % TOPIC_COLORS.length];
                 return (
-                  <div key={topic} className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-[#e6e8ee] capitalize">
+                  <div key={topic} className="space-y-1.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[#e2e8f0] capitalize">
                         {topic}
                         {TOPIC_DISPLAY_NAMES[topic.toLowerCase()]
                           ? ` · ${TOPIC_DISPLAY_NAMES[topic.toLowerCase()]}`
                           : ""}
                       </span>
-                      <span className="font-mono text-[#7e8694]">
+                      <span className="font-mono text-xs text-[#8e98ab]">
                         {pct.toFixed(0)}%
                       </span>
                     </div>
-                    <div className="w-full h-1.5 bg-[#151821]">
+                    <div className="w-full h-2 bg-[#161c2c] rounded-full overflow-hidden">
                       <div
-                        className={`h-full ${color}`}
+                        className={`h-full ${color} rounded-full`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -242,74 +253,71 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
               })}
             </div>
           ) : (
-            <p className="font-mono text-xs text-[#525866] py-4">
-              No topic data yet.
+            <p className="text-sm text-[#5e6b7d] py-4">
+              Waiting for topic classification...
             </p>
           )}
         </div>
 
-        {/* Acoustic Friction & Streaks */}
-        <div className="p-5 space-y-3">
-          <div className="flex items-center justify-between font-mono text-[11px] text-[#7e8694] uppercase">
-            <span>ACOUSTIC FRICTION</span>
+        {/* Friction & Streaks */}
+        <div className="p-6 space-y-4">
+          <div className="flex items-center justify-between text-xs text-[#8e98ab]">
+            <span className="font-semibold uppercase tracking-wider">
+              Acoustic Moments
+            </span>
             <span
               className={
-                total_angry_episodes > 0 ? "text-[#ef4444]" : "text-[#10b981]"
+                total_angry_episodes > 0 ? "text-[#f43f5e]" : "text-[#10b981]"
               }
             >
-              {total_angry_episodes} SPIKES
+              {total_angry_episodes === 0 ? "0 Heated Spikes" : `${total_angry_episodes} Spikes`}
             </span>
           </div>
+
           {angrySpeakers.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {angrySpeakers.map((s) => (
                 <div
                   key={s.speaker_name}
-                  className="border-l-2 border-[#ef4444] pl-3 py-1 space-y-1"
+                  className="border-l-2 border-[#f43f5e] pl-3 py-1 space-y-1 bg-[#101522] rounded-r p-2"
                 >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-[#e6e8ee]">
-                      {s.speaker_name}
-                    </span>
-                    <span className="font-mono text-[10px] text-[#ef4444]">
-                      {s.angry_episodes}x HEATED
+                  <div className="flex items-center justify-between text-sm font-semibold text-white">
+                    <span>{s.speaker_name}</span>
+                    <span className="font-mono text-xs text-[#f43f5e]">
+                      {s.angry_episodes}x Heated
                     </span>
                   </div>
                   {(s.anger_evidence || s.first_anger_quote) && (
-                    <p className="text-xs text-[#9aa2b1] italic" dir="auto">
+                    <p className="text-xs text-[#a0aec0] italic" dir="auto">
                       “{s.anger_evidence || s.first_anger_quote}”
                     </p>
                   )}
                   {s.anger_episodes_history?.[0]?.audio_clip && (
                     <button
                       onClick={() =>
-                        handlePlayAudio(
-                          s.anger_episodes_history![0].audio_clip!
-                        )
+                        handlePlayAudio(s.anger_episodes_history![0].audio_clip!)
                       }
-                      className="inline-flex items-center gap-1 font-mono text-[10px] text-[#ef4444] hover:underline"
+                      className="inline-flex items-center gap-1.5 font-mono text-xs text-[#f43f5e] hover:underline pt-1 cursor-pointer"
                     >
-                      <Volume2 className="w-3 h-3" />
-                      <span>
-                        {playingClip ? "PLAYING..." : "PLAY AUDIO RECEIPT"}
-                      </span>
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>{playingClip ? "Playing..." : "Play Audio Clip"}</span>
                     </button>
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="font-mono text-xs text-[#10b981] py-2">
-              0 acoustic anger spikes detected.
+            <p className="text-sm text-[#10b981] py-2">
+              Calm discussion with zero anger spikes.
             </p>
           )}
 
           {longest_streak?.speaker_name && longest_streak.streak_seconds > 0 && (
-            <div className="pt-3 border-t border-[#1c2029] flex items-center justify-between text-xs">
-              <span className="font-mono text-[10px] uppercase text-[#f59e0b]">
-                LONGEST MONOLOGUE
+            <div className="pt-3 border-t border-[#1c2436] flex items-center justify-between text-sm">
+              <span className="text-xs uppercase text-[#f59e0b] font-medium">
+                Longest Monologue
               </span>
-              <span className="font-mono font-bold text-[#e6e8ee]">
+              <span className="font-mono text-white font-semibold">
                 {longest_streak.speaker_name} (
                 {formatStreakMMSS(longest_streak.streak_seconds)})
               </span>
@@ -320,4 +328,5 @@ export function AnalyticsWidgets({ analytics, onOpenRecap }: Props) {
     </div>
   );
 }
+
 export default AnalyticsWidgets;
