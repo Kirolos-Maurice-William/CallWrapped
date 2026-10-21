@@ -1,17 +1,6 @@
 "use client";
 
 import React from "react";
-import {
-  Zap,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
-  Clock,
-  Radio,
-  Cpu,
-  Search,
-  Volume2
-} from "lucide-react";
 
 interface LatencyMetrics {
   stt_ms?: number;
@@ -21,154 +10,170 @@ interface LatencyMetrics {
   total_ms?: number;
 }
 
+export type ActivePipelineStage =
+  | "idle"
+  | "asr"
+  | "claim"
+  | "offer"
+  | "search"
+  | "verdict";
+
 interface Props {
   latency: LatencyMetrics;
   speechModel?: string;
   targetSlaMs?: number;
+  activeStage?: ActivePipelineStage;
 }
 
 export function PipelineFlow({
   latency,
   speechModel = "Universal-3.5 Pro",
-  targetSlaMs = 2000
+  targetSlaMs = 2000,
+  activeStage = "idle",
 }: Props) {
   const stt = latency.stt_ms ?? 0;
   const llm = latency.llm_ms ?? 0;
   const search = latency.search_ms ?? 0;
   const tts = latency.tts_ms ?? 0;
-  const total = (stt + llm + search + tts) || latency.total_ms || 0;
+  const total = stt + llm + search + tts || latency.total_ms || 0;
 
-  const isArbitration = (llm > 0 || search > 0 || tts > 0);
+  const isArbitration = llm > 0 || search > 0 || tts > 0;
   const isPassingSla = isArbitration ? total <= targetSlaMs : true;
 
+  const stages = [
+    {
+      id: "asr",
+      code: "01",
+      name: "ASR",
+      detail: speechModel,
+      ms: stt > 0 ? `${stt}ms` : "—",
+      active: activeStage === "asr" || stt > 0,
+      highlight: activeStage === "asr",
+    },
+    {
+      id: "gate",
+      code: "02",
+      name: "FASTGATE",
+      detail: "Epistemic",
+      ms: stt > 0 ? "<8ms" : "—",
+      active: activeStage === "claim" || stt > 0,
+      highlight: activeStage === "claim",
+    },
+    {
+      id: "llm",
+      code: "03",
+      name: "GROQ LPU",
+      detail: "Claim FSM",
+      ms: llm > 0 ? `${llm}ms` : "—",
+      active: activeStage === "claim" || activeStage === "offer" || llm > 0,
+      highlight: activeStage === "claim" || activeStage === "offer",
+    },
+    {
+      id: "search",
+      code: "04",
+      name: "TAVILY",
+      detail: "Pre-fetch",
+      ms: search > 0 ? `${search}ms` : "—",
+      active: activeStage === "offer" || activeStage === "search" || search > 0,
+      highlight: activeStage === "offer" || activeStage === "search",
+    },
+    {
+      id: "tts",
+      code: "05",
+      name: "EDGE TTS",
+      detail: "Voice Out",
+      ms: tts > 0 ? `${tts}ms` : "—",
+      active: activeStage === "verdict" || tts > 0,
+      highlight: activeStage === "verdict",
+    },
+  ];
+
   return (
-    <section className="bg-[#2b2d31] border-b border-[#383a40] px-4 md:px-8 py-3">
-      <div className="max-w-7xl mx-auto flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3 text-xs">
-        {/* Title & SLA Badge */}
-        <div className="flex items-center gap-2.5 flex-shrink-0">
-          <div className="p-1.5 rounded-lg bg-[#5865F2]/20 text-[#5865F2] border border-[#5865F2]/30">
-            <Zap className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-[#F2F3F5] text-xs uppercase tracking-wider">
-                Autonomous Pipeline Latency Flow
-              </span>
+    <div className="border-b border-[#1c2029] bg-[#0b0d12] px-4 md:px-6 py-2 font-mono text-[11px] select-none overflow-x-auto">
+      <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-6 min-w-max">
+        {/* Left label */}
+        <div className="flex items-center gap-2.5 text-[#7e8694]">
+          <span
+            className={`w-1.5 h-1.5 ${
+              activeStage !== "idle"
+                ? "bg-[#3b82f6] animate-ping"
+                : stt > 0
+                ? "bg-[#10b981]"
+                : "bg-[#3a404d]"
+            }`}
+          />
+          <span className="uppercase tracking-[0.14em] text-[10px] font-semibold text-[#9aa2b1]">
+            PIPELINE TELEMETRY
+          </span>
+        </div>
+
+        {/* Stage strip */}
+        <div className="flex items-center divide-x divide-[#1c2029]">
+          {stages.map((s) => (
+            <div
+              key={s.id}
+              className={`px-3 first:pl-0 last:pr-0 flex items-center gap-2 transition-colors ${
+                s.highlight
+                  ? "text-[#e6e8ee]"
+                  : s.active
+                  ? "text-[#b4bcc8]"
+                  : "text-[#525866]"
+              }`}
+            >
+              <span className="text-[10px] text-[#525866]">{s.code}</span>
               <span
-                className={`flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
-                  isArbitration
-                    ? isPassingSla
-                      ? "bg-[#23A55A]/15 border-[#23A55A]/30 text-[#23A55A]"
-                      : "bg-[#F23F43]/15 border-[#F23F43]/30 text-[#F23F43]"
-                    : "bg-[#5865F2]/15 border-[#5865F2]/30 text-[#DBDEE1]"
+                className={`font-semibold tracking-wider ${
+                  s.highlight ? "text-[#3b82f6]" : ""
                 }`}
               >
-                <CheckCircle2 className="w-3 h-3" />
-                <span>
-                  {isArbitration
-                    ? `SLA < ${(targetSlaMs / 1000).toFixed(1)}s: ${isPassingSla ? "PASSED" : "EXCEEDED"}`
-                    : "PIPELINE ACTIVE"}
-                </span>
+                {s.name}
+              </span>
+              <span className="hidden xl:inline text-[10px] text-[#68707e]">
+                [{s.detail}]
+              </span>
+              <span
+                className={`px-1.5 py-0.5 text-[10px] font-semibold ${
+                  s.highlight
+                    ? "bg-[#3b82f6]/20 text-[#60a5fa] border border-[#3b82f6]/40"
+                    : s.ms !== "—"
+                    ? "bg-[#13161c] text-[#e6e8ee] border border-[#1c2029]"
+                    : "text-[#525866]"
+                }`}
+              >
+                {s.ms}
               </span>
             </div>
-            <p className="text-[11px] text-[#949BA4]">
-              End-to-end multi-speaker arbitration measured live
-            </p>
-          </div>
+          ))}
         </div>
 
-        {/* Connected Node Flow (Compact Vertically-Stacked Cards with Bottom-Centered Latency) */}
-        <div className="w-full xl:w-auto flex items-center justify-between xl:justify-end gap-1 sm:gap-1.5 flex-nowrap py-1">
-          {/* Node 1: AssemblyAI STT */}
-          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#1e1f22] border border-[#383a40] text-center shadow-sm w-[110px] sm:w-[124px] flex-shrink-0">
-            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-cyan-400 font-bold mb-0.5">
-              <Radio className="w-3 h-3 text-cyan-400" />
-              <span>1. ASR</span>
-            </div>
-            <div className="text-[11px] font-bold text-[#F2F3F5] truncate w-full" title={`AssemblyAI ${speechModel}`}>
-              AssemblyAI
-            </div>
-            <div className="mt-1 px-1.5 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/40 text-cyan-300 font-mono text-[10px] font-bold">
-              {stt}ms
-            </div>
+        {/* Right SLA / Total */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] uppercase tracking-wider text-[#68707e]">
+              PERCEIVED
+            </span>
+            <span className="font-bold text-[#e6e8ee]">
+              {total > 0 ? `${(total / 1000).toFixed(2)}s` : "—"}
+            </span>
           </div>
-
-          <ArrowRight className="w-3 h-3 text-[#949BA4]/40 flex-shrink-0" />
-
-          {/* Node 2: FastGate */}
-          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#1e1f22] border border-[#383a40] text-center shadow-sm w-[110px] sm:w-[124px] flex-shrink-0">
-            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-[#5865F2] font-bold mb-0.5">
-              <ShieldCheck className="w-3 h-3 text-[#5865F2]" />
-              <span>2. FASTGATE</span>
-            </div>
-            <div className="text-[11px] font-bold text-[#F2F3F5] truncate w-full" title="FastGate Epistemic Veto">
-              Epistemic Veto
-            </div>
-            <div className="mt-1 px-1.5 py-0.5 rounded bg-[#5865F2]/20 border border-[#5865F2]/40 text-[#5865F2] font-mono text-[10px] font-bold">
-              &lt;10ms
-            </div>
-          </div>
-
-          <ArrowRight className="w-3 h-3 text-[#949BA4]/40 flex-shrink-0" />
-
-          {/* Node 3: Groq LPU */}
-          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#1e1f22] border border-[#383a40] text-center shadow-sm w-[110px] sm:w-[124px] flex-shrink-0">
-            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-purple-400 font-bold mb-0.5">
-              <Cpu className="w-3 h-3 text-purple-400" />
-              <span>3. REASONING</span>
-            </div>
-            <div className="text-[11px] font-bold text-[#F2F3F5] truncate w-full" title="Groq Qwen 3.8 27B">
-              Groq Qwen 27B
-            </div>
-            <div className="mt-1 px-1.5 py-0.5 rounded bg-purple-950/70 border border-purple-800/40 text-purple-300 font-mono text-[10px] font-bold">
-              {llm}ms
-            </div>
-          </div>
-
-          <ArrowRight className="w-3 h-3 text-[#949BA4]/40 flex-shrink-0" />
-
-          {/* Node 4: Tavily Search */}
-          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#1e1f22] border border-[#383a40] text-center shadow-sm w-[110px] sm:w-[124px] flex-shrink-0">
-            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-[#F0B232] font-bold mb-0.5">
-              <Search className="w-3 h-3 text-[#F0B232]" />
-              <span>4. SEARCH</span>
-            </div>
-            <div className="text-[11px] font-bold text-[#F2F3F5] truncate w-full" title="Tavily Tier-1 Ground Truth Search">
-              Tavily Web
-            </div>
-            <div className="mt-1 px-1.5 py-0.5 rounded bg-amber-950/70 border border-amber-800/40 text-amber-300 font-mono text-[10px] font-bold">
-              {search}ms
-            </div>
-          </div>
-
-          <ArrowRight className="w-3 h-3 text-[#949BA4]/40 flex-shrink-0" />
-
-          {/* Node 5: Edge Neural TTS */}
-          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#1e1f22] border border-[#383a40] text-center shadow-sm w-[110px] sm:w-[124px] flex-shrink-0">
-            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-[#23A55A] font-bold mb-0.5">
-              <Volume2 className="w-3 h-3 text-[#23A55A]" />
-              <span>5. VOICE OUT</span>
-            </div>
-            <div className="text-[11px] font-bold text-[#F2F3F5] truncate w-full" title="Edge Neural TTS (Shakir Arabic / Christopher English)">
-              Edge Neural
-            </div>
-            <div className="mt-1 px-1.5 py-0.5 rounded bg-emerald-950/70 border border-emerald-800/40 text-emerald-300 font-mono text-[10px] font-bold">
-              {tts}ms
-            </div>
-          </div>
-
-          {/* Total Badge */}
-          <div className="flex flex-col items-center justify-between p-2 rounded-xl bg-[#5865F2]/20 border border-[#5865F2]/40 text-center shadow-md w-[90px] sm:w-[100px] flex-shrink-0">
-            <div className="flex items-center gap-1 text-[9px] font-mono uppercase text-[#5865F2] font-bold mb-0.5">
-              <Clock className="w-3 h-3" />
-              <span>TOTAL</span>
-            </div>
-            <div className="text-xs font-black font-mono text-white mt-1">
-              {(total / 1000).toFixed(2)}s
-            </div>
-          </div>
+          <span
+            className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase border ${
+              !isArbitration
+                ? "border-[#1c2029] bg-[#111319] text-[#7e8694]"
+                : isPassingSla
+                ? "border-[#10b981]/40 bg-[#10b981]/10 text-[#10b981]"
+                : "border-[#ef4444]/40 bg-[#ef4444]/10 text-[#ef4444]"
+            }`}
+          >
+            {isArbitration
+              ? isPassingSla
+                ? `SLA <${(targetSlaMs / 1000).toFixed(1)}S PASS`
+                : "SLA EXCEEDED"
+              : "STANDBY"}
+          </span>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
+export default PipelineFlow;

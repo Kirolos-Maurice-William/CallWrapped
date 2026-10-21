@@ -1,31 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #1e1f22;
-  --foreground: #f2f3f5;
+  --background: #090a0d;
+  --foreground: #e6e8ee;
+  --surface: #0e1015;
+  --surface-elevated: #13161c;
+  --border-hairline: #1c2029;
+  --border-strong: #2a303c;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: 'gg sans', 'Noto Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: 'Inter', 'IBM Plex Sans Arabic', system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
+  letter-spacing: -0.011em;
 }
 
-/* Discord Custom scrollbars */
+h1, h2, h3, .font-display {
+  font-family: 'Space Grotesk', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+}
+
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Sharp minimal scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #2b2d31;
+  background: #090a0d;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1a1b1e;
-  border-radius: 4px;
+  background: #222631;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #111214;
+  background: #323846;
 }

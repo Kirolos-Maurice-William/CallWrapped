@@ -1,17 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  X,
-  Award,
-  Crown,
-  PieChart,
-  Smile,
-  Copy,
-  Check,
-  ShieldCheck,
-  Sparkles
-} from "lucide-react";
+import { X, Copy, Check } from "lucide-react";
 import { AnalyticsState, formatDurationHuman } from "./AnalyticsWidgets";
 
 interface Props {
@@ -27,81 +17,127 @@ export function CallWrappedModal({
   onClose,
   analytics,
   verifiedCount = 3,
-  disputedCount = 1
+  disputedCount = 1,
 }: Props) {
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
-  const { speakers, topic_totals, total_talk_seconds, total_angry_episodes, longest_streak } = analytics;
+  const {
+    speakers,
+    topic_totals,
+    total_talk_seconds,
+    total_angry_episodes,
+    longest_streak,
+  } = analytics;
 
-  // Speaker calculations
-  const speakerList = Object.values(speakers || {}).sort((a, b) => b.talk_seconds - a.talk_seconds);
-  const topTalker = speakerList[0];
-  const silentObserver = speakerList.length >= 2 ? speakerList[speakerList.length - 1] : null;
-  const secondSilent = speakerList.length >= 2 ? speakerList[speakerList.length - 2] : null;
+  const speakerList = Object.values(speakers || {}).sort(
+    (a, b) => b.talk_seconds - a.talk_seconds
+  );
+  const silentObserver =
+    speakerList.length >= 2 ? speakerList[speakerList.length - 1] : null;
+  const secondSilent =
+    speakerList.length >= 2 ? speakerList[speakerList.length - 2] : null;
   const isObserverEligible = Boolean(
-    silentObserver && secondSilent && (secondSilent.talk_seconds - silentObserver.talk_seconds >= 1.0)
+    silentObserver &&
+      secondSilent &&
+      secondSilent.talk_seconds - silentObserver.talk_seconds >= 1.0
   );
 
-  const spicySpeakers = speakerList.filter(s => (s.vulgarity_count || 0) > 0).sort((a, b) => (b.vulgarity_count || 0) - (a.vulgarity_count || 0));
+  const spicySpeakers = speakerList
+    .filter((s) => (s.vulgarity_count || 0) > 0)
+    .sort((a, b) => (b.vulgarity_count || 0) - (a.vulgarity_count || 0));
   const topSpicy = spicySpeakers[0];
   const isSpicyEligible = Boolean(
-    speakerList.length >= 2 && topSpicy && (spicySpeakers.length < 2 || (topSpicy.vulgarity_count || 0) > (spicySpeakers[1].vulgarity_count || 0))
+    speakerList.length >= 2 &&
+      topSpicy &&
+      (spicySpeakers.length < 2 ||
+        (topSpicy.vulgarity_count || 0) >
+          (spicySpeakers[1].vulgarity_count || 0))
   );
 
-  const diplomatCandidates = speakerList.filter(
-    s => (s.vulgarity_count || 0) === 0 && s.angry_episodes === 0 && (s.banter_count || 0) === 0 && s.talk_seconds >= 15.0
-  ).sort((a, b) => b.talk_seconds - a.talk_seconds);
-  // Prioritize non-Monologue King to avoid badge hoarding if multiple peaceful speakers qualify
+  const diplomatCandidates = speakerList
+    .filter(
+      (s) =>
+        (s.vulgarity_count || 0) === 0 &&
+        s.angry_episodes === 0 &&
+        (s.banter_count || 0) === 0 &&
+        s.talk_seconds >= 15.0
+    )
+    .sort((a, b) => b.talk_seconds - a.talk_seconds);
   const secondaryDiplomatCandidates = diplomatCandidates.filter(
-    s => !longest_streak?.speaker_name || s.speaker_name !== longest_streak.speaker_name
+    (s) =>
+      !longest_streak?.speaker_name ||
+      s.speaker_name !== longest_streak.speaker_name
   );
-  const topDiplomat = secondaryDiplomatCandidates.length > 0 ? secondaryDiplomatCandidates[0] : diplomatCandidates[0];
+  const topDiplomat =
+    secondaryDiplomatCandidates.length > 0
+      ? secondaryDiplomatCandidates[0]
+      : diplomatCandidates[0];
   const isDiplomatEligible = Boolean(
-    speakerList.length >= 2 && topDiplomat && (diplomatCandidates.length < 2 || (topDiplomat.talk_seconds >= 15.0))
+    speakerList.length >= 2 &&
+      topDiplomat &&
+      (diplomatCandidates.length < 2 || topDiplomat.talk_seconds >= 15.0)
   );
 
-  const banterSpeakers = speakerList.filter(s => (s.banter_count || 0) > 0).sort((a, b) => (b.banter_count || 0) - (a.banter_count || 0));
+  const banterSpeakers = speakerList
+    .filter((s) => (s.banter_count || 0) > 0)
+    .sort((a, b) => (b.banter_count || 0) - (a.banter_count || 0));
   const topBanter = banterSpeakers[0];
   const isBanterEligible = Boolean(
-    speakerList.length >= 2 && topBanter && (banterSpeakers.length < 2 || (topBanter.banter_count || 0) > (banterSpeakers[1].banter_count || 0))
+    speakerList.length >= 2 &&
+      topBanter &&
+      (banterSpeakers.length < 2 ||
+        (topBanter.banter_count || 0) > (banterSpeakers[1].banter_count || 0))
   );
 
-  // Topics
   const topicalEntries = Object.entries(topic_totals || {})
-    .filter(([t]) => t !== "null_topic" && t !== "null" && t !== "بدون موضوع" && t !== "none")
+    .filter(
+      ([t]) =>
+        t !== "null_topic" &&
+        t !== "null" &&
+        t !== "بدون موضوع" &&
+        t !== "none"
+    )
     .sort((a, b) => b[1] - a[1]);
 
   const topTopic = topicalEntries[0];
-  const topTopicName = topTopic ? topTopic[0].toUpperCase() : "GENERAL BANTER";
+  const topTopicName = topTopic ? topTopic[0].toUpperCase() : "GENERAL";
 
   const handleCopy = () => {
-    const observerLine = isObserverEligible && silentObserver
-      ? `🤫 **The Silent Observer:** ${silentObserver.speaker_name} (${formatDurationHuman(silentObserver.talk_seconds)})\n`
-      : "";
-    const spicyLine = isSpicyEligible && topSpicy
-      ? `🌶️ **The Most Unfiltered:** ${topSpicy.speaker_name} (${topSpicy.vulgarity_count} raw tokens)\n`
-      : "";
-    const diplomatLine = isDiplomatEligible && topDiplomat
-      ? `🕊️ **The Diplomat:** ${topDiplomat.speaker_name} (${formatDurationHuman(topDiplomat.talk_seconds)} peaceful)\n`
-      : "";
-    const roastLine = isBanterEligible && topBanter
-      ? `🎭 **The Roast Master:** ${topBanter.speaker_name} (${topBanter.banter_count} mutual roasts)\n`
-      : "";
-    const vibeText = total_angry_episodes === 0
-      ? ((analytics.total_banter_count || 0) > 0 ? `Friendly banter (${analytics.total_banter_count} roasts, 0 anger spikes)` : "Civilized discussion (0 anger spikes)")
-      : `${total_angry_episodes} heated episodes`;
-    const summaryText = `🎙️ **CALLWRAPPED SESSION SUMMARY**\n` +
-      `👑 **Monologue King:** ${longest_streak?.speaker_name || "N/A"} (${formatDurationHuman(longest_streak?.streak_seconds || 0)})\n` +
+    const observerLine =
+      isObserverEligible && silentObserver
+        ? `• **Silent Observer:** ${silentObserver.speaker_name} (${formatDurationHuman(silentObserver.talk_seconds)})\n`
+        : "";
+    const spicyLine =
+      isSpicyEligible && topSpicy
+        ? `• **Most Unfiltered:** ${topSpicy.speaker_name} (${topSpicy.vulgarity_count} raw tokens)\n`
+        : "";
+    const diplomatLine =
+      isDiplomatEligible && topDiplomat
+        ? `• **The Diplomat:** ${topDiplomat.speaker_name} (${formatDurationHuman(topDiplomat.talk_seconds)} peaceful)\n`
+        : "";
+    const roastLine =
+      isBanterEligible && topBanter
+        ? `• **Roast Master:** ${topBanter.speaker_name} (${topBanter.banter_count} roasts)\n`
+        : "";
+    const vibeText =
+      total_angry_episodes === 0
+        ? (analytics.total_banter_count || 0) > 0
+          ? `Friendly Banter (${analytics.total_banter_count} roasts, 0 anger spikes)`
+          : "Civilized (0 anger spikes)"
+        : `${total_angry_episodes} heated episodes`;
+
+    const summaryText =
+      `**CALLWRAPPED // SESSION DOSSIER**\n` +
+      `• **Monologue King:** ${longest_streak?.speaker_name || "N/A"} (${formatDurationHuman(longest_streak?.streak_seconds || 0)})\n` +
       observerLine +
       spicyLine +
       diplomatLine +
       roastLine +
-      `🎯 **Ground Truth:** ${verifiedCount} verified, ${disputedCount} refuted\n` +
-      `📊 **Top Topic:** ${topTopicName}\n` +
-      `🎭 **Call Vibe:** ${vibeText}\n` +
-      `⚡ *Arbitrated live by CallWrapped AI Referee (AssemblyAI + Groq)*`;
+      `• **Fact Record:** ${verifiedCount} verified, ${disputedCount} contradicted\n` +
+      `• **Primary Topic:** ${topTopicName}\n` +
+      `• **Call Vibe:** ${vibeText}`;
 
     navigator.clipboard.writeText(summaryText);
     setCopied(true);
@@ -109,197 +145,180 @@ export function CallWrappedModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-4xl max-h-[92vh] bg-[#2b2d31] border border-[#383a40] rounded-3xl shadow-2xl shadow-black/60 flex flex-col overflow-hidden text-[#F2F3F5]">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#383a40] bg-[#1e1f22]">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-[#5865F2]/20 text-[#5865F2]">
-              <Award className="w-4 h-4" />
-            </div>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#DBDEE1]">
-              Your Call Wrapped • Live Edition
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+      <div className="relative w-full max-w-3xl bg-[#090a0d] border border-[#2a303c] shadow-2xl flex flex-col overflow-hidden text-[#e6e8ee]">
+        {/* Top Bar */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1c2029] bg-[#0e1015]">
+          <div className="flex items-center gap-3">
+            <span className="w-2 h-2 bg-[#3b82f6]" />
+            <span className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-[#e6e8ee]">
+              CALLWRAPPED // POST-CALL DOSSIER
             </span>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-[#313338] hover:bg-[#383a40] text-[#949BA4] hover:text-white transition-colors cursor-pointer"
+            className="p-1 text-[#7e8694] hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Card Body (Spotify Wrapped Aesthetic) */}
-        <div className="p-6 overflow-y-auto space-y-4">
-          {/* Hero Banner */}
-          <div className="relative rounded-2xl bg-[#1e1f22] border border-[#383a40] p-5 overflow-hidden text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#5865F2]/20 border border-[#5865F2]/40 text-[#DBDEE1] text-xs font-bold">
-              <Sparkles className="w-3.5 h-3.5 text-[#F0B232]" />
-              <span>POST-CALL MEMORY RECAP</span>
+        {/* Body */}
+        <div className="divide-y divide-[#1c2029] overflow-y-auto max-h-[82vh]">
+          {/* 4-Metric Strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 divide-x divide-[#1c2029]">
+            <div className="p-5">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-[#7e8694] block">
+                TOTAL AIRTIME
+              </span>
+              <span className="text-2xl font-bold text-white font-display mt-1 block">
+                {formatDurationHuman(total_talk_seconds)}
+              </span>
+              <span className="font-mono text-[11px] text-[#3b82f6] mt-0.5 block">
+                {speakerList.length} speakers
+              </span>
             </div>
-            <h3 className="text-xl font-black text-white tracking-tight">
-              CALLWRAPPED #1
-            </h3>
-            <p className="text-xs text-[#949BA4]">
-              Total airtime: {formatDurationHuman(total_talk_seconds)} • {topicalEntries.length} topics explored
-            </p>
-          </div>
 
-          {/* Cards Grid: 4 Pillars Side-by-Side on Desktop */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {/* Monologue King */}
-            <div className="p-3.5 rounded-xl bg-[#1e1f22] border border-[#F0B232]/30 space-y-1">
-              <div className="flex items-center gap-1.5 text-[#F0B232] text-xs font-bold">
-                <Crown className="w-4 h-4" />
-                <span>Monologue King</span>
-              </div>
-              <p className="text-base font-bold text-white truncate" dir="auto">
-                {longest_streak?.speaker_name || "N/A"}
-              </p>
-              <p className="text-[11px] font-mono text-[#F0B232] font-semibold">
+            <div className="p-5">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-[#7e8694] block">
+                MONOLOGUE KING
+              </span>
+              <span
+                className="text-xl font-bold text-white font-display mt-1 block truncate"
+                dir="auto"
+              >
+                {longest_streak?.speaker_name || "—"}
+              </span>
+              <span className="font-mono text-[11px] text-[#f59e0b] mt-0.5 block">
                 {formatDurationHuman(longest_streak?.streak_seconds || 0)} unbroken
-              </p>
+              </span>
             </div>
 
-            {/* Fact Check Score */}
-            <div className="p-3.5 rounded-xl bg-[#1e1f22] border border-[#23A55A]/30 space-y-1">
-              <div className="flex items-center gap-1.5 text-[#23A55A] text-xs font-bold">
-                <ShieldCheck className="w-4 h-4" />
-                <span>Truth Meter</span>
-              </div>
-              <p className="text-base font-bold text-white">
-                {verifiedCount} Verified
-              </p>
-              <p className="text-[11px] font-mono text-[#23A55A] font-semibold">
-                {disputedCount} Disputed claims
-              </p>
+            <div className="p-5">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-[#7e8694] block">
+                TRUTH RECORD
+              </span>
+              <span className="text-2xl font-bold text-white font-display mt-1 block">
+                {verifiedCount} / {verifiedCount + disputedCount}
+              </span>
+              <span className="font-mono text-[11px] text-[#10b981] mt-0.5 block">
+                {verifiedCount} verified · {disputedCount} refuted
+              </span>
             </div>
 
-            {/* Top Topic */}
-            <div className="p-3.5 rounded-xl bg-[#1e1f22] border border-cyan-500/30 space-y-1">
-              <div className="flex items-center gap-1.5 text-cyan-400 text-xs font-bold">
-                <PieChart className="w-4 h-4" />
-                <span>Dominant Topic</span>
-              </div>
-              <p className="text-base font-bold text-white truncate">
+            <div className="p-5">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-[#7e8694] block">
+                DOMINANT TOPIC
+              </span>
+              <span className="text-xl font-bold text-white font-display mt-1 block truncate">
                 {topTopicName}
-              </p>
-              <p className="text-[11px] font-mono text-cyan-400 font-semibold">
-                {topTopic ? `${topTopic[1]} mentions` : "Diverse"}
-              </p>
-            </div>
-
-            {/* Call Vibe */}
-            <div className="p-3.5 rounded-xl bg-[#1e1f22] border border-pink-500/30 space-y-1">
-              <div className="flex items-center gap-1.5 text-pink-400 text-xs font-bold">
-                <Smile className="w-4 h-4" />
-                <span>Call Vibe</span>
-              </div>
-              <p className="text-base font-bold text-white">
-                {total_angry_episodes === 0 ? ((analytics.total_banter_count || 0) > 0 ? "Friendly Banter 😂" : "Civilized 🕊️") : "Spicy 🌶️"}
-              </p>
-              <p className="text-[11px] font-mono text-pink-300 font-semibold truncate">
-                {total_angry_episodes === 0 ? ((analytics.total_banter_count || 0) > 0 ? `${analytics.total_banter_count} roasts (0 anger)` : "0 anger spikes") : `${total_angry_episodes} heated receipts`}
-              </p>
+              </span>
+              <span className="font-mono text-[11px] text-[#9aa2b1] mt-0.5 block">
+                {total_angry_episodes === 0
+                  ? "0 anger spikes"
+                  : `${total_angry_episodes} heated moment(s)`}
+              </span>
             </div>
           </div>
 
-          {/* Prestigious Awards Grid (2 Columns on Desktop) */}
-          {(isObserverEligible || isSpicyEligible || isDiplomatEligible || isBanterEligible) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* The Silent Observer Award */}
-              {isObserverEligible && silentObserver && (
-                <div className="p-3 rounded-xl bg-[#1e1f22] border border-[#5865F2]/30 flex items-center justify-between text-xs shadow-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 rounded-lg bg-[#5865F2]/20 text-[#5865F2] font-bold text-sm shrink-0">🤫</div>
-                    <div className="min-w-0">
-                      <div className="text-[10px] uppercase font-bold text-[#5865F2] tracking-wider">The Silent Observer</div>
-                      <div className="font-bold text-white truncate" dir="auto">{silentObserver.speaker_name || "Speaker"}</div>
-                    </div>
-                  </div>
-                  <div className="text-right font-mono text-[#5865F2] shrink-0 ml-2">
-                    <div className="font-bold text-xs">{formatDurationHuman(silentObserver.talk_seconds)}</div>
-                    <div className="text-[10px] text-[#949BA4]">
-                      ({total_talk_seconds > 0 ? ((silentObserver.talk_seconds / total_talk_seconds) * 100).toFixed(0) : 0}% airtime)
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* The Most Unfiltered Award */}
-              {isSpicyEligible && topSpicy && (
-                <div className="p-3 rounded-xl bg-[#1e1f22] border border-[#F23F43]/30 flex items-center justify-between text-xs shadow-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 rounded-lg bg-[#F23F43]/20 text-[#F23F43] font-bold text-sm shrink-0">🌶️</div>
-                    <div className="min-w-0">
-                      <div className="text-[10px] uppercase font-bold text-[#F23F43] tracking-wider">The Most Unfiltered</div>
-                      <div className="font-bold text-white truncate" dir="auto">{topSpicy.speaker_name}</div>
-                    </div>
-                  </div>
-                  <div className="text-right font-mono text-[#F23F43] shrink-0 ml-2">
-                    <div className="font-bold text-xs">{topSpicy.vulgarity_count} raw tokens</div>
-                    <div className="text-[10px] text-[#949BA4]">uncensored banter</div>
-                  </div>
-                </div>
-              )}
-
-              {/* The Diplomat Award */}
+          {/* Titles & Awards */}
+          <div className="p-6 space-y-3">
+            <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#7e8694]">
+              EARNED TITLES
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[#1c2029] border border-[#1c2029]">
               {isDiplomatEligible && topDiplomat && (
-                <div className="p-3 rounded-xl bg-[#1e1f22] border border-[#23A55A]/30 flex items-center justify-between text-xs shadow-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 rounded-lg bg-[#23A55A]/20 text-[#23A55A] font-bold text-sm shrink-0">🕊️</div>
-                    <div className="min-w-0">
-                      <div className="text-[10px] uppercase font-bold text-[#23A55A] tracking-wider">The Diplomat</div>
-                      <div className="font-bold text-white truncate" dir="auto">{topDiplomat.speaker_name}</div>
-                    </div>
+                <div className="p-4 bg-[#090a0d] flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-[#10b981] block">
+                      THE DIPLOMAT
+                    </span>
+                    <span className="text-sm font-bold text-white" dir="auto">
+                      {topDiplomat.speaker_name}
+                    </span>
                   </div>
-                  <div className="text-right font-mono text-[#23A55A] shrink-0 ml-2">
-                    <div className="font-bold text-xs">{formatDurationHuman(topDiplomat.talk_seconds)}</div>
-                    <div className="text-[10px] text-[#949BA4]">100% peaceful</div>
-                  </div>
+                  <span className="font-mono text-xs text-[#7e8694]">
+                    {formatDurationHuman(topDiplomat.talk_seconds)} · 0 friction
+                  </span>
                 </div>
               )}
 
-              {/* The Roast Master Award */}
+              {isObserverEligible && silentObserver && (
+                <div className="p-4 bg-[#090a0d] flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-[#3b82f6] block">
+                      SILENT OBSERVER
+                    </span>
+                    <span className="text-sm font-bold text-white" dir="auto">
+                      {silentObserver.speaker_name}
+                    </span>
+                  </div>
+                  <span className="font-mono text-xs text-[#7e8694]">
+                    {formatDurationHuman(silentObserver.talk_seconds)} airtime
+                  </span>
+                </div>
+              )}
+
+              {isSpicyEligible && topSpicy && (
+                <div className="p-4 bg-[#090a0d] flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-[#ef4444] block">
+                      MOST UNFILTERED
+                    </span>
+                    <span className="text-sm font-bold text-white" dir="auto">
+                      {topSpicy.speaker_name}
+                    </span>
+                  </div>
+                  <span className="font-mono text-xs text-[#7e8694]">
+                    {topSpicy.vulgarity_count} raw tokens
+                  </span>
+                </div>
+              )}
+
               {isBanterEligible && topBanter && (
-                <div className="p-3 rounded-xl bg-[#1e1f22] border border-purple-500/30 flex items-center justify-between text-xs shadow-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400 font-bold text-sm shrink-0">🎭</div>
-                    <div className="min-w-0">
-                      <div className="text-[10px] uppercase font-bold text-purple-400 tracking-wider">The Roast Master</div>
-                      <div className="font-bold text-white truncate" dir="auto">{topBanter.speaker_name}</div>
-                    </div>
+                <div className="p-4 bg-[#090a0d] flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-[#f59e0b] block">
+                      ROAST MASTER
+                    </span>
+                    <span className="text-sm font-bold text-white" dir="auto">
+                      {topBanter.speaker_name}
+                    </span>
                   </div>
-                  <div className="text-right font-mono text-purple-400 shrink-0 ml-2">
-                    <div className="font-bold text-xs">{topBanter.banter_count} {topBanter.banter_count === 1 ? "roast turn" : "roast turns"}</div>
-                    <div className="text-[10px] text-[#949BA4]">friendly teasing</div>
-                  </div>
+                  <span className="font-mono text-xs text-[#7e8694]">
+                    {topBanter.banter_count} roasts
+                  </span>
                 </div>
               )}
             </div>
-          )}
+          </div>
 
-          {/* Talk Time Breakdown Bar */}
+          {/* Talk Share Breakdown */}
           {speakerList.length > 0 && (
-            <div className="p-3.5 rounded-xl bg-[#1e1f22] border border-[#383a40] space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-[#DBDEE1]">Talk Time Share</span>
-                <span className="text-[11px] text-[#949BA4] font-mono">
-                  {speakerList.length} participant{speakerList.length === 1 ? "" : "s"}
-                </span>
+            <div className="p-6 space-y-3">
+              <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#7e8694]">
+                SPEAKER SHARE
               </div>
-              <div className="space-y-1.5">
-                {speakerList.slice(0, 3).map((spk, idx) => {
-                  const pct = total_talk_seconds > 0 ? (spk.talk_seconds / total_talk_seconds) * 100 : 0;
+              <div className="space-y-2.5">
+                {speakerList.map((spk) => {
+                  const pct =
+                    total_talk_seconds > 0
+                      ? (spk.talk_seconds / total_talk_seconds) * 100
+                      : 0;
                   return (
-                    <div key={idx} className="space-y-0.5 text-xs">
-                      <div className="flex justify-between text-[11px]">
-                        <span className="font-semibold text-[#F2F3F5]" dir="auto">{spk.speaker_name}</span>
-                        <span className="font-mono text-[#949BA4]">{formatDurationHuman(spk.talk_seconds)} ({pct.toFixed(0)}%)</span>
+                    <div key={spk.speaker_name} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-semibold text-white" dir="auto">
+                          {spk.speaker_name}
+                        </span>
+                        <span className="font-mono text-[#7e8694]">
+                          {formatDurationHuman(spk.talk_seconds)} (
+                          {pct.toFixed(0)}%)
+                        </span>
                       </div>
-                      <div className="h-1.5 w-full bg-[#313338] rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-[#151821]">
                         <div
-                          className="h-full bg-gradient-to-r from-[#5865F2] to-pink-500 rounded-full"
+                          className="h-full bg-[#3b82f6]"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -311,23 +330,32 @@ export function CallWrappedModal({
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-[#383a40] bg-[#1e1f22] flex items-center justify-between gap-3">
-          <button
-            onClick={handleCopy}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold text-xs shadow-lg shadow-[#5865F2]/25 transition-all cursor-pointer"
-          >
-            {copied ? <Check className="w-4 h-4 text-[#23A55A]" /> : <Copy className="w-4 h-4" />}
-            <span>{copied ? "Copied Discord Markdown!" : "Copy Summary to Discord"}</span>
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-xl bg-[#313338] hover:bg-[#383a40] text-[#DBDEE1] text-xs font-semibold transition-colors"
-          >
-            Done
-          </button>
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-[#1c2029] bg-[#0e1015] flex items-center justify-between">
+          <span className="font-mono text-[11px] text-[#7e8694]">
+            ASSEMBLYAI + GROQ LPU + TAVILY
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-mono text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>COPIED TO CLIPBOARD</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>COPY DISCORD SUMMARY</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+export default CallWrappedModal;

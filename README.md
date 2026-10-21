@@ -1,255 +1,117 @@
-<div align="center">
+# CallWrapped
 
-# ⚖️ CallWrapped
-### A Discord Voice Referee & "Call Wrapped" Analytics Bot
-**Built for the [AssemblyAI Voice Agent Hackathon](https://lablab.ai/ai-hackathons/assemblyai-voice-agent-hackathon) (September 2026)**
+Discord voice referee and post-call conversational intelligence.
 
-[![AssemblyAI Universal-3.5 Pro](https://img.shields.io/badge/AssemblyAI-Universal--3.5_Pro-0052FF?style=flat&logo=assemblyai&logoColor=white)](https://www.assemblyai.com/)
-[![Groq LPU](https://img.shields.io/badge/Groq-Fast_Inference-F55036?style=flat&logo=groq&logoColor=white)](https://groq.com/)
-[![Tavily Search](https://img.shields.io/badge/Tavily-Live_Search-4CAF50?style=flat)](https://tavily.com/)
-[![Edge TTS](https://img.shields.io/badge/Edge--TTS-Streaming_Voice-0078D7?style=flat&logo=microsoft&logoColor=white)](https://github.com/rany2/edge-tts)
-[![Discord.py DAVE](https://img.shields.io/badge/Discord.py-Voice_DAVE_E2EE-5865F2?style=flat&logo=discord&logoColor=white)](https://discordpy.readthedocs.io/)
-[![FastAPI + Next.js](https://img.shields.io/badge/Fullstack-FastAPI_+_Next.js_14-000000?style=flat&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+CallWrapped listens to multi-party Discord voice calls, detects conflicting factual claims between participants in real time, and resolves them on demand. The bot operates on a strict consent model: it never interrupts a call uninvited. When a factual disagreement occurs, it offers to verify the claim and only delivers a spoken resolution after explicit verbal confirmation.
 
 ---
 
-</div>
+## Core Mechanics
+
+### Two-Stage Verification Protocol
+
+1. **Passive Transcription**: Audio packets are decrypted using Discord DAVE E2EE and transcribed per speaker using AssemblyAI Universal-3.5 Pro with bilingual code-switching support (English and Arabic).
+2. **Dispute Detection & Speculative Pre-fetch**: When two speakers make conflicting claims, Groq LPU extracts the disputed entities and numerical values. In parallel, Tavily queries authoritative web sources and Edge-TTS pre-warms the audio connection.
+3. **Consensual Voice Offer**: The bot asks a short verbal question in the channel:
+   - Arabic: «أشوفها؟»
+   - English: "Do I check?"
+4. **Verbal Confirmation**: A participant confirms verbally:
+   - Arabic: «شوفها» / «تأكد»
+   - English: "check it" / "verify"
+   - Text command: `!check`
+5. **Instant Spoken Resolution**: Because search results and TTS were pre-fetched in step 2, the verified answer with citations is spoken in under 1.5 seconds. If no one confirms within 30 seconds, the offer quietly expires.
+6. **Barge-in Protection**: If a participant speaks while the referee is talking, playback cuts off immediately.
 
 ---
 
-## 📖 Table of Contents
-1. [What is CallWrapped?](#-what-is-callwrapped)
-2. [How It Works](#-how-it-works)
-3. [System Architecture](#-system-architecture)
-4. [Live Judge Dashboard](#-live-judge-dashboard)
-5. [Discord Commands](#-discord-commands)
-6. [The Golden Demo (Step-by-Step)](#-the-golden-demo-step-by-step)
-7. [Privacy & Ephemeral Memory](#-privacy--ephemeral-memory)
-8. [Future Roadmap](#-future-roadmap)
-9. [Quick Start & Setup](#-quick-start--setup)
-10. [License](#-license)
+## Architecture
+
+- **Audio Ingestion**: Discord DAVE MLS end-to-end encryption adapter (`bot/audio/dave_adapter.py`) with per-speaker 16kHz PCM ring buffers and Voice Activity Detection.
+- **Speech-to-Text**: AssemblyAI Universal-3.5 Pro with dynamic keyterm injection and colloquial normalization.
+- **Reasoning**: Groq LPU with multi-key rotation and token-budget balancing for claim extraction and topic categorization.
+- **Verification**: Tavily Search targeting official documentation, authoritative domains, and manufacturer specifications.
+- **Voice Output**: Microsoft Edge Neural TTS (Arabic: `ar-EG-Shakir`, English: `en-US-Christopher`).
+- **Dashboard**: FastAPI WebSocket hub paired with a Next.js 14 frontend running on port 8000.
 
 ---
 
-## 💡 What is CallWrapped?
+## Discord Commands
 
-In voice calls with friends (multiplayer gaming lobbies, study groups, tech debates, or podcasts), people constantly make contradictory factual claims with absolute confidence:
-- *"Did the RTX 5070 launch with 12GB or 16GB VRAM?"*
-- *"Who won the 2022 World Cup Golden Boot?"*
-- *"Is that company acquisition real or a rumor?"*
-
-Traditional voice assistants (Siri, Alexa) don't work in group calls because nobody pauses a heated debate to say *"Hey Siri"*. On the flip side, voice bots that barge in uninvited to interrupt and correct people create awkward friction and get kicked from the server immediately.
-
-**CallWrapped solves this by acting as a polite, on-demand voice referee:**
-1. **Silent Listening:** The bot transcribes multi-speaker audio in real time using **AssemblyAI Universal-3.5 Pro**.
-2. **Background Fact-Checking:** When participants state conflicting facts, the bot extracts the claims using **Groq LPU**, queries **Tavily** for authoritative sources, and sends a discreet, silent offer in Discord text and on the live dashboard:  
-   *"🤖 I noticed a disagreement on this fact. Want me to check? Say 'check it' or type `!check`."*
-3. **Consensual Voice Verdict:** The bot **never interrupts voice uninvited**. It only delivers a spoken resolution via **Edge-TTS** if someone explicitly confirms.
-4. **Spotify-Style "Call Wrapped":** When the call wraps up (`!recap`), the bot generates a shareable visual summary showing who talked the most, topics discussed, and fun community badges like *The Diplomat* (spoke the most without arguing) or *The Monopolist* (hogged the microphone).
-
----
-
-## 🛠️ How It Works
-
-CallWrapped operates through a polite **Two-Stage Check**:
-
-```mermaid
-flowchart TD
-    subgraph MultiPartyCall ["1. Multi-Party Voice Call"]
-        L["🎧 Listening to Voice Channel<br/><i>(AssemblyAI Universal-3.5 Pro)</i>"]
-    end
-
-    subgraph DisputeAndPrefetch ["2. Dispute Detection & Parallel Pre-fetch"]
-        D["⚡ Conflicting Claims Detected<br/><i>(Groq Qwen LPU Extraction)</i>"]
-        P["🔍 Background Search Pre-fetch & Warm TTS<br/><i>(Tavily API + Edge-TTS)</i>"]
-        O["🤝 Spoken Voice Offer:<br/><b>«أشوفها؟»</b> <i>(Arabic)</i> or <b>'Do I check?'</b> <i>(English)</i>"]
-    end
-
-    subgraph Resolution ["3. Spoken Resolution"]
-        V["🔊 Verified Factual Resolution<br/><i>(Spoken fact with official source + polite hedge)</i>"]
-    end
-
-    L -->|"Two speakers disagree on a fact"| D
-    D --> P
-    D --> O
-    O -->|"User confirms: «شوفها» / 'check it' / !check"| V
-    O -->|"30s timeout without confirmation"| L
-    V -->|"Playback finished or Barge-in interrupt"| L
-```
-
-### 🗣️ Voice Dispute Guide: How to Use «شوفها» and "check it"
-
-CallWrapped is designed to never talk over people or make group calls awkward. When two participants state conflicting facts in voice, it initiates a polite two-stage verification:
-
-1. **The Disagreement Trigger:**
-   Two speakers in voice state conflicting facts (for example, arguing whether the RTX 5070 has 12GB or 16GB, or when a historical event occurred).
-
-2. **The Bot Asks Out Loud:**
-   The bot speaks a quick question in voice:
-   - **Arabic:** **«أشوفها؟»**
-   - **English:** **"Do I check?"**
-   - *(It also displays an offer card on the Live Dashboard and a message in the Discord text channel).*
-
-3. **Background Pre-Fetch:**
-   While the bot asks the question, it is **already searching live web sources in the background** via Tavily and warming the voice connection.
-
-4. **Your Voice Confirmation:**
-   To hear the factual resolution, anyone in the call can confirm naturally in voice:
-   - **Arabic:** Say **«شوفها»** (also supports **«أشوفها»**, **«شوف»**, **«تأكد»**).
-   - **English:** Say **"check it"** (also supports **"check"**, **"do it"**, **"verify"**).
-   - **Text:** Type `!check` in the Discord channel.
-
-5. **Instant Spoken Resolution:**
-   Because search evidence was already pre-fetched in step 3, saying **«شوفها»** speaks the verified fact with official citations in under 1.5 seconds. If no one confirms within 30 seconds, the offer quietly expires with zero noise.
-
-6. **Barge-in Protection:**
-   If someone starts talking while the bot is answering, the bot cuts off immediately so it never interrupts users.
+| Command | Description |
+| :--- | :--- |
+| `!join` | Connects the bot to your current voice channel. |
+| `!start` | Enables fact-checking mode and posts session transparency notice. |
+| `!check` | Confirms a pending dispute offer and speaks the verdict. |
+| `!arbitrate <claim>` | Manually requests verification for a specific claim. |
+| `!recap` | Displays the session talk-time breakdown and badges. |
+| `!stats` | Displays participant speech metrics. |
+| `!status` | Shows connection state, dispute count, and latency metrics. |
+| `!dashboard` | Prints the link to the local web dashboard. |
+| `!privacy` | Displays data retention and ephemeral memory policies. |
+| `!clear` | Resets session memory and claim history. |
+| `!leave` | Disconnects from voice and purges all session state. |
 
 ---
 
-## 🏗️ System Architecture
+## Privacy Policy
 
-CallWrapped is built with an event-driven Python backend and a real-time Next.js frontend:
-
-1. **Audio Ingestion (Discord Voice):**
-   - Ingests real-time voice packets with end-to-end MLS decryption via a native Discord DAVE adapter (`bot/audio/dave_adapter.py`).
-   - Demuxes individual speaker audio into lock-protected 16kHz PCM ring buffers with energy-based Voice Activity Detection (VAD).
-
-2. **Speech Recognition (AssemblyAI Universal-3.5 Pro):**
-   - Processes finalized speech turns through AssemblyAI's batch transcription API.
-   - Tuned to handle code-switching between Arabic and English gaming/tech terms.
-
-3. **Split Epistemic Reasoning (Groq LPU):**
-   - **Fast Claim Path:** Sub-second claim extraction prompt identifying disputed entities and numerical values.
-   - **Batched Analytics Path:** 75-second rolling window aggregating conversation turns to calculate 15-category topic talk shares and speaker streaks.
-   - **Key Rotation Pool:** Automatically rotates across 8 Groq API keys with token-budget balancing, instant 429 rotation, and 5xx failover to ensure zero downtime during active sessions.
-
-4. **Fact Verification & Voice Output:**
-   - **Tavily Search:** Fetches real-world domain citations and filters out private personal claims.
-   - **Microsoft Edge-TTS:** Pre-warmed streaming connection delivering a verified fact followed by a polite hedge.
-
-5. **Live Dashboard Hub (FastAPI + Next.js 14):**
-   - FastAPI WebSocket hub broadcasts dispute cards, latency telemetry, and speaker statistics to a Next.js 14 web interface.
+- **In-Memory Only**: Audio and transcripts are processed in volatile memory. Disconnecting the bot (`!leave`) or clearing the session (`!clear`) immediately purges all conversation context.
+- **Private Entity Veto**: Claims regarding private individuals (such as personal salaries, personal belongings, or private rumors) are rejected by the classifier and never searched on the web.
 
 ---
 
-## 🖥️ Live Judge Dashboard
-
-Served locally at `http://localhost:8000` via FastAPI and Next.js 14:
-
-- **Balanced Two-Column Interface:**
-  - **Left Column:** Live Referee card showing active disputes stacked above the Real-Time Discord Voice Transcript Stream.
-  - **Right Column:** Conversational analytics, 15-category topic distribution, and session stats.
-- **Compact Pipeline Telemetry (~740px):** Displays the 6 processing stages (`AssemblyAI STT`, `Claim Extraction`, `Dispute FSM`, `Tavily Search`, `Two-Stage Gate`, `Edge-TTS Audio`) with live latency badges.
-- **Audio Evidence Playback:** Interactive audio buttons on dispute cards and the **Anger & Frustration Moments** widget allowing users and judges to stream the recorded WAV audio evidence directly in the browser via `/api/audio-evidence/{filename}`.
-- **CallWrapped Showcase Modal:** Complete summary with speaker talk share percentages, topics discussed, and cultural banter badges:
-  - 🕊️ **The Diplomat:** Spoke the most without any anger, vulgarity, or roasts.
-  - 🤫 **The Silent Observer:** Active listener with minimal talk share and zero interruptions.
-  - 🔥 **The Instigator:** Speaker involved in the highest number of disputes.
-  - 🔍 **The Fact Checker:** Speaker with the most verified true claims.
-  - 🎙️ **The Monopolist:** Highest talk-time share of the call.
-  - ⚡ **The Speed Demon:** Quickest response turnaround.
-
----
-
-## 🎮 Discord Commands
-
-| Command | Arguments | Description |
-| :--- | :--- | :--- |
-| `!join` | None | Connects the bot to your current voice channel. |
-| `!start` | None | Activates fact-checking mode and posts the session transparency notice. |
-| `!check` | None | Confirms a pending dispute offer and triggers spoken verdict in voice. |
-| `!arbitrate` | `<claim>` | Manually requests verification for a specific factual claim. |
-| `!recap` | None | Generates the session's Spotify-style CallWrapped card and badges. |
-| `!stats` | None | Displays current speaker talk shares in chat. |
-| `!status` | None | Reports active session phase, dispute counts, and latency averages. |
-| `!dashboard` | None | Displays the link to the local Next.js Live Judge Dashboard. |
-| `!privacy` | None | Displays data retention details and ephemeral memory policies. |
-| `!clear` | None | Resets session memory and claim history. |
-| `!leave` | None | Disconnects the bot from voice and purges active session context. |
-
----
-
-## 🎬 The Golden Demo (Step-by-Step)
-
-1. Join a Discord voice channel and type `!join`.
-2. Activate fact-checking mode by typing `!start`.
-3. Open the Live Dashboard at `http://localhost:8000`.
-4. Say the conflicting claims in voice (or click **"Replay RTX 5070 Live Demo Session"** on the dashboard):
-   - **Speaker 1:** *"The RTX 5070 launched with 16GB VRAM from Nvidia."*
-   - **Speaker 2:** *"No way, it only launched with 12GB GDDR7, there is no 16GB version."*
-5. **Stage 1 (Spoken & Visual Offer):** The bot asks in voice: *"Do I check?"* (or *«أشوفها؟»* for Arabic conversations) while displaying the offer card on the dashboard and in Discord text.
-6. **Stage 2 (Voice Confirmation):** Say *"check it"* (or *«شوفها»*) in voice (or type `!check` in chat).
-7. **Spoken Verdict:** The bot delivers the verified answer with official source citations, while the dashboard highlights the dispute card with verified badges.
-8. Type `!recap` to see your session's CallWrapped recap card and awards.
-
----
-
-## 🔒 Privacy & Ephemeral Memory
-
-- **Session-Only Memory:** CallWrapped does not store long-term conversational profiles. When `!leave` or `!clear` is invoked, all conversation memory, speaker statistics, and pending claims are wiped.
-- **Private Entity Refusal:** The bot automatically ignores personal claims about private individuals (*"my friend bought a new car"*) to protect user privacy and avoid hallucinated web searches.
-- **Transparency Notice:** When `!start` is called, the bot posts a clear operating policy in chat so everyone in the channel knows how it operates.
-
----
-
-## 🗺️ Future Roadmap
-
-- [ ] **Deeper Discord Profile & Asset Integration:** Connect directly with Discord's API to pull native user avatars, server badges, custom icons, and channel banners directly into CallWrapped recap cards and the live dashboard for a tailored community experience.
-- [ ] **Sovereign Open-Weight Model:** Train and fine-tune an open-source model (e.g., Llama-3-8B or Qwen-2.5 on multi-speaker bilingual dialogue) running locally via vLLM to eliminate dependency on third-party cloud APIs like Groq.
-- [ ] **Full-Duplex Streaming STT:** Migrate from batch audio polling to full WebSocket streaming once dialect accuracy on rapid multi-party conversational overlap matches batch performance.
-- [ ] **Community Hosted Bot:** Package as an authorized Discord application so community server moderators can add it with a single invite link.
-
----
-
-## ⚡ Quick Start & Setup
+## Setup
 
 ### Prerequisites
-- **Python:** 3.12+ (tested on Windows 11 & Linux)
-- **Node.js:** 18+ (for Next.js frontend)
-- **FFmpeg:** Required for voice playback (`winget install Gyan.FFmpeg` on Windows, or `apt install ffmpeg` on Linux)
-- **API Keys Required:**
-  - `ASSEMBLYAI_API_KEY`: Speech-to-text processing.
-  - `GROQ_API_KEY`: Fast claim extraction and topic classification.
-  - `TAVILY_API_KEY`: Live web search verification.
-  - `DISCORD_BOT_TOKEN`: Discord application bot token with voice and message intents.
+
+- Python 3.12+
+- Node.js 18+
+- FFmpeg installed and available on PATH
 
 ### 1. Installation
+
 ```bash
 git clone https://github.com/Kirolos-Maurice-William/CallWrapped.git
 cd CallWrapped
 
-# Python setup
-python -m venv backend/venv
-backend/venv/Scripts/activate     # Windows
-# source backend/venv/bin/activate  # Linux
+# Python dependencies
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+
+# Frontend build
+cd frontend
+npm install
+npm run build
+cd ..
 ```
 
 ### 2. Configuration
-```bash
-cp .env.example .env
-```
-Populate your API keys in `.env` (`DISCORD_BOT_TOKEN`, `ASSEMBLYAI_API_KEY`, `GROQ_API_KEY`, `TAVILY_API_KEY`).
 
-### 3. Build Frontend Dashboard
-```bash
-cd frontend && npm install && npm run build && cd ..
+Create a `.env` file in the root directory:
+
+```env
+DISCORD_BOT_TOKEN=your_discord_token
+ASSEMBLYAI_API_KEY=your_assemblyai_key
+GROQ_API_KEY=your_groq_key
+TAVILY_API_KEY=your_tavily_key
 ```
 
-### 4. Launch Services
+### 3. Running
+
 ```bash
+# Windows
 start_all.bat
+
+# Or run services individually:
+# Terminal 1: python -m backend.app.main
+# Terminal 2: python -m bot.main
 ```
-*(Or launch `start_backend.bat`, `start_bot.bat`, and `start_frontend.bat` in separate terminals).*
+
+The web dashboard is served at `http://localhost:8000`.
 
 ---
 
-## 📄 License
+## License
 
-This project is licensed under the [MIT License](LICENSE).
-
-<div align="center">
-<b>CallWrapped: Respectful Factual Grounding & Conversational Intelligence for Voice Calls.</b>
-</div>
+MIT License. See [LICENSE](LICENSE) for details.

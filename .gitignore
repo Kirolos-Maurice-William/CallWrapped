@@ -1,7 +1,14 @@
 # Environment variables (NEVER commit secrets!)
 .env
+.env.*
 backend/.env
 frontend/.env*.local
+
+# Tests and Scratch Tests
+tests/
+test_*.py
+*_test.py
+.pytest_cache/
 
 # Python
 .venv/
@@ -11,7 +18,6 @@ backend/call_intelligence.db
 __pycache__/
 *.py[cod]
 *$py.class
-.pytest_cache/
 
 # Node & Next.js
 frontend/node_modules/
@@ -46,7 +52,3 @@ assemblyai_capability_report.json
 # Editor / Tool Metadata
 .qwen/
 opencode.json
-
-
-
-
